@@ -2,6 +2,8 @@
 /MesteriMC.vcxproj.filters
 /MesteriMC.vcxproj.user
 /x64
+
+.vscode
+build
 vendor
 CMakeLists.txt
-build
