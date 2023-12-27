@@ -1,5 +1,7 @@
 #include "mat4.h"
 
+#include <stdio.h>
+
 mat4 mat4_create(float szam)
 {
     mat4 mat;
@@ -38,11 +40,14 @@ mat4 mat4_sum(mat4 egy, mat4 katto)
 }
 mat4 mat4_multiply(mat4 egy, mat4 katto)
 {
-    mat4 mat;
+    mat4 mat=mat4_create(0);
+    
     for (int i = 0; i < 4; i++) //row
         for (int j = 0; j < 4; j++) //column
             for (int k = 0; k < 4; k++) //index
-                mat.data[j * 4 + i] += egy.data[j * 4 + k] * katto.data[k * 4 + i];
+                mat.data[j * 4 + i] += egy.data[k * 4 + i] * katto.data[j * 4 + k];
+
+    return mat;
 }
 
 mat4 mat4_transpose(mat4 mat)
@@ -83,4 +88,11 @@ mat4 mat4_perspective(float fov, float aspectXY, float near, float far)
 mat4 mat4_ortho(float left, float right, float bottom, float top, float near, float far)
 {
     //TODO
+}
+
+void mat4_print(mat4* mat)
+{
+    for (int i = 0; i < 4; i++) {
+        printf("%.2f %.2f %.2f %.2f\n", mat->data[i], mat->data[4 + i], mat->data[8 + i], mat->data[12 + i]);
+    }
 }

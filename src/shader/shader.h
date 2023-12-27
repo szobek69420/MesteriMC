@@ -5,8 +5,8 @@
 
 #include <glad/glad.h>
 
-#include "glm2/vec3.h"
-#include "glm2/mat4.h"
+#include "../glm2/vec3.h"
+#include "../glm2/mat4.h"
 
 typedef struct {
 	GLuint id;

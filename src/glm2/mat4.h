@@ -30,4 +30,6 @@ mat4 mat4_lookAt(vec3 pos, vec3 direction, vec3 up);
 mat4 mat4_perspective(float fov, float aspectXY, float near, float far);
 mat4 mat4_ortho(float left, float right, float bottom, float top, float near, float far);
 
+void mat4_print(mat4* mat);
+
 #endif

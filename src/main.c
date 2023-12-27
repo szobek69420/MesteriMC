@@ -1,15 +1,20 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <direct.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "shader/shader.h"
 
 GLFWwindow* window_init(const char* name, int width, int height);
 
 int main() {
-    
+
     GLFWwindow* window = window_init("amogus", 600, 600);
+
 
     shader shader = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
     shader_delete(&shader);
