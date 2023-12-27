@@ -5,11 +5,13 @@
 
 typedef struct {
 	float data[16];
-}mat4;
+} mat4; //column-major order
 
 mat4 mat4_create(float szam);
 mat4 mat4_create2(float* data);
 
+float mat4_get(mat4* mat, int row, int col, float value);
+void  mat4_set(mat4* mat, int row, int col, float value);
 
 mat4 mat4_sum(mat4 egy, mat4 katto);
 mat4 mat4_multiply(mat4 egy, mat4 katto);
@@ -19,9 +21,7 @@ mat4 mat4_inverse(mat4 mat);
 
 
 mat4 mat4_scale(mat4 mat, vec3 scale);
-
 mat4 mat4_rotate(mat4 mat, vec3 axis, float angle);
-
 mat4 mat4_translate(mat4 mat, vec3 pos);
 
 

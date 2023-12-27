@@ -7,7 +7,7 @@
 #include <string.h>
 #include <glad/glad.h>
 
-shader importShader(const char* pathToVertexShader, const char* pathToFragmentShader, const char* pathToGeometryShader)
+shader shader_import(const char* pathToVertexShader, const char* pathToFragmentShader, const char* pathToGeometryShader)
 {
     shader program;
     program.id = 0;
@@ -41,7 +41,7 @@ shader importShader(const char* pathToVertexShader, const char* pathToFragmentSh
 
 
     vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &sauce, NULL);
+    glShaderSource(vertexShader, 1, (const char*)&sauce, NULL);
     glCompileShader(vertexShader);
 
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
@@ -73,7 +73,7 @@ shader importShader(const char* pathToVertexShader, const char* pathToFragmentSh
 
 
         geometryShader = glCreateShader(GL_GEOMETRY_SHADER);
-        glShaderSource(geometryShader, 1, &sauce, NULL);
+        glShaderSource(geometryShader, 1, (const char*)&sauce, NULL);
         glCompileShader(geometryShader);
 
         glGetShaderiv(geometryShader, GL_COMPILE_STATUS, &success);
@@ -106,7 +106,7 @@ shader importShader(const char* pathToVertexShader, const char* pathToFragmentSh
 
 
     fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &sauce, NULL);
+    glShaderSource(fragmentShader, 1, (const char*)&sauce, NULL);
     glCompileShader(fragmentShader);
 
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
@@ -145,14 +145,38 @@ shader importShader(const char* pathToVertexShader, const char* pathToFragmentSh
     program.isValid = 69;
     return program;
 }
-
-void deleteShader(shader* shaderToDelete)
+void shader_delete(shader* shaderToDelete)
 {
     glDeleteShader(shaderToDelete->id);
 }
 
-void setShaderInt(GLuint shaderID, const char* uniformName, int uniform)
+void shader_use(GLuint shaderID)
+{
+    glUseProgram(shaderID);
+}
+void shader_setInt(GLuint shaderID, const char* uniformName, int uniform)
 {
     glUseProgram(shaderID);
     glUniform1i(glGetUniformLocation(shaderID, uniformName), uniform);
+}
+void shader_setFloat(GLuint shaderID, const char* uniformName, float uniform)
+{
+    glUseProgram(shaderID);
+    glUniform1f(glGetUniformLocation(shaderID, uniformName), uniform);
+
+}
+void shader_setVec3(GLuint shaderID, const char* uniformName, float x, float y, float z)
+{
+    glUseProgram(shaderID);
+    glUniform3f(glGetUniformLocation(shaderID, uniformName), x, y, z);
+}
+void shader_setVec3v(GLuint shaderID, const char* uniformName, vec3 vec)
+{
+    glUseProgram(shaderID);
+    glUniform3f(glGetUniformLocation(shaderID, uniformName), vec.x, vec.y, vec.z);
+}
+void shader_setMat4(GLuint shaderID, const char* uniformName, mat4 mat)
+{
+    glUseProgram(shaderID);
+    glUniformMatrix4fv(glGetUniformLocation(shaderID, uniformName), 1, GL_FALSE, mat.data);
 }

@@ -3,18 +3,32 @@
 
 #include <stdio.h>
 
-GLFWwindow* initWindow(const char* name, int width, int height);
+#include "shader/shader.h"
+
+GLFWwindow* window_init(const char* name, int width, int height);
 
 int main() {
     
-    GLFWwindow* window = initWindow("amogus", 600, 600);
+    GLFWwindow* window = window_init("amogus", 600, 600);
+
+    shader shader = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
+    shader_delete(&shader);
+
+    while (!glfwWindowShouldClose(window))
+    {
+        glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glfwPollEvents();
+        glfwSwapBuffers(window);
+    }
 
     glfwTerminate();
 
     return 69;
 }
 
-GLFWwindow* initWindow(const char* name, int width, int height)
+GLFWwindow* window_init(const char* name, int width, int height)
 {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
