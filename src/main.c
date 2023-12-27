@@ -3,11 +3,12 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include <direct.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "shader/shader.h"
+
+#include "glm2/mat3.h"
 
 GLFWwindow* window_init(const char* name, int width, int height);
 
