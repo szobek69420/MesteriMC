@@ -1,5 +1,6 @@
 #include "mat4.h"
 #include "mat3.h"
+#include "vec4.h"
 
 #include <stdio.h>
 #include <math.h>
@@ -23,6 +24,52 @@ mat4 mat4_create2(float* data)
     for (int i = 0; i < 16; i++)
         mat.data[i] = data[i];
     return mat;
+}
+
+mat4 mat4_createFromVec(vec4 col0, vec4 col1, vec4 col2, vec4 col3)
+{
+    mat4 vissza;
+
+    vissza.data[0] = col0.x;
+    vissza.data[1] = col0.y;
+    vissza.data[2] = col0.z;
+    vissza.data[3] = col0.w;
+
+    vissza.data[4] = col1.x;
+    vissza.data[5] = col1.y;
+    vissza.data[6] = col1.z;
+    vissza.data[7] = col1.w;
+
+    vissza.data[8] = col2.x;
+    vissza.data[9] = col2.y;
+    vissza.data[10] = col2.z;
+    vissza.data[11] = col2.w;
+
+    vissza.data[12] = col3.x;
+    vissza.data[13] = col3.y;
+    vissza.data[14] = col3.z;
+    vissza.data[15] = col3.w;
+
+    return vissza;
+}
+
+mat4 mat4_createFromMat(mat3 mat)
+{
+    mat4 vissza = mat4_create(1);
+
+    vissza.data[0] = mat.data[0];
+    vissza.data[1] = mat.data[1];
+    vissza.data[2] = mat.data[2];
+
+    vissza.data[4] = mat.data[3];
+    vissza.data[5] = mat.data[4];
+    vissza.data[6] = mat.data[5];
+
+    vissza.data[8] = mat.data[6];
+    vissza.data[9] = mat.data[7];
+    vissza.data[10] = mat.data[8];
+
+    return vissza;
 }
 
 float mat4_get(mat4* mat, int row, int col, float value)
@@ -236,7 +283,14 @@ mat4 mat4_perspective(float fov, float aspectXY, float near, float far)
 }
 mat4 mat4_ortho(float left, float right, float bottom, float top, float near, float far)
 {
-    //TODO
+    //http://www.songho.ca/opengl/gl_projectionmatrix.html
+
+    return mat4_create2((float[]) {
+        2/(right-left),0,0,0,
+        0,2/(top-bottom),0,0,
+        0,0,-2/(far-near),0,
+        -(right+left)/(right-left),-(top+bottom)/(top-bottom),-(far+near)/(far-near),1
+    });
 }
 
 void mat4_print(mat4* mat)

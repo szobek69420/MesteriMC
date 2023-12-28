@@ -2,6 +2,8 @@
 #define MAT4_H
 
 #include "vec3.h"
+#include "vec4.h"
+#include "mat3.h"
 
 typedef struct {
 	float data[16];
@@ -9,6 +11,8 @@ typedef struct {
 
 mat4 mat4_create(float szam);
 mat4 mat4_create2(float* data);
+mat4 mat4_createFromVec(vec4 col0, vec4 col1, vec4 col2, vec4 col3);
+mat4 mat4_createFromMat(mat3);
 
 float mat4_get(mat4* mat, int row, int col, float value);
 void  mat4_set(mat4* mat, int row, int col, float value);

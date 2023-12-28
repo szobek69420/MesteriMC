@@ -15,7 +15,8 @@ vec3 vec3_subtract(vec3, vec3);
 float vec3_dot(vec3, vec3);
 vec3 vec3_cross(vec3, vec3);
 
-float vec3_length(vec3);
+float vec3_sqrMagnitude(vec3);
+float vec3_magnitude(vec3);
 vec3 vec3_normalize(vec3);
 vec3 vec3_scale(vec3, float);
 
