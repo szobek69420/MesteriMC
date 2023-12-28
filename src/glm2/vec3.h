@@ -19,4 +19,6 @@ float vec3_length(vec3);
 vec3 vec3_normalize(vec3);
 vec3 vec3_scale(vec3, float);
 
+void vec3_print(vec3*);
+
 #endif

@@ -10,9 +10,15 @@
 #include "input/input.h"
 #include "shader/shader.h"
 
+#include "glm2/mat4.h"
+#include "glm2/vec3.h"
+
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
 void render();
+
+void init_kuba();
+void draw_kuba();
 
 //glfw callbacks
 void window_size_callback(GLFWwindow* window, int width, int height);
@@ -30,6 +36,8 @@ int main()
     shader shader = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
     shader_delete(&shader);
 
+    init_kuba();
+
     while (!glfwWindowShouldClose(window))
     {
         //update
@@ -40,6 +48,8 @@ int main()
 
         //render
         render();
+
+        draw_kuba();
 
         glfwPollEvents();
         glfwSwapBuffers(window);
@@ -134,4 +144,75 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     event_queue_push((event){ .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
+}
+
+shader program;
+unsigned int vao, vbo;
+void init_kuba()
+{
+    float vertices[] = {
+        1,-1,1,     1,0,0,
+        -1,-1,1,    1,0,0,
+        0,1,0,      1,0,0,
+
+        1,-1,-1,     0.8f,0,0,
+        1,-1,1,    0.8f,0,0,
+        0,1,0,      0.8f,0,0,
+
+        -1,-1,-1,    0.4f,0,0,
+        1,-1,-1,   0.4f,0,0,
+        0,1,0,      0.4f,0,0,
+
+        -1,-1,1,   0.6f,0,0,
+        -1,-1,-1,    0.6f,0,0,
+        0,1,0,      0.6f,0,0,
+
+        -1,-1,1,    0.2f,0,0,
+        1,-1,1,     0.2f,0,0,
+        1,-1,-1,    0.2f,0,0,
+
+        1,-1,-1,    0.2f,0,0,
+        -1,-1,-1,   0.2f,0,0,
+        -1,-1,1,    0.2f,0,0
+    };
+
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3*sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+
+    program = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
+}
+
+void draw_kuba() {
+    glUseProgram(program.id);
+
+    mat4 model = mat4_create(1);
+    model = mat4_rotate(model, vec3_create2(0, 0.4, 1), 50*glfwGetTime());
+    model = mat4_rotate(model, vec3_create2(-3, -2, 1), 70 * glfwGetTime());
+    //model = mat4_translate(model, vec3_create2(0, 0, -0.5f));
+
+    shader_setMat4(program.id, "model", model);
+    //shader_setMat4(program.id, "view", mat4_lookAt(vec3_create2(-6, 5, 10), vec3_create2(6, -5, -10), vec3_create2(0, 1, 0)));
+    shader_setMat4(program.id, "projection", mat4_perspective(40, 1, 0.1, 30));
+
+    shader_setMat4(program.id, "view", mat4_lookAt(vec3_create2(-8, 10, 10), vec3_create2(0.8, -1,-1), vec3_create2(0, 1, 0)));
+    //shader_setMat4(program.id, "projection", mat4_create(1));
+
+    
+    glBindVertexArray(vao);
+    glEnable(GL_DEPTH_TEST);
+    glClearDepth(1);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glDrawArrays(GL_TRIANGLES, 0, 18);
 }
