@@ -4,7 +4,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include "event/event.h"
+#include "../event/event.h"
 
 typedef struct {
     int previous_key_state[GLFW_KEY_LAST];

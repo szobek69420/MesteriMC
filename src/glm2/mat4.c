@@ -2,6 +2,9 @@
 #include "mat3.h"
 
 #include <stdio.h>
+#include <math.h>
+
+#define DEG2RAD 0.01745329252
 
 mat4 mat4_create(float szam)
 {
@@ -160,25 +163,76 @@ mat4 mat4_inverse(mat4 mat)
 
 mat4 mat4_scale(mat4 mat, vec3 scale)
 {
-    //TODO
+    return mat4_multiply(
+        mat,
+        mat4_create2((float[]) {
+            scale.x,0,0,0,
+            0,scale.y,0,0,
+            0,0,scale.z,0,
+            0,0,0,1
+    }));
 }
 mat4 mat4_rotate(mat4 mat, vec3 axis, float angle)
 {
-    //TODO
+    //https://learnopengl.com/Getting-started/Transformations
+    
+    axis = vec3_normalize(axis);
+
+    float rad = DEG2RAD * angle;
+    float cosine = cosf(rad);
+    float oneMinusCosine = 1 - cosine;
+    float sine = sinf(rad);
+    
+    float values[] = {
+        cosine+axis.x*axis.x*oneMinusCosine, axis.y*axis.x*oneMinusCosine+axis.z*sine, axis.z*axis.x*oneMinusCosine-axis.y*sine,0,
+        axis.x*axis.y*oneMinusCosine-axis.z*sine,cosine+axis.y*axis.y*oneMinusCosine,axis.z*axis.y*oneMinusCosine+axis.x*sine,0,
+        axis.x*axis.z*oneMinusCosine+axis.y*sine,axis.y*axis.z*oneMinusCosine-axis.x*sine, cosine+axis.z*axis.z*oneMinusCosine,0,
+        0,0,0,1
+    };
+
+    return mat4_multiply(mat, mat4_create2(values));
 }
 mat4 mat4_translate(mat4 mat, vec3 pos)
 {
-    //TODO
+    return mat4_multiply(mat, mat4_create2((float[]){1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, pos.x, pos.y, pos.z, 1}));
 }
 
 mat4 mat4_lookAt(vec3 pos, vec3 direction, vec3 up)
 {
-    //TODO
+    //look mom, i did it by myself
+
+    direction = vec3_normalize(direction);
+    vec3 right = vec3_normalize(vec3_cross(direction, up));
+    up = vec3_normalize(vec3_cross(right, direction));
+    direction = vec3_create2(-direction.x, -direction.y, -direction.z);
+
+    mat4 worldToView = mat4_create2((float[]) {
+        right.x,up.x,direction.x,0,
+        right.y,up.y,direction.y,0,
+        right.z,up.z,direction.z,0,
+        0,0,0,1
+    }); //ortonormalt matrix inverze a transzponalt
+
+    worldToView = mat4_translate(worldToView, vec3_create2(-pos.x, -pos.y, -pos.z));
+
+    return worldToView;
 }
 
 mat4 mat4_perspective(float fov, float aspectXY, float near, float far)
 {
-    //TODO
+    //http://www.songho.ca/opengl/gl_projectionmatrix.html
+
+    float t = tanf(DEG2RAD * 0.5f * fov) * near;
+    float r = t * aspectXY;
+
+    float values[] = {
+        near/r,0,0,0,
+        0,near/t,0,0,
+        0,0,-(far+near)/(far-near),-1,
+        0,0,-2*far*near/(far-near),0
+    };
+
+    return mat4_create2(values);
 }
 mat4 mat4_ortho(float left, float right, float bottom, float top, float near, float far)
 {
