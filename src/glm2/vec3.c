@@ -28,13 +28,19 @@ vec3 vec3_cross(vec3 egy, vec3 katto)
     return vec3_create2(egy.y * katto.z - egy.z * katto.y, egy.z * katto.x - egy.x * katto.z, egy.x * katto.y - egy.y * katto.x);
 }
 
-float vec3_length(vec3 vec)
+float vec3_sqrMagnitude(vec3 vec)
+{
+    return vec.x * vec.x + vec.y * vec.y + vec.z * vec.z;
+}
+
+float vec3_magnitude(vec3 vec)
 {
     return sqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
 }
+
 vec3 vec3_normalize(vec3 vec)
 {
-    float length = vec3_length(vec);
+    float length = vec3_magnitude(vec);
     return (vec3){ vec.x / length, vec.y / length, vec.z / length };
 }
 vec3 vec3_scale(vec3 vec, float scalar)
