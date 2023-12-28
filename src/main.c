@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "camera/camera.h"
 #include "event/event_queue.h"
 #include "input/input.h"
 #include "shader/shader.h"
@@ -19,7 +20,7 @@ void handle_event(event e);
 void render();
 
 void init_kuba();
-void draw_kuba();
+void draw_kuba(camera* cum);
 
 //glfw callbacks
 void window_size_callback(GLFWwindow* window, int width, int height);
@@ -34,6 +35,8 @@ int main()
     event_queue_init();
     input_init();
 
+    camera cum = camera_create(vec3_create2(-8, 10, 10), vec3_create2(0, 1, 0), 45, -45, 45, 2, 1);
+
     shader shader = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
     shader_delete(&shader);
 
@@ -47,10 +50,11 @@ int main()
         while ((e = event_queue_poll()).type != NONE)
             handle_event(e);
 
+        camera_update(&cum, 0.01f);
+
         //render
         render();
-
-        draw_kuba();
+        draw_kuba(&cum);
 
         glfwPollEvents();
         glfwSwapBuffers(window);
@@ -83,6 +87,8 @@ GLFWwindow* init_window(const char* name, int width, int height)
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetScrollCallback(window, scroll_callback);
+    
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     //check if glad is kaputt
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -104,6 +110,8 @@ void handle_event(event e)
         break;
     default:
         input_handle_event(e);
+        if (e.type == KEY_PRESSED && e.data.key_pressed.key_code == GLFW_KEY_ESCAPE)
+            glfwSetWindowShouldClose(glfwGetCurrentContext(), GLFW_TRUE);
         break;
     }
 }
@@ -188,7 +196,7 @@ void init_kuba()
     program = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
 }
 
-void draw_kuba() {
+void draw_kuba(camera* cum) {
     glUseProgram(program.id);
 
     mat4 model = mat4_create(1);
@@ -196,11 +204,11 @@ void draw_kuba() {
     model = mat4_rotate(model, vec3_create2(-3, -2, 1), 70 * glfwGetTime());
     //model = mat4_translate(model, vec3_create2(0, 0, -0.5f));
 
+
     shader_setMat4(program.id, "model", model);
     shader_setMat4(program.id, "view", mat4_lookAt(vec3_create2(-6, 5, 10), vec3_create2(6, -5, -10), vec3_create2(0, 1, 0)));
     //shader_setMat4(program.id, "projection", mat4_perspective(40, 1, 0.1, 30));
     shader_setMat4(program.id, "projection", mat4_ortho(-5,5,-5,5,1,20));
-
 
     
     glBindVertexArray(vao);

@@ -29,6 +29,7 @@ int input_is_mouse_button_down(int button);
 int input_is_mouse_button_released(int button);
 
 void input_get_mouse_position(double* x, double* y);
+void input_get_mouse_delta(double* x, double* y);
 void input_get_mouse_scroll_delta(double* x, double* y);
 
 #endif
