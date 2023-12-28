@@ -35,7 +35,6 @@ int main()
     event_queue_init();
     input_init();
 
-    //mat4_lookAt(vec3_create2(-6, 5, 10), vec3_create2(6, -5, -10), vec3_create2(0, 1, 0))
     camera cum = camera_create(vec3_create2(-6, 2, 10), vec3_create2(0, 1, 0), 0, 0, 45, 20, 0.8);
 
     shader shader = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
