@@ -82,6 +82,11 @@ void input_get_mouse_position(double* x, double* y)
     *x = input.current_mouse_x;
     *y = input.current_mouse_y;
 }
+void input_get_mouse_delta(double* x, double* y)
+{
+    *x = input.current_mouse_x - input.previous_mouse_x;
+    *y = input.current_mouse_y - input.previous_mouse_y;
+}
 void input_get_mouse_scroll_delta(double* x, double* y)
 {
     *x = input.mouse_scroll_delta_x;

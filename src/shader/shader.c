@@ -154,28 +154,28 @@ void shader_use(GLuint shaderID)
 {
     glUseProgram(shaderID);
 }
-void shader_setInt(GLuint shaderID, const char* uniformName, int uniform)
+void shader_set_int(GLuint shaderID, const char* uniformName, int uniform)
 {
     glUseProgram(shaderID);
     glUniform1i(glGetUniformLocation(shaderID, uniformName), uniform);
 }
-void shader_setFloat(GLuint shaderID, const char* uniformName, float uniform)
+void shader_set_float(GLuint shaderID, const char* uniformName, float uniform)
 {
     glUseProgram(shaderID);
     glUniform1f(glGetUniformLocation(shaderID, uniformName), uniform);
 
 }
-void shader_setVec3(GLuint shaderID, const char* uniformName, float x, float y, float z)
+void shader_set_vec3(GLuint shaderID, const char* uniformName, float x, float y, float z)
 {
     glUseProgram(shaderID);
     glUniform3f(glGetUniformLocation(shaderID, uniformName), x, y, z);
 }
-void shader_setVec3v(GLuint shaderID, const char* uniformName, vec3 vec)
+void shader_set_vec3v(GLuint shaderID, const char* uniformName, vec3 vec)
 {
     glUseProgram(shaderID);
     glUniform3f(glGetUniformLocation(shaderID, uniformName), vec.x, vec.y, vec.z);
 }
-void shader_setMat4(GLuint shaderID, const char* uniformName, mat4 mat)
+void shader_set_mat4(GLuint shaderID, const char* uniformName, mat4 mat)
 {
     glUseProgram(shaderID);
     glUniformMatrix4fv(glGetUniformLocation(shaderID, uniformName), 1, GL_FALSE, mat.data);
