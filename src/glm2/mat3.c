@@ -30,6 +30,17 @@ void mat3_set(mat3* mat, int row, int col, float value)
 }
 
 
+float mat3_determinant(mat3* mat)
+{
+    float det = 0;
+
+    det += mat->data[0] * (mat->data[4] * mat->data[8] - mat->data[5] * mat->data[7]);
+    det -= mat->data[3] * (mat->data[1] * mat->data[8] - mat->data[2] * mat->data[7]);
+    det += mat->data[6] * (mat->data[1] * mat->data[5] - mat->data[2] * mat->data[4]);
+
+    return det;
+}
+
 void mat3_print(mat3* mat)
 {
     for (int i = 0; i < 3; i++) {

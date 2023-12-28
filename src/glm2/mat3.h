@@ -11,6 +11,8 @@ mat3 mat3_create2(float* values);
 void mat3_set(mat3* mat, int row, int col, float value);
 
 
+float mat3_determinant(mat3* mat);
+
 void mat3_print(mat3* mat);
 
 #endif
