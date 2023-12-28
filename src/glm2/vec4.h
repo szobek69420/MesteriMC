@@ -8,4 +8,18 @@ typedef struct {
     float w;
 } vec4;
 
+vec4 vec4_create(float);
+vec4 vec4_create2(float, float, float,float);
+
+vec4 vec4_sum(vec4, vec4);
+vec4 vec4_subtract(vec4, vec4);
+float vec4_dot(vec4, vec4);
+
+float vec4_sqrMagnitude(vec4);
+float vec4_magnitude(vec4);
+vec4 vec4_normalize(vec4);
+vec4 vec4_scale(vec4, float);
+
+void vec4_print(vec4*);
+
 #endif

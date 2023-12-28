@@ -13,6 +13,7 @@
 
 #include "glm2/mat4.h"
 #include "glm2/vec3.h"
+#include "glm2/mat3.h"
 
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
@@ -203,12 +204,11 @@ void draw_kuba(camera* cum) {
     model = mat4_rotate(model, vec3_create2(-3, -2, 1), 70 * glfwGetTime());
     //model = mat4_translate(model, vec3_create2(0, 0, -0.5f));
 
-    shader_set_mat4(program.id, "model", model);
-    //shader_set_mat4(program.id, "view", mat4_look_at(vec3_create2(-6, 5, 10), vec3_create2(6, -5, -10), vec3_create2(0, 1, 0)));
-    shader_set_mat4(program.id, "projection", mat4_perspective(40, 1, 0.1, 30));
 
-    shader_set_mat4(program.id, "view", camera_get_view_matrix(cum));
-    //shader_set_mat4(program.id, "projection", mat4_create(1));
+    shader_setMat4(program.id, "model", model);
+    shader_setMat4(program.id, "view", mat4_lookAt(vec3_create2(-6, 5, 10), vec3_create2(6, -5, -10), vec3_create2(0, 1, 0)));
+    //shader_setMat4(program.id, "projection", mat4_perspective(40, 1, 0.1, 30));
+    shader_setMat4(program.id, "projection", mat4_ortho(-5,5,-5,5,1,20));
 
     
     glBindVertexArray(vao);
