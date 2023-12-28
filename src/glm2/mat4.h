@@ -13,6 +13,8 @@ mat4 mat4_create2(float* data);
 float mat4_get(mat4* mat, int row, int col, float value);
 void  mat4_set(mat4* mat, int row, int col, float value);
 
+float mat4_determinant(mat4* mat);
+
 mat4 mat4_sum(mat4 egy, mat4 katto);
 mat4 mat4_multiply(mat4 egy, mat4 katto);
 
