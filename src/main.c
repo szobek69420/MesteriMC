@@ -203,10 +203,10 @@ void draw_kuba() {
     //model = mat4_translate(model, vec3_create2(0, 0, -0.5f));
 
     shader_setMat4(program.id, "model", model);
-    //shader_setMat4(program.id, "view", mat4_lookAt(vec3_create2(-6, 5, 10), vec3_create2(6, -5, -10), vec3_create2(0, 1, 0)));
+    shader_setMat4(program.id, "view", mat4_lookAt(vec3_create2(-6, 5, 10), vec3_create2(6, -5, -10), vec3_create2(0, 1, 0)));
     shader_setMat4(program.id, "projection", mat4_perspective(40, 1, 0.1, 30));
 
-    shader_setMat4(program.id, "view", mat4_lookAt(vec3_create2(-8, 10, 10), vec3_create2(0.8, -1,-1), vec3_create2(0, 1, 0)));
+    //shader_setMat4(program.id, "view", mat4_lookAt(vec3_create2(-8, 10, 10), vec3_create2(0.8, -1,-1), vec3_create2(0, 1, 0)));
     //shader_setMat4(program.id, "projection", mat4_create(1));
 
     
