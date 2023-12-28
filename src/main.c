@@ -101,15 +101,8 @@ void handle_event(event e)
     case WINDOW_RESIZE:
         glViewport(0, 0, e.data.window_resize.width, e.data.window_resize.height);
         break;
-    case KEY_PRESSED:
-    case KEY_RELEASED:
-    case MOUSE_BUTTON_PRESSED:
-    case MOUSE_BUTTON_RELEASED:
-    case MOUSE_MOVED:
-    case MOUSE_SCROLLED:
-        input_handle_event(e);
-        break;
     default:
+        input_handle_event(e);
         break;
     }
 }
