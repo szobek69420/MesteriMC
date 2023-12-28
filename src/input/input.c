@@ -40,7 +40,7 @@ void input_handle_event(event e)
         break;
     case MOUSE_MOVED:
         input.current_mouse_x = e.data.mouse_moved.x;
-        input.current_mouse_y = e.data.mouse_moved.x;
+        input.current_mouse_y = e.data.mouse_moved.y;
         break;
     case MOUSE_SCROLLED:
         input.mouse_scroll_delta_x += e.data.mouse_scrolled.x;

@@ -17,10 +17,10 @@ shader shader_import(const char* vertex, const char* fragment, const char* geome
 void shader_delete(shader* shader);
 
 void shader_use(GLuint shaderID);
-void shader_set_int(GLuint shaderID, const char* uniformName, int uniform);
-void shader_set_float(GLuint shaderID, const char* uniformName, float uniform);
-void shader_set_vec3(GLuint shaderID, const char* uniformName, float x, float y, float z);
-void shader_set_vec3v(GLuint shaderID, const char* uniformName, vec3 vec);
-void shader_set_mat4(GLuint shaderID, const char* uniformName, mat4 mat);
+void shader_setInt(GLuint shaderID, const char* uniformName, int uniform);
+void shader_setFloat(GLuint shaderID, const char* uniformName, float uniform);
+void shader_setVec3(GLuint shaderID, const char* uniformName, float x, float y, float z);
+void shader_setVec3v(GLuint shaderID, const char* uniformName, vec3 vec);
+void shader_setMat4(GLuint shaderID, const char* uniformName, mat4 mat);
 
 #endif

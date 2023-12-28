@@ -35,7 +35,8 @@ int main()
     event_queue_init();
     input_init();
 
-    camera cum = camera_create(vec3_create2(-8, 10, 10), vec3_create2(0, 1, 0), 45, -45, 45, 2, 1);
+    //mat4_lookAt(vec3_create2(-6, 5, 10), vec3_create2(6, -5, -10), vec3_create2(0, 1, 0))
+    camera cum = camera_create(vec3_create2(-6, 2, 10), vec3_create2(0, 1, 0), 0, 0, 45, 20, 0.8);
 
     shader shader = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
     shader_delete(&shader);
@@ -49,8 +50,12 @@ int main()
         event e;
         while ((e = event_queue_poll()).type != NONE)
             handle_event(e);
+        
+        camera_update(&cum, 0.001f);
 
-        camera_update(&cum, 0.01f);
+        double dx, dy;
+        input_get_mouse_scroll_delta(&dx, &dy);
+        printf("%g, %g\n", dx, dy);
 
         //render
         render();
@@ -206,9 +211,9 @@ void draw_kuba(camera* cum) {
 
 
     shader_setMat4(program.id, "model", model);
-    shader_setMat4(program.id, "view", mat4_lookAt(vec3_create2(-6, 5, 10), vec3_create2(6, -5, -10), vec3_create2(0, 1, 0)));
-    //shader_setMat4(program.id, "projection", mat4_perspective(40, 1, 0.1, 30));
-    shader_setMat4(program.id, "projection", mat4_ortho(-5,5,-5,5,1,20));
+    shader_setMat4(program.id, "view", camera_get_view_matrix(cum));
+    shader_setMat4(program.id, "projection", mat4_perspective(cum->fov, 1, 0.1, 30));
+    //shader_setMat4(program.id, "projection", mat4_ortho(-5,5,-5,5,1,20));
 
     
     glBindVertexArray(vao);
