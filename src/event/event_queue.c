@@ -54,3 +54,10 @@ event event_queue_back()
         return (event){ 0 };
     return queue.data[queue.back];
 }
+
+void event_queue_swap_back(event e)
+{
+    if (event_queue_is_empty())
+        return;
+    queue.data[queue.back] = e;
+}
