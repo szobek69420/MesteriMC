@@ -186,8 +186,8 @@ void draw_kuba(camera* cum) {
     glUseProgram(program.id);
 
     mat4 model = mat4_create(1);
-    model = mat4_rotate(model, vec3_create2(0, 0.4, 1), 50*glfwGetTime());
-    model = mat4_rotate(model, vec3_create2(-3, -2, 1), 70 * glfwGetTime());
+    //model = mat4_rotate(model, vec3_create2(0, 0.4, 1), 50*glfwGetTime());
+    //model = mat4_rotate(model, vec3_create2(-3, -2, 1), 70 * glfwGetTime());
     //model = mat4_translate(model, vec3_create2(0, 0, -0.5f));
 
 
