@@ -22,4 +22,8 @@ int event_queue_get_size();
 event event_queue_front();
 event event_queue_back();
 
+//a kepernyo meretenek megvaltoztatasanal kb pixelenkent lefut a callback, ami nagyon gyorsan feltolti a queue-t (es akkor elvesznek a legfrissebb meretek)
+//szoval a window resize callback-ben amennyiben az utolso event is egy window resize, csak kicserelem az uj eventre
+void event_queue_swap_back(event e);
+
 #endif

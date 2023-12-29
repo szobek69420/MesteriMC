@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "window/window.h"
 #include "camera/camera.h"
 #include "event/event_queue.h"
 #include "input/input.h"
@@ -31,11 +32,13 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 int main()
 {
-    GLFWwindow* window = init_window("amogus", 600, 600);
+    window_setWidth(1300);
+    window_setHeight(800);
+    GLFWwindow* window = init_window("amogus", window_getWidth(), window_getHeight());
     event_queue_init();
     input_init();
 
-    camera cum = camera_create(vec3_create2(-6, 2, 10), vec3_create2(0, 1, 0), 0, 0, 45, 20, 0.8);
+    camera cum = camera_create(vec3_create2(-6, 2, 10), vec3_create2(0, 1, 0), 0, 0, 90, 20, 0.8);
 
     shader shader = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
     shader_delete(&shader);
@@ -52,9 +55,6 @@ int main()
         
         camera_update(&cum, 0.001f);
 
-        double dx, dy;
-        input_get_mouse_scroll_delta(&dx, &dy);
-        printf("%g, %g\n", dx, dy);
 
         //render
         render();
@@ -110,6 +110,8 @@ void handle_event(event e)
     switch (e.type)
     {
     case WINDOW_RESIZE:
+        window_setWidth(e.data.window_resize.width);
+        window_setHeight(e.data.window_resize.height);
         glViewport(0, 0, e.data.window_resize.width, e.data.window_resize.height);
         break;
     default:
@@ -127,7 +129,10 @@ void render()
 
 void window_size_callback(GLFWwindow* window, int width, int height)
 {
-    event_queue_push((event){ .type = WINDOW_RESIZE, .data.window_resize = { width, height } });
+    if(event_queue_back().type!=WINDOW_RESIZE)
+        event_queue_push((event){ .type = WINDOW_RESIZE, .data.window_resize = { width, height } });
+    else
+        event_queue_swap_back((event) { .type = WINDOW_RESIZE, .data.window_resize = { width, height } });
 }
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -211,7 +216,7 @@ void draw_kuba(camera* cum) {
 
     shader_setMat4(program.id, "model", model);
     shader_setMat4(program.id, "view", camera_get_view_matrix(cum));
-    shader_setMat4(program.id, "projection", mat4_perspective(cum->fov, 1, 0.1, 30));
+    shader_setMat4(program.id, "projection", mat4_perspective(cum->fov, window_getAspect(), 0.1, 30));
     //shader_setMat4(program.id, "projection", mat4_ortho(-5,5,-5,5,1,20));
 
     
