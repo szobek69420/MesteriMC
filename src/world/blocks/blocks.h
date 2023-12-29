@@ -19,4 +19,9 @@
 //block: blokktipus, side: melyik oldal, index: az oldalon belul hanyadik csucs (4 csucs per oldal)
 void blocks_getUV(int block, int side, int index, float* uvx, float* uvy);
 
+void blocks_getVertexPosition(int side, int index, float* x, float* y, float* z);
+void blocks_getVertexNormal(int side, float* x, float* y, float* z);
+void blocks_getVertexTangent(int side, float* x, float* y, float* z);
+void blocks_getVertexBitangent(int side, float* x, float* y, float* z);
+
 #endif
