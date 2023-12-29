@@ -1,11 +1,11 @@
 #include "blocks.h"
 #include <stdio.h>
 
-float vertexPosition[];
-float vertexNormal[];
-float vertexTangent[];
-float vertexBitangent[];
-float vertexUV[];
+static float vertexPosition[];
+static float vertexNormal[];
+static float vertexTangent[];
+static float vertexBitangent[];
+static float vertexUV[];
 
 void blocks_getVertexPosition(int side, int index, float* x, float* y, float* z)
 {
