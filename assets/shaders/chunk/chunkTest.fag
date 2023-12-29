@@ -1,0 +1,11 @@
+#version 330 core
+
+in vec3 normal;
+
+out vec4 fragColor;
+
+void main()
+{
+	float diffuse=0.5f*dot(normal,vec3(0.2,0.772,0.662))+0.5f;
+	fragColor=vec4(0,diffuse,diffuse,1);
+}

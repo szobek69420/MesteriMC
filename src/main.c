@@ -12,6 +12,8 @@
 #include "input/input.h"
 #include "shader/shader.h"
 
+#include "world/chunk/chunk.h"
+
 #include "glm2/mat4.h"
 #include "glm2/vec3.h"
 #include "glm2/mat3.h"
@@ -21,6 +23,7 @@ void handle_event(event e);
 void render();
 
 void init_kuba();
+void end_kuba();
 void draw_kuba(camera* cum);
 
 //glfw callbacks
@@ -45,6 +48,15 @@ int main()
 
     init_kuba();
 
+    glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+
+    glEnable(GL_DEPTH_TEST);
+    glClearDepth(1);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+    glFrontFace(GL_CCW);
+
     while (!glfwWindowShouldClose(window))
     {
         //update
@@ -64,6 +76,7 @@ int main()
         glfwSwapBuffers(window);
     }
 
+    end_kuba();
     glfwTerminate();
     return 69;
 }
@@ -123,8 +136,7 @@ void handle_event(event e)
 }
 void render()
 {
-    glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 }
 
 void window_size_callback(GLFWwindow* window, int width, int height)
@@ -158,51 +170,16 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 }
 
 shader program;
-unsigned int vao, vbo;
+chunk kuba;
 void init_kuba()
 {
-    float vertices[] = {
-        1,-1,1,     1,0,0,
-        -1,-1,1,    1,0,0,
-        0,1,0,      1,0,0,
+    program = shader_import("../assets/shaders/chunk/chunkTest.vag", "../assets/shaders/chunk/chunkTest.fag", NULL);
+    kuba = chunk_generate(0, 0, 0);
+}
 
-        1,-1,-1,     0.8f,0,0,
-        1,-1,1,    0.8f,0,0,
-        0,1,0,      0.8f,0,0,
-
-        -1,-1,-1,    0.4f,0,0,
-        1,-1,-1,   0.4f,0,0,
-        0,1,0,      0.4f,0,0,
-
-        -1,-1,1,   0.6f,0,0,
-        -1,-1,-1,    0.6f,0,0,
-        0,1,0,      0.6f,0,0,
-
-        -1,-1,1,    0.2f,0,0,
-        1,-1,1,     0.2f,0,0,
-        1,-1,-1,    0.2f,0,0,
-
-        1,-1,-1,    0.2f,0,0,
-        -1,-1,-1,   0.2f,0,0,
-        -1,-1,1,    0.2f,0,0
-    };
-
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3*sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    glBindVertexArray(0);
-
-    program = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
+void end_kuba() {
+    shader_delete(&program);
+    chunk_destroy(&kuba);
 }
 
 void draw_kuba(camera* cum) {
@@ -216,13 +193,9 @@ void draw_kuba(camera* cum) {
 
     shader_setMat4(program.id, "model", model);
     shader_setMat4(program.id, "view", camera_get_view_matrix(cum));
-    shader_setMat4(program.id, "projection", mat4_perspective(cum->fov, window_getAspect(), 0.1, 30));
-    //shader_setMat4(program.id, "projection", mat4_ortho(-5,5,-5,5,1,20));
+    shader_setMat4(program.id, "projection", mat4_perspective(cum->fov, window_getAspect(), 0.1, 200));
+    //shader_setMat4(program.id, "projection", mat4_ortho(-50,50,-50,50,1,100));
 
     
-    glBindVertexArray(vao);
-    glEnable(GL_DEPTH_TEST);
-    glClearDepth(1);
-    glClear(GL_DEPTH_BUFFER_BIT);
-    glDrawArrays(GL_TRIANGLES, 0, 18);
+    chunk_drawTerrain(&kuba);
 }
