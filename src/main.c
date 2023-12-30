@@ -41,7 +41,7 @@ int main()
     event_queue_init();
     input_init();
 
-    camera cum = camera_create(vec3_create2(-6, 2, 10), vec3_create2(0, 1, 0), 0, 0, 90, 20, 0.8);
+    camera cum = camera_create(vec3_create2(0, 0, 0), vec3_create2(0, 1, 0), 0, 0, 90, 20, 0.8);
 
     shader shader = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
     shader_delete(&shader);
@@ -171,31 +171,34 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 shader program;
 chunk kuba;
+chunk kuba2;
 void init_kuba()
 {
     program = shader_import("../assets/shaders/chunk/chunkTest.vag", "../assets/shaders/chunk/chunkTest.fag", NULL);
     kuba = chunk_generate(0, 0, 0);
+    kuba2 = chunk_generate(1, 0, 0);
 }
 
 void end_kuba() {
     shader_delete(&program);
     chunk_destroy(&kuba);
+    chunk_destroy(&kuba2);
 }
 
 void draw_kuba(camera* cum) {
     glUseProgram(program.id);
 
-    mat4 model = mat4_create(1);
     //model = mat4_rotate(model, vec3_create2(0, 0.4, 1), 50*glfwGetTime());
     //model = mat4_rotate(model, vec3_create2(-3, -2, 1), 70 * glfwGetTime());
     //model = mat4_translate(model, vec3_create2(0, 0, -0.5f));
 
 
-    shader_setMat4(program.id, "model", model);
+    shader_setMat4(program.id, "model", kuba.model);
     shader_setMat4(program.id, "view", camera_get_view_matrix(cum));
     shader_setMat4(program.id, "projection", mat4_perspective(cum->fov, window_getAspect(), 0.1, 200));
     //shader_setMat4(program.id, "projection", mat4_ortho(-50,50,-50,50,1,100));
 
     
     chunk_drawTerrain(&kuba);
+    chunk_drawTerrain(&kuba2);
 }

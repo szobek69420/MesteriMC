@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include "list.h"
 
-list lCreate()
+list list_create()
 {
 	list lista;
 	lista.head = NULL;
@@ -10,7 +10,7 @@ list lCreate()
 	return lista;
 }
 
-void lClear(list* lista)
+void list_clear(list* lista)
 {
 	listElement* current = lista->head;
 	listElement* temp;
@@ -28,7 +28,7 @@ void lClear(list* lista)
 	lista->size = 0;
 }
 
-void lPush(list* lista, unsigned int index, void* data)
+void list_push(list* lista, unsigned int index, void* data)
 {
 	int i;
 	listElement* iterated;
@@ -72,13 +72,13 @@ void lPush(list* lista, unsigned int index, void* data)
 }
 
 
-void lPushBack(list* lista, void* data)
+void list_push_back(list* lista, void* data)
 {
-	lPush(lista, lista->size, data);
+	list_push(lista, lista->size, data);
 }
 
 
-void lRemove(list* lista, void* data)
+void list_remove(list* lista, void* data)
 {
 	listElement* previous = NULL;
 	listElement* current = lista->head;
@@ -102,7 +102,7 @@ void lRemove(list* lista, void* data)
 	}
 }
 
-void lRemoveAt(list* lista, unsigned int index)
+void list_remove_at(list* lista, unsigned int index)
 {
 	int i;
 	listElement* previous;
@@ -128,7 +128,7 @@ void lRemoveAt(list* lista, unsigned int index)
 	lista->size--;
 }
 
-void* lGet(list* lista, unsigned int index)
+void* list_get(list* lista, unsigned int index)
 {
 	int i;
 	listElement* current = lista->head;
@@ -144,7 +144,7 @@ void* lGet(list* lista, unsigned int index)
 	return current->data;
 }
 
-void lSet(list* lista, unsigned int index, void* data)
+void list_set(list* lista, unsigned int index, void* data)
 {
 	int i;
 	listElement* current = lista->head;
@@ -156,4 +156,14 @@ void lSet(list* lista, unsigned int index, void* data)
 		current = current->next;
 
 	current->data = data;
+}
+
+listElement* list_get_iterator(list* lista)
+{
+	return lista->head;
+}
+
+listElement* list_next(listElement* iterator)
+{
+	return iterator->next;
 }
