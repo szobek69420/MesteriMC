@@ -13,10 +13,13 @@
 #include "shader/shader.h"
 
 #include "world/chunk/chunk.h"
+#include "world/chunk/chunkManager.h"
 
 #include "glm2/mat4.h"
 #include "glm2/vec3.h"
 #include "glm2/mat3.h"
+
+#include "utils/list.h"
 
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
@@ -35,13 +38,14 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 int main()
 {
+
     window_setWidth(1300);
     window_setHeight(800);
     GLFWwindow* window = init_window("amogus", window_getWidth(), window_getHeight());
     event_queue_init();
     input_init();
 
-    camera cum = camera_create(vec3_create2(0, 0, 0), vec3_create2(0, 1, 0), 0, 0, 90, 20, 0.8);
+    camera cum = camera_create(vec3_create2(0, 200, 0), vec3_create2(0, 1, 0), 0, 0, 90, 50, 0.8);
 
     shader shader = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
     shader_delete(&shader);
@@ -57,15 +61,30 @@ int main()
     glCullFace(GL_FRONT);
     glFrontFace(GL_CCW);
 
+    float deltaTime;
+    float lastFrame=glfwGetTime();
+    float lastSecond = 0;//az fps szamolashoz
+    int framesInLastSecond = 0;
     while (!glfwWindowShouldClose(window))
     {
+        deltaTime = glfwGetTime() - lastFrame;
+        lastFrame = glfwGetTime();
+        lastSecond += deltaTime;
+        framesInLastSecond++;
+        if (lastSecond > 1)
+        {
+            printf("FPS: %d\n", framesInLastSecond);
+            lastSecond = 0;
+            framesInLastSecond = 0;
+        }
+
         //update
         input_update();
         event e;
         while ((e = event_queue_poll()).type != NONE)
             handle_event(e);
         
-        camera_update(&cum, 0.001f);
+        camera_update(&cum, deltaTime);
 
 
         //render
@@ -170,35 +189,32 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 }
 
 shader program;
-chunk kuba;
-chunk kuba2;
+chunkManager cm;
 void init_kuba()
 {
     program = shader_import("../assets/shaders/chunk/chunkTest.vag", "../assets/shaders/chunk/chunkTest.fag", NULL);
-    kuba = chunk_generate(0, 0, 0);
-    kuba2 = chunk_generate(1, 0, 0);
+    cm = chunkManager_create(69, 4);
 }
 
 void end_kuba() {
     shader_delete(&program);
-    chunk_destroy(&kuba);
-    chunk_destroy(&kuba2);
+    chunkManager_destroy(&cm);
 }
 
 void draw_kuba(camera* cum) {
+
+    int chunkX, chunkY, chunkZ;
+    chunk_getChunkFromPos(cum->position, &chunkX, &chunkY, &chunkZ);
+
+    //vec3_print(&(cum->position));
+    //printf("%d %d %d\n\n", chunkX, chunkY, chunkZ);
+    //printf("loaded: %d, pending: %d\n", cm.loadedChunks.size, cm.pendingUpdates.size);
+    chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
+    chunkManager_update(&cm);
+    chunkManager_update(&cm);
+
     glUseProgram(program.id);
 
-    //model = mat4_rotate(model, vec3_create2(0, 0.4, 1), 50*glfwGetTime());
-    //model = mat4_rotate(model, vec3_create2(-3, -2, 1), 70 * glfwGetTime());
-    //model = mat4_translate(model, vec3_create2(0, 0, -0.5f));
-
-
-    shader_setMat4(program.id, "model", kuba.model);
-    shader_setMat4(program.id, "view", camera_get_view_matrix(cum));
-    shader_setMat4(program.id, "projection", mat4_perspective(cum->fov, window_getAspect(), 0.1, 200));
-    //shader_setMat4(program.id, "projection", mat4_ortho(-50,50,-50,50,1,100));
-
-    
-    chunk_drawTerrain(&kuba);
-    chunk_drawTerrain(&kuba2);
+    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 300);
+    chunkManager_drawTerrain(&cm, &program, cum, &projection);
 }
