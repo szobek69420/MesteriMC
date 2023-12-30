@@ -157,3 +157,13 @@ void list_set(list* lista, unsigned int index, void* data)
 
 	current->data = data;
 }
+
+listElement* list_get_iterator(list* lista)
+{
+	return lista->head;
+}
+
+listElement* list_next(listElement* iterator)
+{
+	return iterator->next;
+}

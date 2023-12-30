@@ -2,6 +2,7 @@
 #define CHUNK_H
 
 #include "../../mesh/mesh.h"
+#include "../../glm2/mat4.h"
 
 #define CHUNK_WIDTH 32
 #define CHUNK_HEIGHT 32
@@ -28,6 +29,8 @@ typedef struct {
 
 	char isThereNormalMesh;
 	char isThereWaterMesh;
+
+	mat4 model;
 
 } chunk;
 

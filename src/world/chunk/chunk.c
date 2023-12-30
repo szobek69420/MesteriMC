@@ -2,6 +2,8 @@
 #include "../blocks/blocks.h"
 #include <stdlib.h>
 #include <glad/glad.h>
+#include "../../glm2/vec3.h"
+#include "../../glm2/mat4.h"
 
 void chunk_drawTerrain(chunk* chomk)
 {
@@ -30,8 +32,10 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 	chomk.chunkZ = chunkZ;
 
 	int basedX = CHUNK_WIDTH*chunkX;
-	int basedY = CHUNK_HEIGHT * chunkX;
+	int basedY = CHUNK_HEIGHT * chunkY;
 	int basedZ = CHUNK_WIDTH * chunkZ;
+
+	chomk.model = mat4_translate(mat4_create(1), vec3_create2(basedX, basedY, basedZ));
 
 	//filling chunk
 	for (int i = 0; i < CHUNK_HEIGHT; i++)//y

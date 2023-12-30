@@ -29,4 +29,7 @@ void* list_get(list* lista, unsigned int index);
 
 void list_set(list* lista, unsigned int index, void* data);
 
+listElement* list_get_iterator(list* lista);
+listElement* list_next(listElement* iterator);
+
 #endif
