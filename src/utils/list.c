@@ -120,7 +120,9 @@ void list_remove_at(list* lista, unsigned int index)
 		current = current->next;
 	}
 
-	if (previous == NULL)
+	if (index == 0 && lista->size == 1)
+		lista->head = NULL;
+	else if (previous == NULL)
 		lista->head = current->next;
 	else
 		previous->next = current->next;
@@ -163,7 +165,7 @@ listElement* list_get_iterator(list* lista)
 	return lista->head;
 }
 
-listElement* list_next(listElement* iterator)
+listElement* list_next(listElement** iterator)
 {
-	return iterator->next;
+	return (*iterator)->next;
 }

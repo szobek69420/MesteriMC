@@ -2,8 +2,10 @@
 #include "chunkManager.h"
 #include "chunk.h"
 #include "../../utils/list.h"
+#include "../../shader/shader.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 
 chunkManager chunkManager_create(int seed, int renderDistance)
 {
@@ -16,6 +18,8 @@ chunkManager chunkManager_create(int seed, int renderDistance)
 
 	cm.pendingUpdates = list_create();
 	cm.loadedChunks = list_create();
+
+	return cm;
 }
 
 void chunkManager_destroy(chunkManager* cm)
@@ -57,7 +61,7 @@ int chunkManager_isChunkLoaded(chunkManager* cm, int playerChunkX, int playerChu
 		if (((chunk*)(iterator->data))->chunkX == playerChunkX && ((chunk*)(iterator->data))->chunkY == playerChunkY && ((chunk*)(iterator->data))->chunkZ == playerChunkZ)
 			return 69;
 
-		iterator=list_next(iterator);
+		iterator=list_next(&iterator);
 	}
 
 	return 0;
@@ -72,7 +76,7 @@ int chunkManager_isChunkPending(chunkManager* cm, int playerChunkX, int playerCh
 		if (((chunkUpdate*)(iterator->data))->chunkX == playerChunkX && ((chunkUpdate*)(iterator->data))->chunkY == playerChunkY && ((chunkUpdate*)(iterator->data))->chunkZ == playerChunkZ)
 			return 69;
 
-		iterator = list_next(iterator);
+		iterator = list_next(&iterator);
 	}
 
 	return 0;
@@ -83,12 +87,15 @@ void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playe
 	//load
 	for (int i = 1; i <= cm->renderDistance; i++)
 	{
-		for (int x = -i; x <= i; x += 2 * i)
+		for (int x = -i; x <= i; x ++)
 		{
-			for (int y = -i; y <= i; y += 2 * i)
+			for (int y = -i; y <= i; y ++)
 			{
-				for (int z = -i; z <= i; z += 2 * i)
+				for (int z = -i; z <= i; z ++)
 				{
+					if (x != -i && x != i && y != -i && y != i && z != -i && z != i)
+						continue;
+
 					if (chunkManager_isChunkLoaded(cm, playerChunkX + x, playerChunkY + y, playerChunkZ + z) == 0
 						&&
 						chunkManager_isChunkPending(cm, playerChunkX + x, playerChunkY + y, playerChunkZ + z) == 0)
@@ -111,6 +118,8 @@ exit_load:
 
 	//unload
 
+exit_unload:
+
 	return;
 }
 
@@ -128,7 +137,7 @@ void chunkManager_update(chunkManager* cm)
 	{
 		case CHUNKMANAGER_LOAD_CHUNK:
 			chomk= (chunk*)malloc(sizeof(chunk));
-			chunk_generate(ceu->chunkX, ceu->chunkY, ceu->chunkZ);
+			*chomk=chunk_generate(ceu->chunkX, ceu->chunkY, ceu->chunkZ);
 			list_push_back(&(cm->loadedChunks), (void*)chomk);
 			break;
 
@@ -143,5 +152,31 @@ void chunkManager_update(chunkManager* cm)
 	}
 
 	free(ceu);
+}
+
+
+void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
+{
+	shader_setMat4(shit->id, "view", camera_get_view_matrix(cum));
+	shader_setMat4(shit->id, "projection", *projection);
+
+	listElement* it = list_get_iterator(&(cm->loadedChunks));
+	while (it != NULL)
+	{
+		//printf("%d %d %d\n", ((chunk*)(it->data))->chunkX, ((chunk*)(it->data))->chunkY, ((chunk*)(it->data))->chunkZ);
+		shader_setMat4(shit->id, "model", ((chunk*)(it->data))->model);
+		chunk_drawTerrain((chunk*)(it->data));
+
+		//it=it->next;
+		it = list_next(&it);
+	}
+
+	/*chunk* chomk;
+	for (int i = 0; i < cm->loadedChunks.size; i++)
+	{
+		chomk = list_get(&(cm->loadedChunks), i);
+		shader_setMat4(shit->id, "model", chomk->model);
+		chunk_drawTerrain(chomk);
+	}*/
 }
 

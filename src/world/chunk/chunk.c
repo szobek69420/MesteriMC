@@ -37,6 +37,8 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 
 	chomk.model = mat4_translate(mat4_create(1), vec3_create2(basedX, basedY, basedZ));
 
+	int heightMap[CHUNK_WIDTH + 2][CHUNK_WIDTH + 2];
+
 	//filling chunk
 	for (int i = 0; i < CHUNK_HEIGHT; i++)//y
 	{
@@ -128,9 +130,9 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 					for (int l = 0; l < 4; l++)
 					{
 						blocks_getVertexPosition(BLOCK_POSITIVE_Z, l, &x, &y, &z);
-						normalVertexData[vertexDataIndex++] = basedX+j+x;
-						normalVertexData[vertexDataIndex++] = basedY+i+y;
-						normalVertexData[vertexDataIndex++] = basedZ+k+z;
+						normalVertexData[vertexDataIndex++] = j+x;
+						normalVertexData[vertexDataIndex++] = i+y;
+						normalVertexData[vertexDataIndex++] = k+z;
 
 						blocks_getUV(chomk.blocks[i][j][k],BLOCK_POSITIVE_Z, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
@@ -171,9 +173,9 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 					for (int l = 0; l < 4; l++)
 					{
 						blocks_getVertexPosition(BLOCK_POSITIVE_X, l, &x, &y, &z);
-						normalVertexData[vertexDataIndex++] = basedX + j + x;
-						normalVertexData[vertexDataIndex++] = basedY + i + y;
-						normalVertexData[vertexDataIndex++] = basedZ + k + z;
+						normalVertexData[vertexDataIndex++] = j + x;
+						normalVertexData[vertexDataIndex++] = i + y;
+						normalVertexData[vertexDataIndex++] = k + z;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_POSITIVE_X, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
@@ -213,9 +215,9 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 					for (int l = 0; l < 4; l++)
 					{
 						blocks_getVertexPosition(BLOCK_NEGATIVE_Z, l, &x, &y, &z);
-						normalVertexData[vertexDataIndex++] = basedX + j + x;
-						normalVertexData[vertexDataIndex++] = basedY + i + y;
-						normalVertexData[vertexDataIndex++] = basedZ + k + z;
+						normalVertexData[vertexDataIndex++] = j + x;
+						normalVertexData[vertexDataIndex++] = i + y;
+						normalVertexData[vertexDataIndex++] = k + z;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_Z, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
@@ -255,9 +257,9 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 					for (int l = 0; l < 4; l++)
 					{
 						blocks_getVertexPosition(BLOCK_NEGATIVE_X, l, &x, &y, &z);
-						normalVertexData[vertexDataIndex++] = basedX + j + x;
-						normalVertexData[vertexDataIndex++] = basedY + i + y;
-						normalVertexData[vertexDataIndex++] = basedZ + k + z;
+						normalVertexData[vertexDataIndex++] = j + x;
+						normalVertexData[vertexDataIndex++] = i + y;
+						normalVertexData[vertexDataIndex++] = k + z;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_X, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
@@ -297,9 +299,9 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 					for (int l = 0; l < 4; l++)
 					{
 						blocks_getVertexPosition(BLOCK_POSITIVE_Y, l, &x, &y, &z);
-						normalVertexData[vertexDataIndex++] = basedX + j + x;
-						normalVertexData[vertexDataIndex++] = basedY + i + y;
-						normalVertexData[vertexDataIndex++] = basedZ + k + z;
+						normalVertexData[vertexDataIndex++] = j + x;
+						normalVertexData[vertexDataIndex++] = i + y;
+						normalVertexData[vertexDataIndex++] = k + z;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_POSITIVE_Y, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
@@ -339,9 +341,9 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 					for (int l = 0; l < 4; l++)
 					{
 						blocks_getVertexPosition(BLOCK_NEGATIVE_Y, l, &x, &y, &z);
-						normalVertexData[vertexDataIndex++] = basedX + j + x;
-						normalVertexData[vertexDataIndex++] = basedY + i + y;
-						normalVertexData[vertexDataIndex++] = basedZ + k + z;
+						normalVertexData[vertexDataIndex++] = j + x;
+						normalVertexData[vertexDataIndex++] = i + y;
+						normalVertexData[vertexDataIndex++] = k + z;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_Y, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
