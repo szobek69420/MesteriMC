@@ -1,4 +1,5 @@
 #include "chunk.h"
+#include "chunkManager.h"
 #include "../blocks/blocks.h"
 #include <stdlib.h>
 #include <glad/glad.h>
@@ -24,20 +25,32 @@ void chunk_drawWalter(chunk* chomk)
 }
 
 
-chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
+chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 {
 	chunk chomk;
 	chomk.chunkX = chunkX;
 	chomk.chunkY = chunkY;
 	chomk.chunkZ = chunkZ;
-
-	int basedX = CHUNK_WIDTH*chunkX;
+ 
+	int basedX = CHUNK_WIDTH * chunkX;
 	int basedY = CHUNK_HEIGHT * chunkY;
 	int basedZ = CHUNK_WIDTH * chunkZ;
 
 	chomk.model = mat4_translate(mat4_create(1), vec3_create2(basedX, basedY, basedZ));
 
-	int heightMap[CHUNK_WIDTH + 2][CHUNK_WIDTH + 2];
+	int heightMap[CHUNK_WIDTH + 2][CHUNK_WIDTH + 2];//[x][z], a +2 azért van, hogy a széleken is ismerje a magasságot
+	float heightHelper;
+	for (int i = 0; i < CHUNK_WIDTH + 2; i++)
+	{
+		for (int j = 0; j < CHUNK_WIDTH + 2; j++)
+		{
+			heightHelper = fnlGetNoise2D(&(cm->noise), basedX + i, basedZ + j);
+			heightHelper *= 1000*heightHelper;
+			heightHelper -= basedY - 20;
+			heightMap[i][j] = heightHelper;
+		}
+	}
+	
 
 	//filling chunk
 	for (int i = 0; i < CHUNK_HEIGHT; i++)//y
@@ -46,7 +59,7 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 		{
 			for (int k = 0; k < CHUNK_WIDTH; k++)//z 
 			{
-				if (i >  j + k)
+				if (i >  heightMap[j+1][k+1])
 					chomk.blocks[i][j][k] = BLOCK_AIR;
 				else
 					chomk.blocks[i][j][k] = BLOCK_DIRT;
@@ -67,27 +80,27 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 					continue;
 
 				//pos z
-				if (k == CHUNK_WIDTH - 1 || chomk.blocks[i][j][k + 1] == BLOCK_AIR)
+				if ((k == CHUNK_WIDTH - 1 && heightMap[j+1][CHUNK_WIDTH + 1]<i) || (k != CHUNK_WIDTH - 1 &&chomk.blocks[i][j][k + 1] == BLOCK_AIR))
 					sideCount++;
 
 				//pos x
-				if (j == CHUNK_WIDTH - 1 || chomk.blocks[i][j+1][k] == BLOCK_AIR)
+				if ((j == CHUNK_WIDTH - 1 && heightMap[CHUNK_WIDTH + 1][k+1]<i) || (j!=CHUNK_WIDTH-1 &&chomk.blocks[i][j+1][k] == BLOCK_AIR))
 					sideCount++;
 
 				//neg z
-				if (k == 0 || chomk.blocks[i][j][k -1] == BLOCK_AIR)
+				if ((k == 0 && heightMap[j+1][0]<i) || (k!=0&&chomk.blocks[i][j][k -1] == BLOCK_AIR))
 					sideCount++;
 
 				//neg x
-				if (j == 0 || chomk.blocks[i][j - 1][k] == BLOCK_AIR)
+				if ((j == 0 &&heightMap[0][k+1]<i) || (j!=0&&chomk.blocks[i][j - 1][k] == BLOCK_AIR))
 					sideCount++;
 
 				//pos y
-				if (i == CHUNK_HEIGHT - 1 || chomk.blocks[i + 1][j][k] == BLOCK_AIR)
+				if ((i == CHUNK_HEIGHT - 1 && heightMap[j+1][k+1] ==CHUNK_HEIGHT-1) || (i!=CHUNK_HEIGHT-1&&chomk.blocks[i + 1][j][k] == BLOCK_AIR))
 					sideCount++;
 
 				//neg y
-				if (i == 0 || chomk.blocks[i - 1][j][k] == BLOCK_AIR)
+				if ((i == 0 &&basedY==0) || (i!=0&&chomk.blocks[i - 1][j][k] == BLOCK_AIR))
 					sideCount++;
 			}
 		}
@@ -116,7 +129,7 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 					continue;
 
 				//pos z
-				if (k == CHUNK_WIDTH - 1 || chomk.blocks[i][j][k + 1] == BLOCK_AIR)
+				if ((k == CHUNK_WIDTH - 1 && heightMap[j + 1][CHUNK_WIDTH + 1] < i) || (k != CHUNK_WIDTH - 1 && chomk.blocks[i][j][k + 1] == BLOCK_AIR))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -159,7 +172,7 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 				}
 
 				//pos x
-				if (j == CHUNK_WIDTH - 1 || chomk.blocks[i][j + 1][k] == BLOCK_AIR)
+				if ((j == CHUNK_WIDTH - 1 && heightMap[CHUNK_WIDTH + 1][k + 1] < i) || (j != CHUNK_WIDTH - 1 && chomk.blocks[i][j + 1][k] == BLOCK_AIR))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -201,7 +214,7 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 				}
 
 				//neg z
-				if (k == 0 || chomk.blocks[i][j][k - 1] == BLOCK_AIR)
+				if ((k == 0 && heightMap[j + 1][0] < i) || (k != 0 && chomk.blocks[i][j][k - 1] == BLOCK_AIR))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -243,7 +256,7 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 				}
 
 				//neg x
-				if (j == 0 || chomk.blocks[i][j - 1][k] == BLOCK_AIR)
+				if ((j == 0 && heightMap[0][k + 1] < i) || (j != 0 && chomk.blocks[i][j - 1][k] == BLOCK_AIR))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -285,7 +298,7 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 				}
 
 				//pos y
-				if (i == CHUNK_HEIGHT - 1 || chomk.blocks[i + 1][j][k] == BLOCK_AIR)
+				if ((i == CHUNK_HEIGHT - 1 && heightMap[j + 1][k + 1] == CHUNK_HEIGHT - 1) || (i != CHUNK_HEIGHT - 1 && chomk.blocks[i + 1][j][k] == BLOCK_AIR))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -327,7 +340,7 @@ chunk chunk_generate(int chunkX, int chunkY, int chunkZ)
 				}
 
 				//neg y
-				if (i == 0 || chomk.blocks[i - 1][j][k] == BLOCK_AIR)
+				if ((i == 0 && basedY == 0) || (i != 0 && chomk.blocks[i - 1][j][k] == BLOCK_AIR))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -419,5 +432,29 @@ void chunk_destroy(chunk* chomk)
 		glDeleteVertexArrays(1, &(chomk->waterMesh.vao));
 		glDeleteBuffers(1, &(chomk->waterMesh.vbo));
 		glDeleteBuffers(1, &(chomk->waterMesh.ebo));
+	}
+}
+
+void chunk_getChunkFromPos(vec3 pos, int* chunkX, int* chunkY, int* chunkZ)
+{
+	if (pos.x < 0) {
+		*chunkX = ((int)(pos.x - CHUNK_WIDTH)) / CHUNK_WIDTH;
+	}
+	else {
+		*chunkX = ((int)(pos.x)) / CHUNK_WIDTH;
+	}
+
+	if (pos.y < 0) {
+		*chunkY = ((int)(pos.y - CHUNK_HEIGHT)) / CHUNK_HEIGHT;
+	}
+	else {
+		*chunkY = ((int)(pos.y)) / CHUNK_HEIGHT;
+	}
+
+	if (pos.z < 0) {
+		*chunkZ = ((int)(pos.z - CHUNK_WIDTH)) / CHUNK_WIDTH;
+	}
+	else {
+		*chunkZ = ((int)(pos.z)) / CHUNK_WIDTH;
 	}
 }

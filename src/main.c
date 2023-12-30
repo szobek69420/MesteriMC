@@ -45,7 +45,7 @@ int main()
     event_queue_init();
     input_init();
 
-    camera cum = camera_create(vec3_create2(0, 0, 0), vec3_create2(0, 1, 0), 0, 0, 90, 20, 0.8);
+    camera cum = camera_create(vec3_create2(0, 200, 0), vec3_create2(0, 1, 0), 0, 0, 90, 50, 0.8);
 
     shader shader = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
     shader_delete(&shader);
@@ -193,7 +193,7 @@ chunkManager cm;
 void init_kuba()
 {
     program = shader_import("../assets/shaders/chunk/chunkTest.vag", "../assets/shaders/chunk/chunkTest.fag", NULL);
-    cm = chunkManager_create(0, 4);
+    cm = chunkManager_create(69, 4);
 }
 
 void end_kuba() {
@@ -203,15 +203,18 @@ void end_kuba() {
 
 void draw_kuba(camera* cum) {
 
+    int chunkX, chunkY, chunkZ;
+    chunk_getChunkFromPos(cum->position, &chunkX, &chunkY, &chunkZ);
+
+    //vec3_print(&(cum->position));
+    //printf("%d %d %d\n\n", chunkX, chunkY, chunkZ);
     //printf("loaded: %d, pending: %d\n", cm.loadedChunks.size, cm.pendingUpdates.size);
-    chunkManager_searchForUpdates(&cm, 0, 0, 0);
+    chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
+    chunkManager_update(&cm);
     chunkManager_update(&cm);
 
     glUseProgram(program.id);
 
-    //model = mat4_rotate(model, vec3_create2(0, 0.4, 1), 50*glfwGetTime());
-    //model = mat4_rotate(model, vec3_create2(-3, -2, 1), 70 * glfwGetTime());
-    //model = mat4_translate(model, vec3_create2(0, 0, -0.5f));
-    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 200);
+    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 300);
     chunkManager_drawTerrain(&cm, &program, cum, &projection);
 }
