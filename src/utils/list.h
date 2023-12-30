@@ -13,20 +13,20 @@ typedef struct {
 	unsigned int size;
 } list;
 
-list lCreate();
+list list_create();
 
-void lClear(list* lista);
+void list_clear(list* lista);
 
-void lPush(list* lista, unsigned int index, void* data);
+void list_push(list* lista, unsigned int index, void* data);
 
-void lPushBack(list* lista, void* data);
+void list_push_back(list* lista, void* data);
 
-void lRemove(list* lista, void* data);
+void list_remove(list* lista, void* data);
 
-void lRemoveAt(list* lista, unsigned int index);
+void list_remove_at(list* lista, unsigned int index);
 
-void* lGet(list* lista, unsigned int index);
+void* list_get(list* lista, unsigned int index);
 
-void lSet(list* lista, unsigned int index, void* data);
+void list_set(list* lista, unsigned int index, void* data);
 
 #endif

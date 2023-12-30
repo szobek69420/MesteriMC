@@ -12,7 +12,7 @@ void chunk_drawTerrain(chunk* chomk)
 	glDrawElements(GL_TRIANGLES, chomk->normalMesh.indexCount, GL_UNSIGNED_INT, 0);
 }
 
-void chunk_drawWater(chunk* chomk)
+void chunk_drawWalter(chunk* chomk)
 {
 	if (chomk->isThereWaterMesh == 0)
 		return;

@@ -36,6 +36,6 @@ void chunk_destroy(chunk* chomk);
 
 
 void chunk_drawTerrain(chunk* chomk);
-void chunk_drawWater(chunk* chomk);
+void chunk_drawWalter(chunk* chomk);
 
 #endif
