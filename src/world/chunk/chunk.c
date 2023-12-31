@@ -38,6 +38,14 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 
 	chomk.model = mat4_translate(mat4_create(1), vec3_create2(basedX, basedY, basedZ));
 
+	chomk.blocks = (char***)malloc(CHUNK_HEIGHT * sizeof(char**));
+	for (int i = 0; i < CHUNK_WIDTH; i++)
+	{
+		chomk.blocks[i] = (char**)malloc(CHUNK_WIDTH * sizeof(char*));
+		for (int j = 0; j < CHUNK_WIDTH; j++)
+			chomk.blocks[i][j] = (char*)malloc(CHUNK_WIDTH * sizeof(char));
+	}
+
 	int heightMap[CHUNK_WIDTH + 2][CHUNK_WIDTH + 2];//[x][z], a +2 azért van, hogy a széleken is ismerje a magasságot
 	float heightHelper;
 	for (int i = 0; i < CHUNK_WIDTH + 2; i++)
@@ -421,6 +429,15 @@ WalterGeneration:
 
 void chunk_destroy(chunk* chomk)
 {
+	for (int i = 0; i < CHUNK_WIDTH; i++)
+	{
+		for (int j = 0; j < CHUNK_WIDTH; j++)
+			free(chomk->blocks[i][j]);
+
+		free(chomk->blocks[i]);
+	}
+	free(chomk->blocks);
+
 	if (chomk->isThereNormalMesh != 0) {
 		chomk->isThereNormalMesh = 0;
 		glDeleteVertexArrays(1, &(chomk->normalMesh.vao));
