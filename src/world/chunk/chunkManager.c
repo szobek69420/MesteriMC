@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <glad/glad.h>
+
 chunkManager chunkManager_create(int seed, int renderDistance)
 {
 	chunkManager cm;
@@ -202,18 +204,61 @@ void chunkManager_update(chunkManager* cm)
 	free(ceu);
 }
 
+static float chunkBounds[24] = {
+	0,0,0,
+	0,0,CHUNK_WIDTH,
+	0,CHUNK_HEIGHT,0,
+	0,CHUNK_HEIGHT,CHUNK_WIDTH,
+	CHUNK_WIDTH,0,0,
+	CHUNK_WIDTH,0,CHUNK_WIDTH,
+	CHUNK_WIDTH,CHUNK_HEIGHT,0,
+	CHUNK_WIDTH,CHUNK_HEIGHT,CHUNK_WIDTH
+};
 
 void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
 {
-	shader_setMat4(shit->id, "view", camera_get_view_matrix(cum));
-	shader_setMat4(shit->id, "projection", *projection);
+	chunk* chomk;
+	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
+	char isInFrustum;
+	float basedX, basedY, basedZ;
+	vec4 temp;
+	mat4 pv = mat4_multiply(*projection, camera_get_view_matrix(cum));
+	mat4 pvm;
+
+	//shader_setMat4(shit->id, "view", camera_get_view_matrix(cum));
+	//shader_setMat4(shit->id, "projection", *projection);
+	glUniformMatrix4fv(glGetUniformLocation(shit->id, "view"), 1, GL_FALSE, camera_get_view_matrix(cum).data);
+	glUniformMatrix4fv(glGetUniformLocation(shit->id, "projection"), 1, GL_FALSE, projection->data);
 
 	listElement* it = list_get_iterator(&(cm->loadedChunks));
 	while (it != NULL)
 	{
-		//printf("%d %d %d\n", ((chunk*)(it->data))->chunkX, ((chunk*)(it->data))->chunkY, ((chunk*)(it->data))->chunkZ);
-		shader_setMat4(shit->id, "model", ((chunk*)(it->data))->model);
-		chunk_drawTerrain((chunk*)(it->data));
+		chomk = ((chunk*)it->data);
+		if (chomk->isThereNormalMesh)
+		{
+			basedX = chomk->chunkX * CHUNK_WIDTH;
+			basedY = chomk->chunkY * CHUNK_HEIGHT;
+			basedZ = chomk->chunkZ * CHUNK_WIDTH;
+
+			pvm = mat4_multiply(pv, chomk->model);
+
+			for (int i = 0; i < 24; )
+			{
+				temp.x = basedX + chunkBounds[i++];
+				temp.y = basedY + chunkBounds[i++];
+				temp.z = basedZ + chunkBounds[i++];
+				temp.w = 1;
+				temp = vec4_multiplyWithMatrix(pvm, temp);
+				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
+
+				if (temp.x * temp.x < 1 || temp.y * temp.y < 1 || temp.z * temp.z < 1)
+				{
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
+					chunk_drawTerrain(chomk);
+					break;
+				}
+			}
+		}
 
 		//it=it->next;
 		it = list_next(&it);
