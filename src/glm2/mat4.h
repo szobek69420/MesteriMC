@@ -5,7 +5,7 @@
 #include "vec4.h"
 #include "mat3.h"
 
-typedef struct {
+typedef struct mat4 {
 	float data[16];
 } mat4; //column-major order
 
