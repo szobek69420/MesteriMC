@@ -14,7 +14,7 @@ typedef struct {
 
 	int chunkX, chunkY, chunkZ;
 
-	char blocks[CHUNK_HEIGHT][CHUNK_WIDTH][CHUNK_WIDTH];//y,x,z
+	char*** blocks;//[y][x][z]
 
 	/*
 	* normal mesh layout:

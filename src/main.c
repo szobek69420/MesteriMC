@@ -11,6 +11,7 @@
 #include "event/event_queue.h"
 #include "input/input.h"
 #include "shader/shader.h"
+#include "texture_handler/texture_handler.h"
 
 #include "world/chunk/chunk.h"
 #include "world/chunk/chunkManager.h"
@@ -45,14 +46,13 @@ int main()
     event_queue_init();
     input_init();
 
-    camera cum = camera_create(vec3_create2(0, 200, 0), vec3_create2(0, 1, 0), 0, 0, 90, 50, 0.8);
-
-    shader shader = shader_import("../assets/shaders/amoma.vag", "../assets/shaders/amoma.fag", NULL);
-    shader_delete(&shader);
+    camera cum = camera_create(vec3_create2(0, 200, 0), vec3_create2(0, 1, 0), 0, 0, 90, 50, 0.2);
 
     init_kuba();
 
-    glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+    textureHandler_importTextures();
+
+    glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
 
     glEnable(GL_DEPTH_TEST);
     glClearDepth(1);
@@ -96,6 +96,7 @@ int main()
     }
 
     end_kuba();
+    textureHandler_destroyTextures();
     glfwTerminate();
     return 69;
 }
@@ -193,6 +194,9 @@ chunkManager cm;
 void init_kuba()
 {
     program = shader_import("../assets/shaders/chunk/chunkTest.vag", "../assets/shaders/chunk/chunkTest.fag", NULL);
+    shader_use(program.id);
+    shader_setInt(program.id, "tex", 0);
+    shader_use(0);
     cm = chunkManager_create(69, 4);
 }
 
@@ -214,6 +218,9 @@ void draw_kuba(camera* cum) {
     chunkManager_update(&cm);
 
     glUseProgram(program.id);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_ALBEDO));
 
     mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 300);
     chunkManager_drawTerrain(&cm, &program, cum, &projection);

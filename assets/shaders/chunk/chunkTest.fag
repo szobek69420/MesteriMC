@@ -1,11 +1,14 @@
 #version 330 core
 
 in vec3 normal;
+in vec2 uv;
 
 out vec4 fragColor;
+
+uniform sampler2D tex;
 
 void main()
 {
 	float diffuse=0.5f*dot(normal,vec3(0.2,0.772,0.662))+0.5f;
-	fragColor=vec4(0,diffuse,diffuse,1);
+	fragColor=pow(texture(tex, uv), vec4(0.4545));//gamma corr
 }
