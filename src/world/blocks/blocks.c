@@ -39,7 +39,7 @@ void blocks_getUV(int block, int side, int index, float* uvx, float* uvy)
 {
 	int szam = 18 * block + 3 * side;
 	*uvx = vertexUV[szam];
-	*uvx= vertexUV[szam+1];
+	*uvy= vertexUV[szam+1];
 	
 	//ez trukkos
 	if (index % 3)

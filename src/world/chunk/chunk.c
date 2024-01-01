@@ -67,10 +67,15 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 		{
 			for (int k = 0; k < CHUNK_WIDTH; k++)//z 
 			{
-				if (i >  heightMap[j+1][k+1])
+				int level = heightMap[j + 1][k + 1];
+				if (i >  level)
 					chomk.blocks[i][j][k] = BLOCK_AIR;
-				else
+				else if(i>level-1)
+					chomk.blocks[i][j][k] = BLOCK_GRASS;
+				else if (i > level - 8)
 					chomk.blocks[i][j][k] = BLOCK_DIRT;
+				else
+					chomk.blocks[i][j][k] = BLOCK_STONE;
 			}
 		}
 	}
