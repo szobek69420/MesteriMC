@@ -1,6 +1,8 @@
 #ifndef FRAMEBUFFER_H
 #define FRAMEBUFFER_H
 
+#define RENDERER_SHADOW_RESOLUTION 1024
+
 //buffer types
 #define RENDERER_END_BUFFER 2
 #define RENDERER_G_BUFFER 3
@@ -36,7 +38,7 @@ typedef struct renderer {
 	endFBO endBuffer;
 } renderer;
 
-renderer renderer_create();
-renderer renderer_destroy(renderer cucc);
+renderer renderer_create(int width, int height);
+void renderer_destroy(renderer cucc);
 
 #endif

@@ -4,9 +4,31 @@
 #include "framebuffer.h"
 
 shadowFBO renderer_createShadowFBO(int width, int height);
+void renderer_destroyShadowFBO(shadowFBO shadowBuffer);
 
-renderer renderer_create();
-renderer renderer_destroy(renderer cucc);
+geometryFBO renderer_createGeometryFBO(int width, int height);
+void renderer_destroyGeometryFBO(geometryFBO gBuffer);
+
+endFBO renderer_createEndFBO(int width, int height);
+void renderer_destroyEndFBO(endFBO endBuffer);
+
+
+
+renderer renderer_create(int width, int height)
+{
+    renderer rendor;
+    rendor.shadowBuffer = renderer_createShadowFBO(RENDERER_SHADOW_RESOLUTION,RENDERER_SHADOW_RESOLUTION);
+    rendor.gBuffer = renderer_createGeometryFBO(width, height);
+    rendor.endBuffer = renderer_createEndFBO(width, height);
+    return rendor;
+}
+
+void renderer_destroy(renderer cucc)
+{
+    renderer_destroyShadowFBO(cucc.shadowBuffer);
+    renderer_destroyGeometryFBO(cucc.gBuffer);
+    renderer_destroyEndFBO(cucc.endBuffer);
+}
 
 
 shadowFBO renderer_createShadowFBO(int width, int height)
@@ -37,6 +59,12 @@ shadowFBO renderer_createShadowFBO(int width, int height)
     return fb;
 }
 
+void renderer_destroyShadowFBO(shadowFBO shadowBuffer)
+{
+    glDeleteTextures(1, &shadowBuffer.depthBuffer);
+    glDeleteFramebuffers(1, &shadowBuffer.id);
+}
+
 geometryFBO renderer_createGeometryFBO(int width, int height)
 {
     geometryFBO gBuffer;
@@ -47,7 +75,7 @@ geometryFBO renderer_createGeometryFBO(int width, int height)
     // - position color buffer
     glGenTextures(1, &gBuffer.position);
     glBindTexture(GL_TEXTURE_2D, gBuffer.position);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gBuffer.position, 0);
@@ -55,7 +83,7 @@ geometryFBO renderer_createGeometryFBO(int width, int height)
     // - normal color buffer
     glGenTextures(1, &gBuffer.normal);
     glBindTexture(GL_TEXTURE_2D, gBuffer.normal);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gBuffer.normal, 0);
@@ -85,6 +113,18 @@ geometryFBO renderer_createGeometryFBO(int width, int height)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     return gBuffer;
+}
+
+void renderer_destroyGeometryFBO(geometryFBO gBuffer)
+{
+    //glDeleteTextures(3,&gBuffer.position);
+    glDeleteTextures(1, &gBuffer.position);
+    glDeleteTextures(1, &gBuffer.normal);
+    glDeleteTextures(1, &gBuffer.albedoSpec);
+
+    glDeleteRenderbuffers(1, &gBuffer.depthBuffer);
+
+    glDeleteFramebuffers(1, &gBuffer.id);
 }
 
 endFBO renderer_createEndFBO(int width, int height)
@@ -117,4 +157,11 @@ endFBO renderer_createEndFBO(int width, int height)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     return endBuffer;
+}
+
+void renderer_destroyEndFBO(endFBO endBuffer)
+{
+    glDeleteTextures(1, &endBuffer.colorBuffer);
+    glDeleteRenderbuffers(1, &endBuffer.depthBuffer);
+    glDeleteFramebuffers(1, &endBuffer.id);
 }

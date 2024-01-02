@@ -227,8 +227,6 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 
 	//shader_setMat4(shit->id, "view", camera_get_view_matrix(cum));
 	//shader_setMat4(shit->id, "projection", *projection);
-	glUniformMatrix4fv(glGetUniformLocation(shit->id, "view"), 1, GL_FALSE, camera_get_view_matrix(cum).data);
-	glUniformMatrix4fv(glGetUniformLocation(shit->id, "projection"), 1, GL_FALSE, projection->data);
 
 	listElement* it = list_get_iterator(&(cm->loadedChunks));
 	while (it != NULL)
