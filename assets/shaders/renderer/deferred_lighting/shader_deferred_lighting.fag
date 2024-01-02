@@ -1,0 +1,18 @@
+#version 330 core
+
+in vec2 uv;
+
+out vec4 fragColor;
+
+uniform sampler2D texture_normal;
+uniform sampler2D texture_albedospec;
+
+uniform sampler2D texture_shadow;
+
+uniform mat4 projectionToWorld;
+
+void main()
+{
+	vec4 pos=projectionToWorld*gl_FragCoord;
+	fragColor=vec4(texture(texture_normal,uv).rgb,1);
+}
