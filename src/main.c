@@ -46,6 +46,13 @@ int main()
     event_queue_init();
     input_init();
 
+    shader shit=shader_import(
+        "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.vag",
+        "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.fag",
+        "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.gag");
+    shader_delete(&shit);
+
+
     camera cum = camera_create(vec3_create2(0, 200, 0), vec3_create2(0, 1, 0), 0, 0, 90, 50, 0.2);
 
     init_kuba();
