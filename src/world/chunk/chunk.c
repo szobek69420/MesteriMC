@@ -46,7 +46,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 			chomk.blocks[i][j] = (char*)malloc(CHUNK_WIDTH * sizeof(char));
 	}
 
-	int heightMap[CHUNK_WIDTH + 2][CHUNK_WIDTH + 2];//[x][z], a +2 azért van, hogy a széleken is ismerje a magasságot
+	int heightMap[CHUNK_WIDTH + 2][CHUNK_WIDTH + 2];//[x][z], a +2 azï¿½rt van, hogy a szï¿½leken is ismerje a magassï¿½got
 	float heightHelper;
 	for (int i = 0; i < CHUNK_WIDTH + 2; i++)
 	{
@@ -424,6 +424,9 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 	glBindVertexArray(0);
 
 	chomk.isThereNormalMesh = 69;
+	
+	free(normalVertexData);
+	free(normalVertexIndices);
 
 WalterGeneration:
 

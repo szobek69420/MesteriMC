@@ -117,6 +117,7 @@ GLFWwindow* init_window(const char* name, int width, int height)
         return NULL;
     }
     glfwMakeContextCurrent(window);
+    glfwSwapInterval(0);
 
     //callbacks
     glfwSetWindowSizeCallback(window, window_size_callback);
