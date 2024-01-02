@@ -12,7 +12,6 @@
 typedef struct geometryFBO {
 	unsigned int id;
 
-	unsigned int position;
 	unsigned int normal;
 	unsigned int albedoSpec;
 

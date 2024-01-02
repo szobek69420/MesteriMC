@@ -61,8 +61,6 @@ int main()
 
     init_renderer();
 
-    glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
-
     float deltaTime;
     float lastFrame=glfwGetTime();
     float lastSecond = 0;//az fps szamolashoz
@@ -173,7 +171,8 @@ unsigned int rectangleVAO;
 
 void init_renderer()
 {
-    rendor = renderer_create(window_getWidth(), window_getHeight());
+    //rendor = renderer_create(window_getWidth(), window_getHeight());
+    rendor = renderer_create(1920, 1080);
 
     shadowShader = shader_import(
         "../assets/shaders/renderer/shadow/shader_shadow.vag",
@@ -184,6 +183,7 @@ void init_renderer()
         "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.vag",
         "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.fag",
         "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.gag");
+
     glUseProgram(geometryPassShader.id);
     glUniform1i(glGetUniformLocation(geometryPassShader.id, "texture_albedo"), 0);
     glUniform1i(glGetUniformLocation(geometryPassShader.id, "texture_normal"), 1);
@@ -195,10 +195,9 @@ void init_renderer()
         NULL
     );
     glUseProgram(lightingPassShader.id);
-    glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_position"), 0);
-    glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_normal"), 1);
-    glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_albedospec"), 2);
-    glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_shadow"), 3);
+    glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_normal"), 0);
+    glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_albedospec"), 1);
+    glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_shadow"), 2);
 
     rectangleShader = shader_import(
         "../assets/shaders/renderer/rectangle/shader_rectangle.vag",
@@ -268,20 +267,20 @@ void render(camera* cum)
 
 
     //geometry pass
-    glViewport(0, 0, window_getWidth(), window_getHeight());
+    glViewport(0, 0, 1920, 1080);
+    //glViewport(0, 0, window_getWidth(), window_getHeight());
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.gBuffer.id);
 
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
-
-    mat4 projection= mat4_perspective(cum->fov, window_getAspect(), 0.1, 300);
+    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 300);
+    mat4 pv= mat4_multiply(projection, camera_get_view_matrix(cum));
 
     glUseProgram(geometryPassShader.id);
 
-    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "view"), 1, GL_FALSE, camera_get_view_matrix(cum).data);
-    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "projection"), 1, GL_FALSE, projection.data);
+    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "pv"), 1, GL_FALSE, pv.data);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_ALBEDO));
@@ -299,31 +298,42 @@ void render(camera* cum)
     
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.position);
+    glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
 
-    glActiveTexture(GL_TEXTURE1);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
 
-    glActiveTexture(GL_TEXTURE2);
+    glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.albedoSpec);
 
-    glActiveTexture(GL_TEXTURE3);
+    glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, rendor.shadowBuffer.depthBuffer);
 
     glUseProgram(lightingPassShader.id);
+
     glBindVertexArray(rectangleVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    //draw results to screen
+    //draw deferred results to screen
+    glViewport(0, 0, window_getWidth(), window_getHeight());
     glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
 
     glUseProgram(rectangleShader.id);
+    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "projectionToWorld"), 1, GL_FALSE, mat4_inverse(pv).data);
     glBindVertexArray(rectangleVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    //copy depth buffer
+    /*glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBlitFramebuffer(0, 0, 1920, 1080, 0, 0, window_getWidth(), window_getHeight(), GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);*/
+
+    //render forward scene
 }
 
 void window_size_callback(GLFWwindow* window, int width, int height)
@@ -373,7 +383,7 @@ void end_kuba() {
 }
 
 void draw_kuba(camera* cum, mat4* projection) {
-    chunkManager_drawTerrain(&cm, &program, cum, projection);
+    chunkManager_drawTerrain(&cm, &geometryPassShader, cum, projection);
 }
 
 void update_kuba(camera* cum)

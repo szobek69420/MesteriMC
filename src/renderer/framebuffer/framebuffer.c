@@ -72,21 +72,13 @@ geometryFBO renderer_createGeometryFBO(int width, int height)
     glGenFramebuffers(1, &gBuffer.id);
     glBindFramebuffer(GL_FRAMEBUFFER, gBuffer.id);
 
-    // - position color buffer
-    glGenTextures(1, &gBuffer.position);
-    glBindTexture(GL_TEXTURE_2D, gBuffer.position);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gBuffer.position, 0);
-
     // - normal color buffer
     glGenTextures(1, &gBuffer.normal);
     glBindTexture(GL_TEXTURE_2D, gBuffer.normal);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gBuffer.normal, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gBuffer.normal, 0);
 
     // - color + specular color buffer
     glGenTextures(1, &gBuffer.albedoSpec);
@@ -94,11 +86,11 @@ geometryFBO renderer_createGeometryFBO(int width, int height)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gBuffer.albedoSpec, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gBuffer.albedoSpec, 0);
 
     // - tell OpenGL which color attachments we'll use (of this framebuffer) for rendering 
-    unsigned int attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-    glDrawBuffers(3, attachments);
+    unsigned int attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, attachments);
 
     //depth
     glGenRenderbuffers(1, &(gBuffer.depthBuffer));
@@ -117,8 +109,7 @@ geometryFBO renderer_createGeometryFBO(int width, int height)
 
 void renderer_destroyGeometryFBO(geometryFBO gBuffer)
 {
-    //glDeleteTextures(3,&gBuffer.position);
-    glDeleteTextures(1, &gBuffer.position);
+    //glDeleteTextures(2,&gBuffer.normal);
     glDeleteTextures(1, &gBuffer.normal);
     glDeleteTextures(1, &gBuffer.albedoSpec);
 
@@ -137,7 +128,7 @@ endFBO renderer_createEndFBO(int width, int height)
     glGenTextures(1, &(endBuffer.colorBuffer));
     glBindTexture(GL_TEXTURE_2D, endBuffer.colorBuffer);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);//itt elég lenne a GL_RGB16F, de aszem az nem minden videjókárgyával kompatibilis
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);//itt elég lenne a GL_RGB16F, de aszem az nem minden videjókárgyával kompatibilis
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

@@ -7,23 +7,16 @@ layout (location=4) in vec3 aBitangent;
 
 out VS_OUT{
     vec2 TexCoords;
-    vec3 FragPos;
-    vec3 Normal;
-    vec3 Tangent;
-    vec3 Bitangent;
+    mat3 tbn_inverse;
 }vs_out;
 
 uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
+uniform mat4 pv;
 
 void main()
 {    
     vs_out.TexCoords=aUVG.xy;
-    vs_out.FragPos=aPos;
-    vs_out.Normal=aNormal;
-    vs_out.Tangent=aTangent;
-    vs_out.Bitangent=aBitangent;
+    vs_out.tbn_inverse=transpose(mat3(aTangent, aBitangent, aNormal));
 
-    gl_Position=projection*view*model*vec4(aPos,1);
+    gl_Position=pv*model*vec4(aPos,1);
 }  
