@@ -165,7 +165,7 @@ listElement* list_get_iterator(list* lista)
 	return lista->head;
 }
 
-listElement* list_next(listElement** iterator)
+listElement* list_next(listElement* iterator)
 {
-	return (*iterator)->next;
+	return iterator->next;
 }

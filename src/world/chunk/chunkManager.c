@@ -65,7 +65,7 @@ int chunkManager_isChunkLoaded(chunkManager* cm, int chunkX, int chunkY, int chu
 		if (((chunk*)(iterator->data))->chunkX == chunkX && ((chunk*)(iterator->data))->chunkY ==chunkY && ((chunk*)(iterator->data))->chunkZ == chunkZ)
 			return 69;
 
-		iterator=list_next(&iterator);
+		iterator=list_next(iterator);
 	}
 
 	return 0;
@@ -80,7 +80,7 @@ int chunkManager_isChunkPending(chunkManager* cm, int chunkX, int chunkY, int ch
 		if (((chunkUpdate*)(iterator->data))->chunkX == chunkX && ((chunkUpdate*)(iterator->data))->chunkY == chunkY && ((chunkUpdate*)(iterator->data))->chunkZ == chunkZ)
 			return 69;
 
-		iterator = list_next(&iterator);
+		iterator = list_next(iterator);
 	}
 
 	return 0;
@@ -146,7 +146,7 @@ exit_load:
 			}
 		}
 
-		iterator = list_next(&iterator);
+		iterator = list_next(iterator);
 	}
 
 
@@ -190,7 +190,7 @@ void chunkManager_update(chunkManager* cm)
 					break;
 				}
 
-				iterator = list_next(&iterator);
+				iterator = list_next(iterator);
 				index++;
 			}
 			break;
@@ -261,7 +261,7 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 		}
 
 		//it=it->next;
-		it = list_next(&it);
+		it = list_next(it);
 	}
 }
 
