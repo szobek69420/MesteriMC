@@ -53,7 +53,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 		for (int j = 0; j < CHUNK_WIDTH + 2; j++)
 		{
 			heightHelper = fnlGetNoise2D(&(cm->noise), basedX + i, basedZ + j);
-			heightHelper *= 1000*heightHelper;
+			heightHelper *= 100*heightHelper;
 			heightHelper -= basedY - 20;
 			heightMap[i][j] = heightHelper;
 		}
@@ -163,7 +163,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						blocks_getUV(chomk.blocks[i][j][k],BLOCK_POSITIVE_Z, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = 0;//geometry
+						//normalVertexData[vertexDataIndex++] = 0;//geometry
 
 						blocks_getVertexNormal(BLOCK_POSITIVE_Z, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
@@ -175,10 +175,10 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						normalVertexData[vertexDataIndex++] = y;
 						normalVertexData[vertexDataIndex++] = z;
 
-						blocks_getVertexBitangent(BLOCK_POSITIVE_Z, &x, &y, &z);
+						/*blocks_getVertexBitangent(BLOCK_POSITIVE_Z, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = z;
+						normalVertexData[vertexDataIndex++] = z;*/
 					}
 
 					currentVertex += 4;
@@ -206,7 +206,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_POSITIVE_X, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = 0;//geometry
+						//normalVertexData[vertexDataIndex++] = 0;//geometry
 
 						blocks_getVertexNormal(BLOCK_POSITIVE_X, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
@@ -218,10 +218,10 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						normalVertexData[vertexDataIndex++] = y;
 						normalVertexData[vertexDataIndex++] = z;
 
-						blocks_getVertexBitangent(BLOCK_POSITIVE_X, &x, &y, &z);
+						/*blocks_getVertexBitangent(BLOCK_POSITIVE_X, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = z;
+						normalVertexData[vertexDataIndex++] = z;*/
 					}
 					currentVertex += 4;
 				}
@@ -248,7 +248,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_Z, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = 0;//geometry
+						//normalVertexData[vertexDataIndex++] = 0;//geometry
 
 						blocks_getVertexNormal(BLOCK_NEGATIVE_Z, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
@@ -260,10 +260,10 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						normalVertexData[vertexDataIndex++] = y;
 						normalVertexData[vertexDataIndex++] = z;
 
-						blocks_getVertexBitangent(BLOCK_NEGATIVE_Z, &x, &y, &z);
+						/*blocks_getVertexBitangent(BLOCK_NEGATIVE_Z, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = z;
+						normalVertexData[vertexDataIndex++] = z;*/
 					}
 					currentVertex += 4;
 				}
@@ -290,7 +290,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_X, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = 0;//geometry
+						//normalVertexData[vertexDataIndex++] = 0;//geometry
 
 						blocks_getVertexNormal(BLOCK_NEGATIVE_X, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
@@ -302,10 +302,10 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						normalVertexData[vertexDataIndex++] = y;
 						normalVertexData[vertexDataIndex++] = z;
 
-						blocks_getVertexBitangent(BLOCK_NEGATIVE_X, &x, &y, &z);
+						/*blocks_getVertexBitangent(BLOCK_NEGATIVE_X, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = z;
+						normalVertexData[vertexDataIndex++] = z;*/
 					}
 					currentVertex += 4;
 				}
@@ -332,7 +332,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_POSITIVE_Y, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = 0;//geometry
+						//normalVertexData[vertexDataIndex++] = 0;//geometry
 
 						blocks_getVertexNormal(BLOCK_POSITIVE_Y, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
@@ -344,10 +344,10 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						normalVertexData[vertexDataIndex++] = y;
 						normalVertexData[vertexDataIndex++] = z;
 
-						blocks_getVertexBitangent(BLOCK_POSITIVE_Y, &x, &y, &z);
+						/*blocks_getVertexBitangent(BLOCK_POSITIVE_Y, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = z;
+						normalVertexData[vertexDataIndex++] = z;*/
 					}
 					currentVertex += 4;
 				}
@@ -374,7 +374,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_Y, l, &x, &y);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = 0;//geometry
+						//normalVertexData[vertexDataIndex++] = 0;//geometry
 
 						blocks_getVertexNormal(BLOCK_NEGATIVE_Y, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
@@ -386,10 +386,10 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 						normalVertexData[vertexDataIndex++] = y;
 						normalVertexData[vertexDataIndex++] = z;
 
-						blocks_getVertexBitangent(BLOCK_NEGATIVE_Y, &x, &y, &z);
+						/*blocks_getVertexBitangent(BLOCK_NEGATIVE_Y, &x, &y, &z);
 						normalVertexData[vertexDataIndex++] = x;
 						normalVertexData[vertexDataIndex++] = y;
-						normalVertexData[vertexDataIndex++] = z;
+						normalVertexData[vertexDataIndex++] = z;*/
 					}
 					currentVertex += 4;
 				}
@@ -412,14 +412,14 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 	
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);//positions
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(3*sizeof(float)));
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(3*sizeof(float)));
 	glEnableVertexAttribArray(1);//uv and geom
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(6 * sizeof(float)));
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(5 * sizeof(float)));
 	glEnableVertexAttribArray(2);//normal
-	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(9 * sizeof(float)));
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(8 * sizeof(float)));
 	glEnableVertexAttribArray(3);//tangent
-	glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(12 * sizeof(float)));
-	glEnableVertexAttribArray(4);//bitangent
+	/*glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(12 * sizeof(float)));
+	glEnableVertexAttribArray(4);//bitangent*/
 
 	glBindVertexArray(0);
 

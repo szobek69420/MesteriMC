@@ -74,6 +74,7 @@ int main()
         if (lastSecond > 1)
         {
             printf("FPS: %d\n", framesInLastSecond);
+            printf("Pos: %d %d %d\n\n", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
             lastSecond = 0;
             framesInLastSecond = 0;
         }
@@ -172,7 +173,7 @@ unsigned int rectangleVAO;
 void init_renderer()
 {
     //rendor = renderer_create(window_getWidth(), window_getHeight());
-    rendor = renderer_create(1920, 1080);
+    rendor = renderer_create(1920,1080);
 
     shadowShader = shader_import(
         "../assets/shaders/renderer/shadow/shader_shadow.vag",
@@ -389,7 +390,7 @@ void draw_kuba(camera* cum, mat4* projection) {
 void update_kuba(camera* cum)
 {
     int chunkX, chunkY, chunkZ;
-    chunk_getChunkFromPos(cum->position, &chunkX, &chunkY, &chunkZ);
+    chunk_getChunkFromPos(vec3_create2(cum->position.x+CHUNK_WIDTH*0.5f, cum->position.y + CHUNK_HEIGHT * 0.5f, cum->position.z + CHUNK_WIDTH * 0.5f), &chunkX, &chunkY, &chunkZ);
 
     chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
     chunkManager_update(&cm);
