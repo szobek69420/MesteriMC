@@ -18,6 +18,8 @@
 
 #include "renderer/framebuffer/framebuffer.h"
 
+#include "font_handler/font_handler.h"
+
 #include "glm2/mat4.h"
 #include "glm2/vec3.h"
 #include "glm2/mat3.h"
@@ -29,12 +31,14 @@ void handle_event(event e);
 
 void init_renderer();
 void end_renderer();
-void render(camera* cum);
+void render(camera* cum, font* f);
 
 void init_kuba();
 void end_kuba();
 void draw_kuba(camera* cum, mat4* projection);
 void update_kuba(camera* cum);
+
+void render_text(font* f, const char* text, float x, float y, float scale);
 
 //glfw callbacks
 void window_size_callback(GLFWwindow* window, int width, int height);
@@ -45,21 +49,21 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 int main()
 {
-
     window_setWidth(1300);
     window_setHeight(800);
     GLFWwindow* window = init_window("amogus", window_getWidth(), window_getHeight());
+    
     event_queue_init();
     input_init();
-
+    fontHandler_init();
 
     camera cum = camera_create(vec3_create2(0, 200, 0), vec3_create2(0, 1, 0), 0, 0, 90, 50, 0.2);
 
     init_kuba();
+    init_renderer();
 
     textureHandler_importTextures();
-
-    init_renderer();
+    font f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
 
     float deltaTime;
     float lastFrame=glfwGetTime();
@@ -90,8 +94,7 @@ int main()
         update_kuba(&cum);
 
         //render
-        render(&cum);
-        //draw_kuba(&cum);
+        render(&cum, &f);
 
         glfwPollEvents();
         glfwSwapBuffers(window);
@@ -99,6 +102,7 @@ int main()
 
     end_kuba();
     textureHandler_destroyTextures();
+    fontHandler_close();
     end_renderer();
 
     glfwTerminate();
@@ -166,15 +170,20 @@ shader geometryPassShader;
 shader lightingPassShader;
 shader forwardPassShader;
 shader rectangleShader;
+shader textShader;
 
-unsigned int rectangleVBO;
 unsigned int rectangleVAO;
+unsigned int rectangleVBO;
+
+unsigned int textVAO;
+unsigned int textVBO;
 
 void init_renderer()
 {
     //rendor = renderer_create(window_getWidth(), window_getHeight());
     rendor = renderer_create(1920,1080);
 
+    //shaders
     shadowShader = shader_import(
         "../assets/shaders/renderer/shadow/shader_shadow.vag",
         "../assets/shaders/renderer/shadow/shader_shadow.fag",
@@ -208,8 +217,15 @@ void init_renderer()
     glUseProgram(rectangleShader.id);
     glUniform1i(glGetUniformLocation(rectangleShader.id, "tex"), 0);
 
+    textShader = shader_import(
+        "../assets/shaders/renderer2D/text/shader_text.vag",
+        "../assets/shaders/renderer2D/text/shader_text.fag",
+        NULL
+    );
+
     glUseProgram(0);
 
+    //rectangle VAO, VBO
     float vertices[] = {
         1,-1,0,     1,0,
         -1,-1,0,     0,0,
@@ -233,12 +249,28 @@ void init_renderer()
 
     glBindVertexArray(0);
 
+    //text VAO, VBO
+    glGenVertexArrays(1, &textVAO);
+    glBindVertexArray(textVAO);
+
+    glGenBuffers(1, &textVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+    
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    
+    glBindVertexArray(0);
+
     glEnable(GL_DEPTH_TEST);
     glClearDepth(1);
 
-    glEnable(GL_CULL_FACE);
+    //cull front faces
     glCullFace(GL_FRONT);
     glFrontFace(GL_CCW);
+
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void end_renderer()
@@ -253,8 +285,10 @@ void end_renderer()
     glDeleteBuffers(1, &rectangleVBO);
 }
 
-void render(camera* cum)
+void render(camera* cum, font* f)
 {
+    glEnable(GL_CULL_FACE);
+    
     //shadow
     glViewport(0, 0, RENDERER_SHADOW_RESOLUTION, RENDERER_SHADOW_RESOLUTION);
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.shadowBuffer.id);
@@ -277,7 +311,7 @@ void render(camera* cum)
 
 
     mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 300);
-    mat4 pv= mat4_multiply(projection, camera_get_view_matrix(cum));
+    mat4 pv= mat4_multiply(projection, camera_getViewMatrix(cum));
 
     glUseProgram(geometryPassShader.id);
 
@@ -335,6 +369,21 @@ void render(camera* cum)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);*/
 
     //render forward scene
+
+
+    //render 2d stuff (only text yet)
+    //glEnable(GL_BLEND);
+    glDisable(GL_CULL_FACE);
+    glUseProgram(textShader.id);
+    
+    mat4 projection2D = mat4_ortho(0, window_getWidth(), 0, window_getHeight(), -1, 1);
+    glUniformMatrix4fv(glGetUniformLocation(textShader.id, "projection"), 1, GL_FALSE, projection2D.data);
+    glUniform3f(glGetUniformLocation(textShader.id, "textColor"), 1, 1, 1);
+    
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(textVAO);
+    render_text(f, "amogus", 10, 10, 1);
+    //glDisable(GL_BLEND);
 }
 
 void window_size_callback(GLFWwindow* window, int width, int height)
@@ -395,4 +444,42 @@ void update_kuba(camera* cum)
     chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
     chunkManager_update(&cm);
     chunkManager_update(&cm);
+}
+
+void render_text(font* f, const char* text, float x, float y, float scale)
+{
+    // assuming textShader is used, uniforms are set and VAO is bound
+    // iterate through all characters
+    for (int i = 0; text[i] != '\0'; i++) 
+    {
+        character ch = f->characters[text[i]];
+
+        float xpos = x + ch.bearingX * scale;
+        float ypos = y - (ch.height - ch.bearingY) * scale;
+
+        float w = ch.width * scale;
+        float h = ch.height * scale;
+        // update VBO for each character
+        float vertices[6][4] = {
+            { xpos,     ypos + h,   0.0f, 0.0f },            
+            { xpos,     ypos,       0.0f, 1.0f },
+            { xpos + w, ypos,       1.0f, 1.0f },
+
+            { xpos,     ypos + h,   0.0f, 0.0f },
+            { xpos + w, ypos,       1.0f, 1.0f },
+            { xpos + w, ypos + h,   1.0f, 0.0f }           
+        };
+        // render glyph texture over quad
+        glBindTexture(GL_TEXTURE_2D, ch.textureID);
+        // update content of VBO memory
+        glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // be sure to use glBufferSubData and not glBufferData
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        // render quad
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        // now advance cursors for next glyph (note that advance is number of 1/64 pixels)
+        x += (ch.advance >> 6) * scale; // bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
+    }
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }

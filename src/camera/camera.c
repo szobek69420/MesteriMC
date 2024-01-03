@@ -56,7 +56,7 @@ void camera_update(camera* cam, float delta_time)
         cam->fov = 179.0f;
 }
 
-mat4 camera_get_view_matrix(camera* cam)
+mat4 camera_getViewMatrix(camera* cam)
 {
     return mat4_lookAt(cam->position, cam->front, cam->up);
 }
