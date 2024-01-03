@@ -208,6 +208,7 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_normal"), 0);
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_albedospec"), 1);
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_shadow"), 2);
+    glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_depth"), 3);
 
     rectangleShader = shader_import(
         "../assets/shaders/renderer/rectangle/shader_rectangle.vag",
@@ -310,7 +311,9 @@ void render(camera* cum, font* f)
 
 
     mat4 view = camera_getViewMatrix(cum);
-    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 300);
+    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 200);
+    mat4 projectionInverse = mat4_inverse(projection);
+
     mat4 pv= mat4_multiply(projection, view);
     //mat3 viewNormal = mat3_transpose(mat3_inverse(mat3_createFromMat(view)));
     mat3 viewNormal = mat3_createFromMat(view);
@@ -348,7 +351,11 @@ void render(camera* cum, font* f)
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, rendor.shadowBuffer.depthBuffer);
 
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
+
     glUseProgram(lightingPassShader.id);
+    glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
 
     glBindVertexArray(rectangleVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -361,7 +368,6 @@ void render(camera* cum, font* f)
     glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
 
     glUseProgram(rectangleShader.id);
-    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "projectionToWorld"), 1, GL_FALSE, mat4_inverse(pv).data);
     glBindVertexArray(rectangleVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 

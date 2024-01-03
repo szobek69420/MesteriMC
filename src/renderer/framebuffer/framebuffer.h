@@ -15,7 +15,7 @@ typedef struct geometryFBO {
 	unsigned int normal;
 	unsigned int albedoSpec;
 
-	unsigned int depthBuffer;//rbo
+	unsigned int depthBuffer;//texture
 } geometryFBO;
 
 typedef struct shadowFBO {
