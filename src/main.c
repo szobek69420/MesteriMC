@@ -266,6 +266,7 @@ void init_renderer()
     glClearDepth(1);
 
     //cull front faces
+    glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
     glFrontFace(GL_CCW);
 
@@ -285,9 +286,7 @@ void end_renderer()
 }
 
 void render(camera* cum, font* f)
-{
-    glEnable(GL_CULL_FACE);
-    
+{    
     //shadow
     glViewport(0, 0, RENDERER_SHADOW_RESOLUTION, RENDERER_SHADOW_RESOLUTION);
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.shadowBuffer.id);
@@ -372,7 +371,6 @@ void render(camera* cum, font* f)
 
     //render 2d stuff (only text yet)
     //glEnable(GL_BLEND);
-    glDisable(GL_CULL_FACE);
     glUseProgram(textShader.id);
     
     mat4 projection2D = mat4_ortho(0, window_getWidth(), 0, window_getHeight(), -1, 1);
@@ -460,12 +458,12 @@ void render_text(font* f, const char* text, float x, float y, float scale)
         float h = ch.height * scale;
         // update VBO for each character
         float vertices[6][4] = {
-            { xpos,     ypos + h,   0.0f, 0.0f },            
             { xpos,     ypos,       0.0f, 1.0f },
+            { xpos,     ypos + h,   0.0f, 0.0f },            
             { xpos + w, ypos,       1.0f, 1.0f },
 
-            { xpos,     ypos + h,   0.0f, 0.0f },
             { xpos + w, ypos,       1.0f, 1.0f },
+            { xpos,     ypos + h,   0.0f, 0.0f },
             { xpos + w, ypos + h,   1.0f, 0.0f }           
         };
         // render glyph texture over quad
