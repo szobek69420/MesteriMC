@@ -4,7 +4,7 @@ layout (location = 1) out vec4 gAlbedoSpec;
 
 in GS_OUT{
     vec2 TexCoords;
-    mat3 tbn_inverse;
+    mat3 tangentToView;
 }fs_in;
 
 uniform sampler2D texture_albedo;
@@ -13,8 +13,8 @@ uniform sampler2D texture_specular;
 
 void main()
 {    
-    vec3 normalTemp=texture(texture_normal,fs_in.TexCoords).rgb;
-    gNormal =fs_in.tbn_inverse*normalTemp;
+    vec3 normalTemp=2*(texture(texture_normal,fs_in.TexCoords).rgb-vec3(0.5));
+    gNormal = 0.5*(fs_in.tangentToView*normalTemp)+vec3(0.5);
 
     gAlbedoSpec.rgb = texture(texture_albedo, fs_in.TexCoords).rgb;
     gAlbedoSpec.a = texture(texture_specular, fs_in.TexCoords).r;

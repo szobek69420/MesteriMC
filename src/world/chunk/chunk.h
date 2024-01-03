@@ -8,7 +8,7 @@
 #define CHUNK_WIDTH 32
 #define CHUNK_HEIGHT 32
 
-#define CHUNK_NORMAL_MESH_VERTEX_SIZE 15
+#define CHUNK_NORMAL_MESH_VERTEX_SIZE 11
 
 typedef struct {
 
@@ -19,10 +19,9 @@ typedef struct {
 	/*
 	* normal mesh layout:
 	* vec3 pos
-	* vec3 uv(2), geometry(1)
+	* vec2 uv(2)
 	* vec3 normal
 	* vec3 tangent
-	* vec3 bitangent
 	*/
 	mesh normalMesh;
 	

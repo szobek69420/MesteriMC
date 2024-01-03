@@ -78,6 +78,7 @@ int main()
         if (lastSecond > 1)
         {
             printf("FPS: %d\n", framesInLastSecond);
+            printf("Pos: %d %d %d\n\n", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
             lastSecond = 0;
             framesInLastSecond = 0;
         }
@@ -180,7 +181,7 @@ unsigned int textVBO;
 void init_renderer()
 {
     //rendor = renderer_create(window_getWidth(), window_getHeight());
-    rendor = renderer_create(1920, 1080);
+    rendor = renderer_create(1920,1080);
 
     //shaders
     shadowShader = shader_import(
@@ -308,12 +309,16 @@ void render(camera* cum, font* f)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
+    mat4 view = camera_getViewMatrix(cum);
     mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 300);
-    mat4 pv= mat4_multiply(projection, camera_getViewMatrix(cum));
+    mat4 pv= mat4_multiply(projection, view);
+    //mat3 viewNormal = mat3_transpose(mat3_inverse(mat3_createFromMat(view)));
+    mat3 viewNormal = mat3_createFromMat(view);
 
     glUseProgram(geometryPassShader.id);
 
     glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "pv"), 1, GL_FALSE, pv.data);
+    glUniformMatrix3fv(glGetUniformLocation(geometryPassShader.id, "view_normal"), 1, GL_FALSE, viewNormal.data);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_ALBEDO));
@@ -436,7 +441,7 @@ void draw_kuba(camera* cum, mat4* projection) {
 void update_kuba(camera* cum)
 {
     int chunkX, chunkY, chunkZ;
-    chunk_getChunkFromPos(cum->position, &chunkX, &chunkY, &chunkZ);
+    chunk_getChunkFromPos(vec3_create2(cum->position.x+CHUNK_WIDTH*0.5f, cum->position.y + CHUNK_HEIGHT * 0.5f, cum->position.z + CHUNK_WIDTH * 0.5f), &chunkX, &chunkY, &chunkZ);
 
     chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
     chunkManager_update(&cm);
