@@ -93,11 +93,15 @@ geometryFBO renderer_createGeometryFBO(int width, int height)
     glDrawBuffers(2, attachments);
 
     //depth
-    glGenRenderbuffers(1, &(gBuffer.depthBuffer));
-    glBindRenderbuffer(GL_RENDERBUFFER, gBuffer.depthBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gBuffer.depthBuffer);
+    glGenTextures(1, &gBuffer.depthBuffer);
+    glBindTexture(GL_TEXTURE_2D, gBuffer.depthBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gBuffer.depthBuffer, 0);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         printf("something is fucked with the framebuffer");
@@ -113,7 +117,7 @@ void renderer_destroyGeometryFBO(geometryFBO gBuffer)
     glDeleteTextures(1, &gBuffer.normal);
     glDeleteTextures(1, &gBuffer.albedoSpec);
 
-    glDeleteRenderbuffers(1, &gBuffer.depthBuffer);
+    glDeleteTextures(1, &gBuffer.depthBuffer);
 
     glDeleteFramebuffers(1, &gBuffer.id);
 }

@@ -9,10 +9,15 @@ uniform sampler2D texture_albedospec;
 
 uniform sampler2D texture_shadow;
 
-uniform mat4 projectionToWorld;
+uniform sampler2D texture_depth;
+
+uniform mat4 projection_inverse;
 
 void main()
 {
-	vec4 pos=projectionToWorld*gl_FragCoord;
-	fragColor=vec4(texture(texture_normal,uv).rgb,1);
+	float depth=texture(texture_depth, uv).r;//getting depth buffer info
+	vec4 pos = projection_inverse * (vec4(uv, depth, 1)* 2 - 1);
+	vec3 viewspace_position = pos.xyz / pos.w;
+
+	fragColor=vec4(0.005*viewspace_position+0.5,1);
 }
