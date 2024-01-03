@@ -309,12 +309,16 @@ void render(camera* cum, font* f)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
+    mat4 view = camera_getViewMatrix(cum);
     mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 300);
-    mat4 pv= mat4_multiply(projection, camera_getViewMatrix(cum));
+    mat4 pv= mat4_multiply(projection, view);
+    //mat3 viewNormal = mat3_transpose(mat3_inverse(mat3_createFromMat(view)));
+    mat3 viewNormal = mat3_createFromMat(view);
 
     glUseProgram(geometryPassShader.id);
 
     glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "pv"), 1, GL_FALSE, pv.data);
+    glUniformMatrix3fv(glGetUniformLocation(geometryPassShader.id, "view_normal"), 1, GL_FALSE, viewNormal.data);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_ALBEDO));
