@@ -222,10 +222,10 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 	char isInFrustum;
 	float basedX, basedY, basedZ;
 	vec4 temp;
-	mat4 pv = mat4_multiply(*projection, camera_get_view_matrix(cum));
+	mat4 pv = mat4_multiply(*projection, camera_getViewMatrix(cum));
 	mat4 pvm;
 
-	//shader_setMat4(shit->id, "view", camera_get_view_matrix(cum));
+	//shader_setMat4(shit->id, "view", camera_getViewMatrix(cum));
 	//shader_setMat4(shit->id, "projection", *projection);
 
 	listElement* it = list_get_iterator(&(cm->loadedChunks));
