@@ -1,6 +1,7 @@
 #include "vec3.h"
 
 #include <math.h>
+#include <stdio.h>
 
 vec3 vec3_create(float szam)
 {

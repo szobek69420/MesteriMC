@@ -75,7 +75,7 @@ geometryFBO renderer_createGeometryFBO(int width, int height)
     // - normal color buffer
     glGenTextures(1, &gBuffer.normal);
     glBindTexture(GL_TEXTURE_2D, gBuffer.normal);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB10, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gBuffer.normal, 0);
@@ -104,7 +104,7 @@ geometryFBO renderer_createGeometryFBO(int width, int height)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gBuffer.depthBuffer, 0);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        printf("something is fucked with the framebuffer");
+        printf("big problem with the geometry framebuffer");
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 

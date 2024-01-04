@@ -4,6 +4,8 @@
 #include "vec3.h"
 #include "mat4.h"
 
+struct mat4;
+
 typedef struct {
 	float data[9];
 } mat3; //column-major order
@@ -11,7 +13,7 @@ typedef struct {
 mat3 mat3_create(float szam);
 mat3 mat3_create2(float* values);
 mat3 mat3_createFromVec(vec3 col0, vec3 col1, vec3 col2);
-mat3 mat3_createFromMat(mat4);
+mat3 mat3_createFromMat(struct mat4);
 
 void mat3_set(mat3* mat, int row, int col, float value);
 

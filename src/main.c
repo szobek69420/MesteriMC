@@ -25,6 +25,7 @@
 #include "glm2/mat3.h"
 
 #include "utils/list.h"
+#include "utils/vector.h"
 
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
@@ -39,6 +40,7 @@ void draw_kuba(camera* cum, mat4* projection);
 void update_kuba(camera* cum);
 
 void render_text(font* f, const char* text, float x, float y, float scale);
+void render_cube();
 
 //glfw callbacks
 void window_size_callback(GLFWwindow* window, int width, int height);
@@ -77,8 +79,8 @@ int main()
         framesInLastSecond++;
         if (lastSecond > 1)
         {
-            printf("FPS: %d\n", framesInLastSecond);
-            printf("Pos: %d %d %d\n\n", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
+            //printf("FPS: %d\n", framesInLastSecond);
+            //printf("Pos: %d %d %d\n\n", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
             lastSecond = 0;
             framesInLastSecond = 0;
         }
@@ -95,6 +97,11 @@ int main()
 
         //render
         render(&cum, &f);
+        static char buffer[50];
+        sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
+        render_text(&f, buffer, 15, window_getHeight() - 34, 0.5);
+        sprintf(buffer, "Pos: %d %d %d", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
+        render_text(&f, buffer, 15, window_getHeight() - 69, 0.5);
 
         glfwPollEvents();
         glfwSwapBuffers(window);
@@ -178,6 +185,10 @@ unsigned int rectangleVBO;
 unsigned int textVAO;
 unsigned int textVBO;
 
+const unsigned int NR_LIGHTS = 32;
+Vector* light_positions;
+Vector* light_colors;
+
 void init_renderer()
 {
     //rendor = renderer_create(window_getWidth(), window_getHeight());
@@ -209,6 +220,12 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_albedospec"), 1);
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_shadow"), 2);
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_depth"), 3);
+
+    forwardPassShader = shader_import(
+        "../assets/shaders/renderer/forward/shader_forward.vag",
+        "../assets/shaders/renderer/forward/shader_forward.fag",
+        NULL
+    );
 
     rectangleShader = shader_import(
         "../assets/shaders/renderer/rectangle/shader_rectangle.vag",
@@ -273,6 +290,26 @@ void init_renderer()
     glFrontFace(GL_CCW);
 
     //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    //light shit
+    srand(13);
+    light_positions = vector_create(NR_LIGHTS);
+    light_colors = vector_create(NR_LIGHTS);
+    for (unsigned int i = 0; i < NR_LIGHTS; i++)
+    {
+        // calculate slightly random offsets
+        vec3* pos = malloc(sizeof(vec3));
+        pos->x = 30 + (((rand() % 100) / 100.0) * 6.0 - 3.0);
+        pos->y = 30 + (((rand() % 100) / 100.0) * 6.0 - 4.0);
+        pos->z = 30 + (((rand() % 100) / 100.0) * 6.0 - 3.0);
+        vector_push_back(light_positions, pos);
+        // also calculate random color
+        vec3* col = malloc(sizeof(vec3));
+        col->x = (((rand() % 100) / 200.0f) + 0.5);
+        col->y = (((rand() % 100) / 200.0f) + 0.5);
+        col->z = (((rand() % 100) / 200.0f) + 0.5);
+        vector_push_back(light_colors, col);
+    }
 }
 
 void end_renderer()
@@ -285,6 +322,15 @@ void end_renderer()
 
     glDeleteVertexArrays(1, &rectangleVAO);
     glDeleteBuffers(1, &rectangleVBO);
+
+    //light cleanup
+    for (int i = 0; i < NR_LIGHTS; i++)
+    {
+        free(vector_get(light_positions, i));
+        free(vector_get(light_colors, i));
+    }
+    vector_destroy(light_positions);
+    vector_destroy(light_colors);
 }
 
 void render(camera* cum, font* f)
@@ -356,6 +402,41 @@ void render(camera* cum, font* f)
 
     glUseProgram(lightingPassShader.id);
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
+    
+    for (unsigned int i = 0; i < NR_LIGHTS; i++)
+    {
+        static char buffer[100];
+        sprintf(buffer, "lights[%d].position", i);
+        vec3 pos = *((vec3*)vector_get(light_positions, i));
+        vec4 _pos = vec4_create2(pos.x, pos.y, pos.z, 1.0f);
+        _pos = vec4_multiplyWithMatrix(view, _pos);
+        glUniform3f(glGetUniformLocation(lightingPassShader.id, buffer), _pos.x, _pos.y, _pos.z);
+        sprintf(buffer, "lights[%d].color", i);
+        vec3 color = *((vec3*)vector_get(light_colors, i));
+        glUniform3f(glGetUniformLocation(lightingPassShader.id, buffer), color.x, color.y, color.z);
+        
+        // update attenuation parameters and calculate radius
+        //const float constant = 1.0f;
+        //const float linear = 0.7f;
+        //const float quadratic = 1.8f;
+        const float constant = 0.2f; // adjusted parameters to fit our scene (very strong light)
+        const float linear = 0.01f;
+        const float quadratic = 0.01f;
+        sprintf(buffer, "lights[%d].constant", i);
+        glUniform1f(glGetUniformLocation(lightingPassShader.id, buffer), constant);
+        sprintf(buffer, "lights[%d].linear", i);
+        glUniform1f(glGetUniformLocation(lightingPassShader.id, buffer), linear);
+        sprintf(buffer, "lights[%d].quadratic", i);
+        glUniform1f(glGetUniformLocation(lightingPassShader.id, buffer), quadratic);
+
+        // then calculate radius of light volume/sphere
+        vec3 colors = *((vec3*)vector_get(light_colors, i));
+        const float maxBrightness = fmax(fmax(colors.x, colors.y), colors.z);
+        float radius = (-linear + sqrt(linear * linear - 4 * quadratic * (constant - (256.0f / 5.0f) * maxBrightness))) / (2.0f * quadratic);
+        sprintf(buffer, "lights[%d].radius", i);
+        glUniform1f(glGetUniformLocation(lightingPassShader.id, buffer), radius);
+    }
+
 
     glBindVertexArray(rectangleVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -372,26 +453,28 @@ void render(camera* cum, font* f)
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
     //copy depth buffer
-    /*glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBlitFramebuffer(0, 0, 1920, 1080, 0, 0, window_getWidth(), window_getHeight(), GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);*/
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     //render forward scene
-
+    glUseProgram(forwardPassShader.id);
+    glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "projection"), 1, GL_FALSE, projection.data);
+    glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "view"), 1, GL_FALSE, view.data);
+    for (unsigned int i = 0; i < NR_LIGHTS; i++)
+    {
+        mat4 model = mat4_create(1.0f);
+        model = mat4_translate(model, *((vec3*)vector_get(light_positions, i)));
+        model = mat4_scale(model, vec3_create(0.125f));
+        glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "model"), 1, GL_FALSE, model.data);
+        glUniform3fv(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, (float*)vector_get(light_colors, i));
+        render_cube();
+    }
 
     //render 2d stuff (only text yet)
-    //glEnable(GL_BLEND);
-    glUseProgram(textShader.id);
-    
-    mat4 projection2D = mat4_ortho(0, window_getWidth(), 0, window_getHeight(), -1, 1);
-    glUniformMatrix4fv(glGetUniformLocation(textShader.id, "projection"), 1, GL_FALSE, projection2D.data);
-    glUniform3f(glGetUniformLocation(textShader.id, "textColor"), 1, 1, 1);
-    
-    glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(textVAO);
+    //everything is inside render_text like use shader bing VAO etc. (inefficient but good enough for now)
     render_text(f, "amogus", 10, 10, 1);
-    //glDisable(GL_BLEND);
 }
 
 void window_size_callback(GLFWwindow* window, int width, int height)
@@ -456,7 +539,12 @@ void update_kuba(camera* cum)
 
 void render_text(font* f, const char* text, float x, float y, float scale)
 {
-    // assuming textShader is used, uniforms are set and VAO is bound
+    glUseProgram(textShader.id);
+    mat4 projection2D = mat4_ortho(0, window_getWidth(), 0, window_getHeight(), -1, 1);
+    glUniformMatrix4fv(glGetUniformLocation(textShader.id, "projection"), 1, GL_FALSE, projection2D.data);
+    glUniform3f(glGetUniformLocation(textShader.id, "textColor"), 1, 1, 1);
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(textVAO);
     // iterate through all characters
     for (int i = 0; text[i] != '\0'; i++) 
     {
@@ -490,4 +578,77 @@ void render_text(font* f, const char* text, float x, float y, float scale)
     }
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+unsigned int cubeVAO = 0;
+unsigned int cubeVBO = 0;
+void render_cube()
+{
+    // initialize (if necessary)
+    if (cubeVAO == 0)
+    {
+        float vertices[] = {
+            // back face
+            -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+             1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
+             1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right         
+             1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
+            -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+            -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f, // top-left
+            // front face
+            -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
+             1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f, // bottom-right
+             1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
+             1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
+            -1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f, // top-left
+            -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
+            // left face
+            -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
+            -1.0f,  1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-left
+            -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
+            -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
+            -1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-right
+            -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
+            // right face
+             1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
+             1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
+             1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right         
+             1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
+             1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
+             1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left     
+            // bottom face
+            -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
+             1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f, // top-left
+             1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
+             1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
+            -1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 0.0f, // bottom-right
+            -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
+            // top face
+            -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
+             1.0f,  1.0f , 1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
+             1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right     
+             1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
+            -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
+            -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left        
+        };
+        glGenVertexArrays(1, &cubeVAO);
+        glGenBuffers(1, &cubeVBO);
+        // fill buffer
+        glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+        // link vertex attributes
+        glBindVertexArray(cubeVAO);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+    }
+    // render Cube
+    glBindVertexArray(cubeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
 }
