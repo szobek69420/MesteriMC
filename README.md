@@ -1,2 +1,2 @@
 # MesteriMC
-a minecraft clone written in C because definitely no one has ever done that
+A minecraft clone written in C. When it's done, it will be so beautiful that mankind will never ever have to touch grass again.
