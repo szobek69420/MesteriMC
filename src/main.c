@@ -17,6 +17,7 @@
 #include "world/chunk/chunkManager.h"
 
 #include "renderer/framebuffer/framebuffer.h"
+#include "mesh/sphere/sphere.h"
 
 #include "font_handler/font_handler.h"
 
@@ -191,6 +192,7 @@ Vector* light_colors;
 
 void init_renderer()
 {
+
     //rendor = renderer_create(window_getWidth(), window_getHeight());
     rendor = renderer_create(1920,1080);
 

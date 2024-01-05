@@ -9,4 +9,6 @@ typedef struct {
 	unsigned int indexCount;
 } mesh;
 
+void mesh_destroy(mesh m);
+
 #endif
