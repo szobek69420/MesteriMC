@@ -306,7 +306,7 @@ void init_renderer()
         *lit = light_create(
             vec3_create2((((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5)),
             vec3_create2((((rand() % 100) / 100.0) * 50.0 - 3.0), 25 + (((rand() % 100) / 100.0) * 10.0 - 4.0), (((rand() % 100) / 100.0) * 50.0 - 3.0)),
-            vec3_create2(10, 0.05, 0.05)
+            vec3_create2(10, 0.2, 0.2)
             );
         vector_push_back(lights, lit);
     }
@@ -397,9 +397,9 @@ void render(camera* cum, font* f)
     glDepthFunc(GL_GREATER);
     glFrontFace(GL_CW);
 
-    /*glEnable(GL_BLEND);
+    glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE);
-    glBlendEquation(GL_FUNC_ADD);*/
+    glBlendEquation(GL_FUNC_ADD);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
