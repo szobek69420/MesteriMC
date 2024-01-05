@@ -242,6 +242,7 @@ mat4 mat4_rotate(mat4 mat, vec3 axis, float angle)
 mat4 mat4_translate(mat4 mat, vec3 pos)
 {
     return mat4_multiply(mat, mat4_create2((float[]){1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, pos.x, pos.y, pos.z, 1}));
+    //return mat4_sum(mat, mat4_create2((float[]) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, pos.x, pos.y, pos.z, 1 }));
 }
 
 mat4 mat4_lookAt(vec3 pos, vec3 direction, vec3 up)

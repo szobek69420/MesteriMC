@@ -2,7 +2,7 @@
 #include "../mesh.h"
 #include <glad/glad.h>
 
-static float vertices[SPHERE_VERTEX_COUNT];
+static float vertices[SPHERE_VERTEX_VALUE_COUNT];
 static unsigned int indices[SPHERE_INDEX_COUNT];
 
 mesh sphere_create()
@@ -24,6 +24,8 @@ mesh sphere_create()
 	glEnableVertexAttribArray(0);
 
 	glBindVertexArray(0);
+
+	m.indexCount = SPHERE_INDEX_COUNT;
 
 	return m;
 }
