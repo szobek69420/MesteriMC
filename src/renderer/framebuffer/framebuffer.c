@@ -132,7 +132,7 @@ endFBO renderer_createEndFBO(int width, int height)
     glGenTextures(1, &(endBuffer.colorBuffer));
     glBindTexture(GL_TEXTURE_2D, endBuffer.colorBuffer);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
