@@ -30,7 +30,7 @@ typedef struct endFBO {
 	unsigned int id;
 
 	unsigned int colorBuffer;
-	unsigned int depthBuffer;//rbo
+	unsigned int depthBuffer;//texture
 } endFBO;
 
 typedef struct renderer {

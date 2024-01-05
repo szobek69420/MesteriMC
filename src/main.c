@@ -304,9 +304,9 @@ void init_renderer()
     {
         light* lit = (light*)malloc(sizeof(light));
         *lit = light_create(
-            vec3_create2((((rand() % 100) / 100.0) * 30.0 - 3.0), 30 + (((rand() % 100) / 100.0) * 30.0 - 4.0), (((rand() % 100) / 100.0) * 30.0 - 3.0)),
             vec3_create2((((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5)),
-            vec3_create2(1, 0.2, 0.2)
+            vec3_create2((((rand() % 100) / 100.0) * 50.0 - 3.0), 25 + (((rand() % 100) / 100.0) * 10.0 - 4.0), (((rand() % 100) / 100.0) * 50.0 - 3.0)),
+            vec3_create2(10, 0.05, 0.05)
             );
         vector_push_back(lights, lit);
     }
@@ -380,13 +380,26 @@ void render(camera* cum, font* f)
 
     draw_kuba(cum, &projection);
 
-    //lighting pass
-    glDisable(GL_DEPTH_TEST);
-    
-    glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
+    //copy depth buffer
+    glEnable(GL_DEPTH_TEST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rendor.endBuffer.id);
+    glBlitFramebuffer(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, 0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
-    glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
+    //lighting pass
+    glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
+    //glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
+    glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glDepthFunc(GL_GREATER);
+    glFrontFace(GL_CW);
+
+    /*glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glBlendEquation(GL_FUNC_ADD);*/
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
@@ -406,32 +419,24 @@ void render(camera* cum, font* f)
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
     
     float* bufferData = (float*)malloc(lights->size * LIGHT_SIZE_IN_VBO);
-
+    light* tempLight;
+    vec4 tempVec;
     for (unsigned int i = 0; i < lights->size; i++)
     {
-        memcpy(bufferData + i * LIGHT_FLOATS_IN_VBO, &(((light*)vector_get(lights, i))->position.x), LIGHT_SIZE_IN_VBO);
+        tempLight = (light*)vector_get(lights, i);
+        memcpy(bufferData + i * LIGHT_FLOATS_IN_VBO, &(tempLight->position.x), LIGHT_SIZE_IN_VBO);
     }
-    
+   
     light_fillRenderer(&lightRenderer, bufferData, lights->size);
     free(bufferData);
     light_render(&lightRenderer, 69);
 
-    //draw deferred results to screen
-    glViewport(0, 0, window_getWidth(), window_getHeight());
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
-    
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
+    glDepthMask(GL_TRUE);
+    glDepthFunc(GL_LESS);
+    glFrontFace(GL_CCW);
 
-    glUseProgram(rectangleShader.id);
-    glBindVertexArray(rectangleVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glDisable(GL_BLEND);
 
-    //copy depth buffer
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glBlitFramebuffer(0, 0, 1920, 1080, 0, 0, window_getWidth(), window_getHeight(), GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     //render forward scene
     glUseProgram(forwardPassShader.id);
@@ -446,6 +451,19 @@ void render(camera* cum, font* f)
         glUniform3fv(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, (float*)&(((light*)vector_get(lights, i))->colour.x));
         render_cube();
     }
+
+    // draw deferred results to screen
+    glDisable(GL_DEPTH_TEST);
+
+    glViewport(0, 0, window_getWidth(), window_getHeight());
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
+
+    glUseProgram(rectangleShader.id);
+    glBindVertexArray(rectangleVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 
     //render 2d stuff (only text yet)
     //everything is inside render_text like use shader bing VAO etc. (inefficient but good enough for now)

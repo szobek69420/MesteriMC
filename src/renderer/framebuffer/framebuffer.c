@@ -140,11 +140,21 @@ endFBO renderer_createEndFBO(int width, int height)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, endBuffer.colorBuffer, 0);
 
-    glGenRenderbuffers(1, &(endBuffer.depthBuffer));
+    /*glGenRenderbuffers(1, &(endBuffer.depthBuffer));
     glBindRenderbuffer(GL_RENDERBUFFER, endBuffer.depthBuffer);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, endBuffer.depthBuffer);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, endBuffer.depthBuffer);*/
+
+    glGenTextures(1, &endBuffer.depthBuffer);
+    glBindTexture(GL_TEXTURE_2D, endBuffer.depthBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, endBuffer.depthBuffer, 0);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         printf("something is fucked with the framebuffer");
@@ -157,6 +167,7 @@ endFBO renderer_createEndFBO(int width, int height)
 void renderer_destroyEndFBO(endFBO endBuffer)
 {
     glDeleteTextures(1, &endBuffer.colorBuffer);
-    glDeleteRenderbuffers(1, &endBuffer.depthBuffer);
+    //glDeleteRenderbuffers(1, &endBuffer.depthBuffer);
+    glDeleteTextures(1, &endBuffer.depthBuffer);
     glDeleteFramebuffers(1, &endBuffer.id);
 }
