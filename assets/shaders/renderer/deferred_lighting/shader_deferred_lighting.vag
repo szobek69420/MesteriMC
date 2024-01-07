@@ -14,7 +14,7 @@ uniform mat4 projection;
 
 void main()
 {
-	lightPosition=vec3(view*vec4(aPos,1));
+	lightPosition=vec3(view*vec4(position,1));
 	lightColour=colour;
 	lightAttenuation=attenuation;
 

@@ -16,6 +16,10 @@ uniform mat4 projection_inverse;
 uniform float onePerScreenWidth;
 uniform float onePerScreenHeight;
 
+uniform float fogStart;
+uniform float fogEnd;
+uniform float fogHelper;//1/(fogEnd-fogStart)
+
 void main()
 {
 	vec2 uv=vec2(gl_FragCoord.x*onePerScreenWidth, gl_FragCoord.y*onePerScreenHeight);
@@ -46,7 +50,14 @@ void main()
 	spec *= attenuation;
 	lighting += alb + spec;
 
-	fragColor = vec4(lighting,1);
+	float alpha=1;
+	float distanceFromEye=length(viewspace_position);
+	if(distanceFromEye>fogStart)
+		alpha=(fogEnd-distanceFromEye)*fogHelper;
+	if(alpha<0)
+		alpha=0;
+
+	fragColor = vec4(lighting,alpha);
 	//fragColor=vec4(depth, depth, depth,1);
 
 	//fragColor = vec4(normal, 1.0);

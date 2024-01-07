@@ -225,6 +225,9 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_depth"), 3);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 100);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 120);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1/(120-100));
 
     forwardPassShader = shader_import(
         "../assets/shaders/renderer/forward/shader_forward.vag",
@@ -398,7 +401,7 @@ void render(camera* cum, font* f)
     glFrontFace(GL_CW);
 
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    glBlendFuncSeparate(GL_ONE, GL_ONE, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBlendEquation(GL_FUNC_ADD);
 
     glActiveTexture(GL_TEXTURE0);
