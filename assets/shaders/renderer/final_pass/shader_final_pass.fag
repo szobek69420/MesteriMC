@@ -1,0 +1,24 @@
+#version 330 core
+
+in vec2 uv;
+
+out vec4 fragColour;
+
+uniform sampler2D tex;
+uniform float exposure;
+
+void main()
+{
+	fragColour=texture(tex,uv);
+	
+	vec3 colour=fragColour.rgb;
+	float alpha=fragColour.a;
+
+	// exposure tone mapping
+    colour = vec3(1.0) - exp(-colour * exposure);
+
+    // gamma correction 
+    colour = pow(colour, vec3(1));
+
+	fragColour.rgb=colour;
+}

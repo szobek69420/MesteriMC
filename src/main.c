@@ -178,7 +178,7 @@ shader shadowShader;
 shader geometryPassShader;
 shader lightingPassShader;
 shader forwardPassShader;
-shader rectangleShader;
+shader finalPassShader;
 shader textShader;
 
 unsigned int rectangleVAO;
@@ -235,13 +235,14 @@ void init_renderer()
         NULL
     );
 
-    rectangleShader = shader_import(
-        "../assets/shaders/renderer/rectangle/shader_rectangle.vag",
-        "../assets/shaders/renderer/rectangle/shader_rectangle.fag",
+    finalPassShader = shader_import(
+        "../assets/shaders/renderer/final_pass/shader_final_pass.vag",
+        "../assets/shaders/renderer/final_pass/shader_final_pass.fag",
         NULL
     );
-    glUseProgram(rectangleShader.id);
-    glUniform1i(glGetUniformLocation(rectangleShader.id, "tex"), 0);
+    glUseProgram(finalPassShader.id);
+    glUniform1i(glGetUniformLocation(finalPassShader.id, "tex"), 0);
+    glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 1);
 
     textShader = shader_import(
         "../assets/shaders/renderer2D/text/shader_text.vag",
@@ -302,13 +303,13 @@ void init_renderer()
     //light shit
     lightRenderer = light_createRenderer();
     srand(13);
-    lights = vector_create(32);
-    for (unsigned int i = 0; i < 32; i++)
+    lights = vector_create(100);
+    for (unsigned int i = 0; i < 100; i++)
     {
         light* lit = (light*)malloc(sizeof(light));
         *lit = light_create(
             vec3_create2((((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5)),
-            vec3_create2((((rand() % 100) / 100.0) * 50.0 - 3.0), 25 + (((rand() % 100) / 100.0) * 10.0 - 4.0), (((rand() % 100) / 100.0) * 50.0 - 3.0)),
+            vec3_create2((((rand() % 100) / 100.0) * 50.0 - 3.0), 25 + (((rand() % 100) / 100.0) * 20.0 - 4.0), (((rand() % 100) / 100.0) * 100.0 - 3.0)),
             vec3_create2(10, 0.05, 0.05)
             );
         vector_push_back(lights, lit);
@@ -464,7 +465,7 @@ void render(camera* cum, font* f)
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
 
-    glUseProgram(rectangleShader.id);
+    glUseProgram(finalPassShader.id);
     glBindVertexArray(rectangleVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
