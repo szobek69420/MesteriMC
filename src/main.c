@@ -317,8 +317,8 @@ void init_renderer()
     }
 
     sunTzu = light_create(
-        vec3_create2(1, 1, 1),
-        vec3_create2(1, 1, 1),
+        vec3_create2(1, 0.97, 0.4),
+        vec3_create2(0.6, 1.3, 0.8),
         vec3_create2(3, 0, 0)
     );
 }
