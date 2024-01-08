@@ -2,6 +2,8 @@
 #define FRAMEBUFFER_H
 
 #define RENDERER_SHADOW_RESOLUTION 1024
+#define RENDERER_WIDTH 1920
+#define RENDERER_HEIGHT 1080
 
 //buffer types
 #define RENDERER_END_BUFFER 2
@@ -28,7 +30,7 @@ typedef struct endFBO {
 	unsigned int id;
 
 	unsigned int colorBuffer;
-	unsigned int depthBuffer;//rbo
+	unsigned int depthBuffer;//texture
 } endFBO;
 
 typedef struct renderer {

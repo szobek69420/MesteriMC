@@ -17,6 +17,7 @@
 #include "world/chunk/chunkManager.h"
 
 #include "renderer/framebuffer/framebuffer.h"
+#include "renderer/light/light.h"
 #include "mesh/sphere/sphere.h"
 
 #include "font_handler/font_handler.h"
@@ -177,7 +178,7 @@ shader shadowShader;
 shader geometryPassShader;
 shader lightingPassShader;
 shader forwardPassShader;
-shader rectangleShader;
+shader finalPassShader;
 shader textShader;
 
 unsigned int rectangleVAO;
@@ -186,9 +187,10 @@ unsigned int rectangleVBO;
 unsigned int textVAO;
 unsigned int textVBO;
 
-const unsigned int NR_LIGHTS = 32;
-Vector* light_positions;
-Vector* light_colors;
+Vector* lights;
+light sunTzu;
+
+light_renderer lightRenderer;
 
 void init_renderer()
 {
@@ -222,6 +224,11 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_albedospec"), 1);
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_shadow"), 2);
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_depth"), 3);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 100);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 120);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f/(120-100));
 
     forwardPassShader = shader_import(
         "../assets/shaders/renderer/forward/shader_forward.vag",
@@ -229,13 +236,14 @@ void init_renderer()
         NULL
     );
 
-    rectangleShader = shader_import(
-        "../assets/shaders/renderer/rectangle/shader_rectangle.vag",
-        "../assets/shaders/renderer/rectangle/shader_rectangle.fag",
+    finalPassShader = shader_import(
+        "../assets/shaders/renderer/final_pass/shader_final_pass.vag",
+        "../assets/shaders/renderer/final_pass/shader_final_pass.fag",
         NULL
     );
-    glUseProgram(rectangleShader.id);
-    glUniform1i(glGetUniformLocation(rectangleShader.id, "tex"), 0);
+    glUseProgram(finalPassShader.id);
+    glUniform1i(glGetUniformLocation(finalPassShader.id, "tex"), 0);
+    glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 0.3);
 
     textShader = shader_import(
         "../assets/shaders/renderer2D/text/shader_text.vag",
@@ -294,24 +302,25 @@ void init_renderer()
     //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     //light shit
+    lightRenderer = light_createRenderer();
     srand(13);
-    light_positions = vector_create(NR_LIGHTS);
-    light_colors = vector_create(NR_LIGHTS);
-    for (unsigned int i = 0; i < NR_LIGHTS; i++)
+    lights = vector_create(32);
+    for (unsigned int i = 0; i < 32; i++)
     {
-        // calculate slightly random offsets
-        vec3* pos = malloc(sizeof(vec3));
-        pos->x = 30 + (((rand() % 100) / 100.0) * 6.0 - 3.0);
-        pos->y = 30 + (((rand() % 100) / 100.0) * 6.0 - 4.0);
-        pos->z = 30 + (((rand() % 100) / 100.0) * 6.0 - 3.0);
-        vector_push_back(light_positions, pos);
-        // also calculate random color
-        vec3* col = malloc(sizeof(vec3));
-        col->x = (((rand() % 100) / 200.0f) + 0.5);
-        col->y = (((rand() % 100) / 200.0f) + 0.5);
-        col->z = (((rand() % 100) / 200.0f) + 0.5);
-        vector_push_back(light_colors, col);
+        light* lit = (light*)malloc(sizeof(light));
+        *lit = light_create(
+            vec3_create2((((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5)),
+            vec3_create2((((rand() % 100) / 100.0) * 50.0 - 3.0), 25 + (((rand() % 100) / 100.0) * 20.0 - 4.0), (((rand() % 100) / 100.0) * 100.0 - 3.0)),
+            vec3_create2(10, 0.05, 0.05)
+            );
+        vector_push_back(lights, lit);
     }
+
+    sunTzu = light_create(
+        vec3_create2(1, 0.97, 0.4),
+        vec3_create2(0.6, 1.3, 0.8),
+        vec3_create2(3, 0, 0)
+    );
 }
 
 void end_renderer()
@@ -326,13 +335,13 @@ void end_renderer()
     glDeleteBuffers(1, &rectangleVBO);
 
     //light cleanup
-    for (int i = 0; i < NR_LIGHTS; i++)
+    for (int i = 0; i < lights->size; i++)
     {
-        free(vector_get(light_positions, i));
-        free(vector_get(light_colors, i));
+        free((light*)vector_get(lights, i));
     }
-    vector_destroy(light_positions);
-    vector_destroy(light_colors);
+    vector_destroy(lights);
+
+    light_destroyRenderer(lightRenderer);
 }
 
 void render(camera* cum, font* f)
@@ -382,13 +391,26 @@ void render(camera* cum, font* f)
 
     draw_kuba(cum, &projection);
 
-    //lighting pass
-    glDisable(GL_DEPTH_TEST);
-    
-    glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
+    //copy depth buffer
+    glEnable(GL_DEPTH_TEST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rendor.endBuffer.id);
+    glBlitFramebuffer(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, 0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
-    glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
+    //lighting pass ------------------------------------------------------------------------------------------
+    glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
+    //glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
+    glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glDepthFunc(GL_GREATER);
+    glFrontFace(GL_CW);
+
+    glEnable(GL_BLEND);
+    glBlendFuncSeparate(GL_ONE, GL_ONE, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendEquation(GL_FUNC_ADD);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
@@ -403,76 +425,70 @@ void render(camera* cum, font* f)
     glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
 
     glUseProgram(lightingPassShader.id);
+    glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "view"), 1, GL_FALSE, view.data);
+    glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
     
-    for (unsigned int i = 0; i < NR_LIGHTS; i++)
+    //point lights
+    float* bufferData = (float*)malloc(lights->size * LIGHT_SIZE_IN_VBO);
+    light* tempLight;
+    for (unsigned int i = 0; i < lights->size; i++)
     {
-        static char buffer[100];
-        sprintf(buffer, "lights[%d].position", i);
-        vec3 pos = *((vec3*)vector_get(light_positions, i));
-        vec4 _pos = vec4_create2(pos.x, pos.y, pos.z, 1.0f);
-        _pos = vec4_multiplyWithMatrix(view, _pos);
-        glUniform3f(glGetUniformLocation(lightingPassShader.id, buffer), _pos.x, _pos.y, _pos.z);
-        sprintf(buffer, "lights[%d].color", i);
-        vec3 color = *((vec3*)vector_get(light_colors, i));
-        glUniform3f(glGetUniformLocation(lightingPassShader.id, buffer), color.x, color.y, color.z);
-        
-        // update attenuation parameters and calculate radius
-        //const float constant = 1.0f;
-        //const float linear = 0.7f;
-        //const float quadratic = 1.8f;
-        const float constant = 0.2f; // adjusted parameters to fit our scene (very strong light)
-        const float linear = 0.01f;
-        const float quadratic = 0.01f;
-        sprintf(buffer, "lights[%d].constant", i);
-        glUniform1f(glGetUniformLocation(lightingPassShader.id, buffer), constant);
-        sprintf(buffer, "lights[%d].linear", i);
-        glUniform1f(glGetUniformLocation(lightingPassShader.id, buffer), linear);
-        sprintf(buffer, "lights[%d].quadratic", i);
-        glUniform1f(glGetUniformLocation(lightingPassShader.id, buffer), quadratic);
-
-        // then calculate radius of light volume/sphere
-        vec3 colors = *((vec3*)vector_get(light_colors, i));
-        const float maxBrightness = fmax(fmax(colors.x, colors.y), colors.z);
-        float radius = (-linear + sqrt(linear * linear - 4 * quadratic * (constant - (256.0f / 5.0f) * maxBrightness))) / (2.0f * quadratic);
-        sprintf(buffer, "lights[%d].radius", i);
-        glUniform1f(glGetUniformLocation(lightingPassShader.id, buffer), radius);
+        tempLight = (light*)vector_get(lights, i);
+        memcpy(bufferData + i * LIGHT_FLOATS_IN_VBO, &(tempLight->position.x), LIGHT_SIZE_IN_VBO);
     }
+   
+    light_fillRenderer(&lightRenderer, bufferData, lights->size);
+    light_render(&lightRenderer, 69);
+    free(bufferData);
+
+    //Sun Tzu
+    bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
+    memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
+    light_fillRenderer(&lightRenderer, bufferData, 1);
+    light_render(&lightRenderer, 0);
+    free(bufferData);
+
+    glDepthMask(GL_TRUE);
+    glDepthFunc(GL_LESS);
+    glFrontFace(GL_CCW);
+
+    glDisable(GL_BLEND);
 
 
-    glBindVertexArray(rectangleVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    //draw deferred results to screen
-    glViewport(0, 0, window_getWidth(), window_getHeight());
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
-    
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
-
-    glUseProgram(rectangleShader.id);
-    glBindVertexArray(rectangleVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    //copy depth buffer
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glBlitFramebuffer(0, 0, 1920, 1080, 0, 0, window_getWidth(), window_getHeight(), GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    //render forward scene
+    //render forward scene --------------------------------------------------------------------------------
     glUseProgram(forwardPassShader.id);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "view"), 1, GL_FALSE, view.data);
-    for (unsigned int i = 0; i < NR_LIGHTS; i++)
+    for (unsigned int i = 0; i < lights->size; i++)
     {
         mat4 model = mat4_create(1.0f);
-        model = mat4_translate(model, *((vec3*)vector_get(light_positions, i)));
+        model = mat4_translate(model, ((light*)vector_get(lights, i))->position);
         model = mat4_scale(model, vec3_create(0.125f));
         glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "model"), 1, GL_FALSE, model.data);
-        glUniform3fv(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, (float*)vector_get(light_colors, i));
+        glUniform3fv(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, (float*)&(((light*)vector_get(lights, i))->colour.x));
         render_cube();
     }
+
+    // draw results to screen ------------------------------------------------------------------------------
+    glViewport(0, 0, window_getWidth(), window_getHeight());
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
+    
+    glDisable(GL_DEPTH_TEST);
+    glClearColor(0, 0.04f, 0.6f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendEquation(GL_FUNC_ADD);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
+
+    glUseProgram(finalPassShader.id);
+    glBindVertexArray(rectangleVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glDisable(GL_BLEND);
 
     //render 2d stuff (only text yet)
     //everything is inside render_text like use shader bing VAO etc. (inefficient but good enough for now)

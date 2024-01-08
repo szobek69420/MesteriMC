@@ -223,7 +223,6 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 	float basedX, basedY, basedZ;
 	vec4 temp;
 	mat4 pv = mat4_multiply(*projection, camera_getViewMatrix(cum));
-	mat4 pvm;
 
 	//shader_setMat4(shit->id, "view", camera_getViewMatrix(cum));
 	//shader_setMat4(shit->id, "projection", *projection);
@@ -238,15 +237,13 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 			basedY = chomk->chunkY * CHUNK_HEIGHT;
 			basedZ = chomk->chunkZ * CHUNK_WIDTH;
 
-			pvm = mat4_multiply(pv, chomk->model);
-
 			for (int i = 0; i < 24; )
 			{
 				temp.x = basedX + chunkBounds[i++];
 				temp.y = basedY + chunkBounds[i++];
 				temp.z = basedZ + chunkBounds[i++];
 				temp.w = 1;
-				temp = vec4_multiplyWithMatrix(pvm, temp);
+				temp = vec4_multiplyWithMatrix(pv, temp);
 				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
 
 				if (temp.x * temp.x < 1 || temp.y * temp.y < 1 || temp.z * temp.z < 1)
