@@ -188,6 +188,7 @@ unsigned int textVAO;
 unsigned int textVBO;
 
 Vector* lights;
+light sunTzu;
 
 light_renderer lightRenderer;
 
@@ -242,7 +243,7 @@ void init_renderer()
     );
     glUseProgram(finalPassShader.id);
     glUniform1i(glGetUniformLocation(finalPassShader.id, "tex"), 0);
-    glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 1);
+    glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 0.3);
 
     textShader = shader_import(
         "../assets/shaders/renderer2D/text/shader_text.vag",
@@ -303,8 +304,8 @@ void init_renderer()
     //light shit
     lightRenderer = light_createRenderer();
     srand(13);
-    lights = vector_create(100);
-    for (unsigned int i = 0; i < 100; i++)
+    lights = vector_create(32);
+    for (unsigned int i = 0; i < 32; i++)
     {
         light* lit = (light*)malloc(sizeof(light));
         *lit = light_create(
@@ -314,6 +315,12 @@ void init_renderer()
             );
         vector_push_back(lights, lit);
     }
+
+    sunTzu = light_create(
+        vec3_create2(1, 1, 1),
+        vec3_create2(1, 1, 1),
+        vec3_create2(3, 0, 0)
+    );
 }
 
 void end_renderer()
@@ -422,9 +429,9 @@ void render(camera* cum, font* f)
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
     
+    //point lights
     float* bufferData = (float*)malloc(lights->size * LIGHT_SIZE_IN_VBO);
     light* tempLight;
-    vec4 tempVec;
     for (unsigned int i = 0; i < lights->size; i++)
     {
         tempLight = (light*)vector_get(lights, i);
@@ -432,8 +439,15 @@ void render(camera* cum, font* f)
     }
    
     light_fillRenderer(&lightRenderer, bufferData, lights->size);
-    free(bufferData);
     light_render(&lightRenderer, 69);
+    free(bufferData);
+
+    //Sun Tzu
+    bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
+    memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
+    light_fillRenderer(&lightRenderer, bufferData, 1);
+    light_render(&lightRenderer, 0);
+    free(bufferData);
 
     glDepthMask(GL_TRUE);
     glDepthFunc(GL_LESS);

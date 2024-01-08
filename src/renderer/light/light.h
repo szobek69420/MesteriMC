@@ -10,7 +10,7 @@
 #define LIGHT_SIZE_IN_VBO 25*sizeof(float)//position, colour, attenuation, model matrix
 #define LIGHT_FLOATS_IN_VBO 25
 
-//ha directional light, akkor a position az a direction és a range az negatív (directional light, ha a linear és a quadratic 0.0001 vagy kevesebb)
+//ha directional light, akkor a position az a direction és a range az negatív (directional light, ha a linear és a quadratic 0.00001 vagy kevesebb)
 typedef struct light {
 	vec3 position;
 	vec3 colour;

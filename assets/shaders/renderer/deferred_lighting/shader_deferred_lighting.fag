@@ -39,7 +39,12 @@ void main()
 	vec3 lighting = albedo * 0.1*attenuation;
 
 	// albedo
-	vec3 light_dir = normalize(lightPosition - viewspace_position);
+	vec3 light_dir;
+	if(lightAttenuation.y<0.00001&&lightAttenuation.z<0.00001)//directional
+		light_dir=lightPosition;
+	else
+		light_dir=normalize(lightPosition - viewspace_position);
+
 	vec3 alb = max(dot(normal, light_dir), 0.0) * albedo * lightColour;
 	// specular
 	vec3 halfway_dir = normalize(light_dir + view_dir);  

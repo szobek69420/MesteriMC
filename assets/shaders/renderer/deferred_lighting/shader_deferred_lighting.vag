@@ -14,9 +14,14 @@ uniform mat4 projection;
 
 void main()
 {
-	lightPosition=vec3(view*vec4(position,1));
+	float w=1;
+	if(attenuation.y<0.00001&&attenuation.z<0.00001) w=0;
+
+	lightPosition=vec3(view*vec4(position,w));
 	lightColour=colour;
 	lightAttenuation=attenuation;
 
-	gl_Position=projection*view*modelMatrix*vec4(aPos,1);
+	gl_Position=vec4(aPos,1);
+	if(w>0.00001)
+		gl_Position=projection*view*modelMatrix*gl_Position;
 }

@@ -18,7 +18,7 @@ void main()
     colour = vec3(1.0) - exp(-colour * exposure);
 
     // gamma correction 
-    colour = pow(colour, vec3(1));
+    colour = pow(colour, vec3(0.4545));
 
 	fragColour.rgb=colour;
 }
