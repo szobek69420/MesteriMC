@@ -228,7 +228,7 @@ void init_renderer()
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 100);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 120);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1/(120-100));
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f/(120-100));
 
     forwardPassShader = shader_import(
         "../assets/shaders/renderer/forward/shader_forward.vag",
@@ -397,7 +397,7 @@ void render(camera* cum, font* f)
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rendor.endBuffer.id);
     glBlitFramebuffer(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, 0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
-    //lighting pass
+    //lighting pass ------------------------------------------------------------------------------------------
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
     //glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
     glClearColor(0, 0, 0, 0);
@@ -456,7 +456,7 @@ void render(camera* cum, font* f)
     glDisable(GL_BLEND);
 
 
-    //render forward scene
+    //render forward scene --------------------------------------------------------------------------------
     glUseProgram(forwardPassShader.id);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "view"), 1, GL_FALSE, view.data);
@@ -470,11 +470,16 @@ void render(camera* cum, font* f)
         render_cube();
     }
 
-    // draw deferred results to screen
-    glDisable(GL_DEPTH_TEST);
-
+    // draw results to screen ------------------------------------------------------------------------------
     glViewport(0, 0, window_getWidth(), window_getHeight());
     glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
+    
+    glDisable(GL_DEPTH_TEST);
+    glClearColor(0, 0.04f, 0.6f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendEquation(GL_FUNC_ADD);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
@@ -482,6 +487,8 @@ void render(camera* cum, font* f)
     glUseProgram(finalPassShader.id);
     glBindVertexArray(rectangleVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glDisable(GL_BLEND);
 
     //render 2d stuff (only text yet)
     //everything is inside render_text like use shader bing VAO etc. (inefficient but good enough for now)
