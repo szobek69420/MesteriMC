@@ -12,7 +12,7 @@ uniform sampler2D texture_albedo;
 uniform sampler2D texture_normal;
 uniform sampler2D texture_specular;
 
-const float heightScale=0.5;
+const float heightScale=0.2;
 
 const float heightStep=0.2;
 const float onePerHeightStep=5.0;

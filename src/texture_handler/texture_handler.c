@@ -7,6 +7,8 @@ static unsigned int atlas_albedo=0;
 static unsigned int atlas_specular=0;//https://github.com/rre36/lab-pbr/wiki/Specular-Texture-Details (mi csak az r komponenst használjuk)
 static unsigned int atlas_normal=0;//rgba(normal.x, normal.y, normal.z, height)
 
+static unsigned int skybox = 0;
+
 unsigned int textureHandler_loadImage(const char* pathToTexture, GLint internalFormat, GLenum format, int filterType, int flipVertically);
 
 int textureHandler_importTextures()
@@ -24,6 +26,10 @@ int textureHandler_importTextures()
     if (atlas_normal == 0)
         problem++;
 
+    skybox = textureHandler_loadSkybox();
+    if (skybox == 0)
+        problem++;
+
     return problem;
 }
 
@@ -32,6 +38,8 @@ void textureHandler_destroyTextures()
 	glDeleteTextures(1, &atlas_albedo);
 	glDeleteTextures(1, &atlas_specular);
 	glDeleteTextures(1, &atlas_normal);
+
+    glDeleteTextures(1, &skybox);
 }
 
 unsigned int textureHandler_getTexture(int texture)
@@ -46,6 +54,9 @@ unsigned int textureHandler_getTexture(int texture)
 
     case TEXTURE_ATLAS_NORMAL:
         return atlas_normal;
+
+    case TEXTURE_SKYBOX:
+        return skybox;
 
     default:
         return 0;
@@ -82,4 +93,50 @@ unsigned int textureHandler_loadImage(const char* pathToTexture, GLint internalF
     stbi_image_free(data);
 
     return texture;
+}
+
+unsigned int textureHandler_loadSkybox()
+{
+    unsigned int cubeMap;
+    unsigned char* data;
+    int width, height, nrChannels;
+
+    glGenTextures(1, &cubeMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMap);
+
+    stbi_set_flip_vertically_on_load(0);
+    const char* cubeMapTextures[]={ 
+        "../assets/textures/skybox/left.png",
+        "../assets/textures/skybox/right.png",
+        "../assets/textures/skybox/top.png",
+        "../assets/textures/skybox/bottom.png",
+        "../assets/textures/skybox/front.png",
+        "../assets/textures/skybox/back.png" };
+
+    for (unsigned int i = 0; i < 6; i++)
+    {
+        data = stbi_load(cubeMapTextures[i], &width, &height, &nrChannels, 0);
+        
+        if (data != NULL)
+        {
+            glTexImage2D(
+                GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                0, GL_SRGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data
+            );
+        }
+        else
+        {
+            printf("The skybox texture \"%s\" is absolutely fucked\n", cubeMapTextures[i]);
+            return 0;
+        }
+    }
+    stbi_set_flip_vertically_on_load(1);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return cubeMap;
 }

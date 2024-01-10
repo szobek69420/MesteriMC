@@ -19,6 +19,7 @@
 #include "renderer/framebuffer/framebuffer.h"
 #include "renderer/light/light.h"
 #include "mesh/sphere/sphere.h"
+#include "mesh/kuba/kuba.h"
 
 #include "font_handler/font_handler.h"
 
@@ -180,6 +181,7 @@ shader lightingPassShader;
 shader forwardPassShader;
 shader finalPassShader;
 shader textShader;
+shader skyboxShader; mesh skyboxMesh;
 
 unsigned int rectangleVAO;
 unsigned int rectangleVBO;
@@ -251,7 +253,7 @@ void init_renderer()
         NULL
     );
 
-    glUseProgram(0);
+    
 
     //rectangle VAO, VBO
     float vertices[] = {
@@ -321,6 +323,18 @@ void init_renderer()
         vec3_create2(0.6, 1.3, 0.8),
         vec3_create2(3, 0, 0)
     );
+
+    //skybox
+    skyboxShader = shader_import(
+        "../assets/shaders/skybox/shader_skybox.vag",
+        "../assets/shaders/skybox/shader_skybox.fag",
+        NULL
+    );
+    glUseProgram(skyboxShader.id);
+    glUniform1i(glGetUniformLocation(skyboxShader.id, "skybox"), 0);
+    glUseProgram(0);
+
+    skyboxMesh = kuba_create();
 }
 
 void end_renderer()
@@ -342,6 +356,10 @@ void end_renderer()
     vector_destroy(lights);
 
     light_destroyRenderer(lightRenderer);
+
+    //skybox
+    shader_delete(&skyboxShader);
+    mesh_destroy(skyboxMesh);
 }
 
 void render(camera* cum, font* f)
@@ -354,27 +372,21 @@ void render(camera* cum, font* f)
     glClear(GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(shadowShader.id);
-    //set up lightmatrix
-    //render geometry
 
 
-    //geometry pass
-    glViewport(0, 0, 1920, 1080);
-    //glViewport(0, 0, window_getWidth(), window_getHeight());
-    glBindFramebuffer(GL_FRAMEBUFFER, rendor.gBuffer.id);
-
-    glClearColor(0, 0, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
+    //matrices
     mat4 view = camera_getViewMatrix(cum);
     mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 200);
     mat4 projectionInverse = mat4_inverse(projection);
-
-    //mat4 pv= mat4_multiply(projection, view);
-    //mat3 viewNormal = mat3_transpose(mat3_inverse(mat3_createFromMat(view)));
     mat3 viewNormal = mat3_createFromMat(view);
 
+    //prepare gbuffer fbo
+    glViewport(0, 0, 1920, 1080);
+    glBindFramebuffer(GL_FRAMEBUFFER, rendor.gBuffer.id);
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    //geometry pass
     glUseProgram(geometryPassShader.id);
 
     glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "view"), 1, GL_FALSE, view.data);
@@ -472,13 +484,25 @@ void render(camera* cum, font* f)
         render_cube();
     }
 
-    // draw results to screen ------------------------------------------------------------------------------
+    //switch to default fbo ------------------------------------------------------------------------
     glViewport(0, 0, window_getWidth(), window_getHeight());
     glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
-    
+
+    //skybox
     glDisable(GL_DEPTH_TEST);
-    glClearColor(0, 0.04f, 0.6f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureHandler_getTexture(TEXTURE_SKYBOX));
+    glUseProgram(skyboxShader.id);
+    glBindVertexArray(skyboxMesh.vao);
+    glDrawElements(GL_TRIANGLES, skyboxMesh.indexCount, GL_UNSIGNED_INT, 0);
+
+    glEnable(GL_DEPTH_TEST);
+
+    // draw results to screen ----------------------------------------------------------------------------- 
+    glDisable(GL_DEPTH_TEST);
+    //glClearColor(0, 0.04f, 0.6f, 1.0f);
+    //glClear(GL_COLOR_BUFFER_BIT);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBlendEquation(GL_FUNC_ADD);
