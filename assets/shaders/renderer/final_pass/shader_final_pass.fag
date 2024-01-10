@@ -44,4 +44,6 @@ void main()
     colour = pow(colour, vec3(0.4545));
 
 	fragColour.rgb=colour;
+
+    //fragColour=texture(tex,uv);
 }

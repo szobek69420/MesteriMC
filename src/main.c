@@ -371,13 +371,14 @@ void render(camera* cum, font* f)
     mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 200);
     mat4 projectionInverse = mat4_inverse(projection);
 
-    mat4 pv= mat4_multiply(projection, view);
+    //mat4 pv= mat4_multiply(projection, view);
     //mat3 viewNormal = mat3_transpose(mat3_inverse(mat3_createFromMat(view)));
     mat3 viewNormal = mat3_createFromMat(view);
 
     glUseProgram(geometryPassShader.id);
 
-    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "pv"), 1, GL_FALSE, pv.data);
+    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "view"), 1, GL_FALSE, view.data);
+    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix3fv(glGetUniformLocation(geometryPassShader.id, "view_normal"), 1, GL_FALSE, viewNormal.data);
 
     glActiveTexture(GL_TEXTURE0);
@@ -430,6 +431,7 @@ void render(camera* cum, font* f)
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
     
     //point lights
+    light_setPosition((light*)vector_get(lights, 0), cum->position);
     float* bufferData = (float*)malloc(lights->size * LIGHT_SIZE_IN_VBO);
     light* tempLight;
     for (unsigned int i = 0; i < lights->size; i++)
@@ -460,7 +462,7 @@ void render(camera* cum, font* f)
     glUseProgram(forwardPassShader.id);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "view"), 1, GL_FALSE, view.data);
-    for (unsigned int i = 0; i < lights->size; i++)
+    for (unsigned int i = 1; i < lights->size; i++)
     {
         mat4 model = mat4_create(1.0f);
         model = mat4_translate(model, ((light*)vector_get(lights, i))->position);
