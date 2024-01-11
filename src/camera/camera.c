@@ -58,7 +58,7 @@ void camera_update(camera* cam, float delta_time)
 
 mat4 camera_getViewMatrix(camera* cam)
 {
-    return mat4_lookAt(cam->position, cam->front, cam->up);
+    return cam->view_matrix;
 }
 
 static void _camera_update_vectors(camera* cam)
@@ -70,4 +70,5 @@ static void _camera_update_vectors(camera* cam)
     cam->front = vec3_normalize(front);
     cam->right = vec3_normalize(vec3_cross(cam->front, cam->world_up));
     cam->up = vec3_normalize(vec3_cross(cam->right, cam->front));
+    cam->view_matrix = mat4_lookAt(cam->position, cam->front, cam->up);
 }

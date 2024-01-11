@@ -8,6 +8,7 @@ static unsigned int atlas_specular=0;//https://github.com/rre36/lab-pbr/wiki/Spe
 static unsigned int atlas_normal=0;//rgba(normal.x, normal.y, normal.z, height)
 
 static unsigned int skybox = 0;
+static unsigned int sun = 0;
 
 unsigned int textureHandler_loadImage(const char* pathToTexture, GLint internalFormat, GLenum format, int filterType, int flipVertically);
 
@@ -26,8 +27,13 @@ int textureHandler_importTextures()
     if (atlas_normal == 0)
         problem++;
 
+
     skybox = textureHandler_loadSkybox();
     if (skybox == 0)
+        problem++;
+
+    sun = textureHandler_loadImage("../assets/textures/sun/sun.png", GL_RGBA, GL_RGBA, GL_LINEAR, 69);
+    if (sun == 0)
         problem++;
 
     return problem;
@@ -40,6 +46,7 @@ void textureHandler_destroyTextures()
 	glDeleteTextures(1, &atlas_normal);
 
     glDeleteTextures(1, &skybox);
+    glDeleteTextures(1, &sun);
 }
 
 unsigned int textureHandler_getTexture(int texture)
@@ -57,6 +64,9 @@ unsigned int textureHandler_getTexture(int texture)
 
     case TEXTURE_SKYBOX:
         return skybox;
+
+    case TEXTURE_SUN:
+        return sun;
 
     default:
         return 0;

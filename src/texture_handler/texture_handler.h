@@ -7,6 +7,7 @@
 #define TEXTURE_ATLAS_SPECULAR 2
 #define TEXTURE_ATLAS_NORMAL 3
 #define TEXTURE_SKYBOX 69420
+#define TEXTURE_SUN 69421
 
 int textureHandler_importTextures();//visszateresi ertek 0, ha sikerult
 void textureHandler_destroyTextures();

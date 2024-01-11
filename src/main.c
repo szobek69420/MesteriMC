@@ -15,6 +15,7 @@
 
 #include "world/chunk/chunk.h"
 #include "world/chunk/chunkManager.h"
+#include "world/sun/sun.h"
 
 #include "renderer/framebuffer/framebuffer.h"
 #include "renderer/light/light.h"
@@ -194,6 +195,8 @@ light sunTzu;
 
 light_renderer lightRenderer;
 
+sun szunce;
+
 void init_renderer()
 {
 
@@ -335,6 +338,9 @@ void init_renderer()
     glUseProgram(0);
 
     skyboxMesh = kuba_create();
+
+    //sun
+    szunce = sun_create();
 }
 
 void end_renderer()
@@ -360,6 +366,9 @@ void end_renderer()
     //skybox
     shader_delete(&skyboxShader);
     mesh_destroy(skyboxMesh);
+
+    //sun
+    sun_destroy(&szunce);
 }
 
 void render(camera* cum, font* f)
@@ -377,6 +386,7 @@ void render(camera* cum, font* f)
     //matrices
     mat4 view = camera_getViewMatrix(cum);
     mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 200);
+    mat4 pv = mat4_multiply(projection, view);
     mat4 projectionInverse = mat4_inverse(projection);
     mat3 viewNormal = mat3_createFromMat(view);
 
@@ -409,6 +419,7 @@ void render(camera* cum, font* f)
     glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rendor.endBuffer.id);
     glBlitFramebuffer(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, 0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
 
     //lighting pass ------------------------------------------------------------------------------------------
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
@@ -456,7 +467,7 @@ void render(camera* cum, font* f)
     light_render(&lightRenderer, 69);
     free(bufferData);
 
-    //Sun Tzu
+    //directional
     bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
     memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
     light_fillRenderer(&lightRenderer, bufferData, 1);
@@ -471,6 +482,8 @@ void render(camera* cum, font* f)
 
 
     //render forward scene --------------------------------------------------------------------------------
+
+    //light kuba
     glUseProgram(forwardPassShader.id);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "view"), 1, GL_FALSE, view.data);
@@ -487,22 +500,29 @@ void render(camera* cum, font* f)
     //switch to default fbo ------------------------------------------------------------------------
     glViewport(0, 0, window_getWidth(), window_getHeight());
     glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
+    //glClearColor(0, 0.04f, 0.6f, 1.0f);
+    //glClear(GL_COLOR_BUFFER_BIT);
 
     //skybox
     glDisable(GL_DEPTH_TEST);
+    glFrontFace(GL_CW);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureHandler_getTexture(TEXTURE_SKYBOX));
     glUseProgram(skyboxShader.id);
+    glUniformMatrix4fv(glGetUniformLocation(skyboxShader.id, "pvm"), 1, GL_FALSE, mat4_multiply(pv, mat4_create2((float[]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, cum->position.x, cum->position.y, cum->position.z, 1 })).data);
     glBindVertexArray(skyboxMesh.vao);
     glDrawElements(GL_TRIANGLES, skyboxMesh.indexCount, GL_UNSIGNED_INT, 0);
 
+    glFrontFace(GL_CCW);
+
+    //sun (ide lehet, hogy kell majd blend)
+    sun_render(&szunce, cum, &projection);
     glEnable(GL_DEPTH_TEST);
 
     // draw results to screen ----------------------------------------------------------------------------- 
     glDisable(GL_DEPTH_TEST);
-    //glClearColor(0, 0.04f, 0.6f, 1.0f);
-    //glClear(GL_COLOR_BUFFER_BIT);
+
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBlendEquation(GL_FUNC_ADD);
@@ -551,19 +571,13 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     event_queue_push((event){ .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
 }
 
-shader program;
 chunkManager cm;
 void init_kuba()
 {
-    program = shader_import("../assets/shaders/chunk/chunkTest.vag", "../assets/shaders/chunk/chunkTest.fag", NULL);
-    shader_use(program.id);
-    shader_setInt(program.id, "tex", 0);
-    shader_use(0);
     cm = chunkManager_create(69, 4);
 }
 
 void end_kuba() {
-    shader_delete(&program);
     chunkManager_destroy(&cm);
 }
 

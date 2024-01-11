@@ -1,0 +1,14 @@
+#version 330 core
+
+in vec2 uv;
+
+out vec4 fragColour;
+
+uniform sampler2D texture_sun;
+
+void main()
+{
+	fragColour=texture(texture_sun, uv);
+	if(fragColour.a<0.4)
+		discard;
+}
