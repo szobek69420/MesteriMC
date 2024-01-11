@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "window/window.h"
 #include "camera/camera.h"
@@ -55,6 +56,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 int main()
 {
+    printf("%.2f\n", 57.295779513f * acosf(0.88f));
     window_setWidth(1300);
     window_setHeight(800);
     GLFWwindow* window = init_window("amogus", window_getWidth(), window_getHeight());

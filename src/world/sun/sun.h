@@ -20,8 +20,8 @@ typedef struct {
 sun sun_create();
 void sun_destroy(sun* sunTzu);
 
-void sun_render(mat4 pv);
-
 void sun_render(sun* sunTzu, camera* cum, mat4* projection);
+
+void sun_setDirection(sun* sunTzu, vec3 direction);
 
 #endif
