@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "window/window.h"
 #include "camera/camera.h"
@@ -15,10 +16,12 @@
 
 #include "world/chunk/chunk.h"
 #include "world/chunk/chunkManager.h"
+#include "world/sun/sun.h"
 
 #include "renderer/framebuffer/framebuffer.h"
 #include "renderer/light/light.h"
 #include "mesh/sphere/sphere.h"
+#include "mesh/kuba/kuba.h"
 
 #include "font_handler/font_handler.h"
 
@@ -53,6 +56,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 int main()
 {
+    printf("%.2f\n", 57.295779513f * acosf(0.88f));
     window_setWidth(1300);
     window_setHeight(800);
     GLFWwindow* window = init_window("amogus", window_getWidth(), window_getHeight());
@@ -180,6 +184,7 @@ shader lightingPassShader;
 shader forwardPassShader;
 shader finalPassShader;
 shader textShader;
+shader skyboxShader; mesh skyboxMesh;
 
 unsigned int rectangleVAO;
 unsigned int rectangleVBO;
@@ -191,6 +196,8 @@ Vector* lights;
 light sunTzu;
 
 light_renderer lightRenderer;
+
+sun szunce;
 
 void init_renderer()
 {
@@ -251,7 +258,7 @@ void init_renderer()
         NULL
     );
 
-    glUseProgram(0);
+    
 
     //rectangle VAO, VBO
     float vertices[] = {
@@ -321,6 +328,21 @@ void init_renderer()
         vec3_create2(0.6, 1.3, 0.8),
         vec3_create2(3, 0, 0)
     );
+
+    //skybox
+    skyboxShader = shader_import(
+        "../assets/shaders/skybox/shader_skybox.vag",
+        "../assets/shaders/skybox/shader_skybox.fag",
+        NULL
+    );
+    glUseProgram(skyboxShader.id);
+    glUniform1i(glGetUniformLocation(skyboxShader.id, "skybox"), 0);
+    glUseProgram(0);
+
+    skyboxMesh = kuba_create();
+
+    //sun
+    szunce = sun_create();
 }
 
 void end_renderer()
@@ -342,6 +364,13 @@ void end_renderer()
     vector_destroy(lights);
 
     light_destroyRenderer(lightRenderer);
+
+    //skybox
+    shader_delete(&skyboxShader);
+    mesh_destroy(skyboxMesh);
+
+    //sun
+    sun_destroy(&szunce);
 }
 
 void render(camera* cum, font* f)
@@ -354,30 +383,26 @@ void render(camera* cum, font* f)
     glClear(GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(shadowShader.id);
-    //set up lightmatrix
-    //render geometry
 
 
-    //geometry pass
+    //matrices
+    mat4 view = camera_getViewMatrix(cum);
+    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 200);
+    mat4 pv = mat4_multiply(projection, view);
+    mat4 projectionInverse = mat4_inverse(projection);
+    mat3 viewNormal = mat3_createFromMat(view);
+
+    //prepare gbuffer fbo
     glViewport(0, 0, 1920, 1080);
-    //glViewport(0, 0, window_getWidth(), window_getHeight());
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.gBuffer.id);
-
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
-    mat4 view = camera_getViewMatrix(cum);
-    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 200);
-    mat4 projectionInverse = mat4_inverse(projection);
-
-    mat4 pv= mat4_multiply(projection, view);
-    //mat3 viewNormal = mat3_transpose(mat3_inverse(mat3_createFromMat(view)));
-    mat3 viewNormal = mat3_createFromMat(view);
-
+    //geometry pass
     glUseProgram(geometryPassShader.id);
 
-    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "pv"), 1, GL_FALSE, pv.data);
+    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "view"), 1, GL_FALSE, view.data);
+    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix3fv(glGetUniformLocation(geometryPassShader.id, "view_normal"), 1, GL_FALSE, viewNormal.data);
 
     glActiveTexture(GL_TEXTURE0);
@@ -396,6 +421,7 @@ void render(camera* cum, font* f)
     glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rendor.endBuffer.id);
     glBlitFramebuffer(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, 0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
 
     //lighting pass ------------------------------------------------------------------------------------------
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
@@ -430,6 +456,7 @@ void render(camera* cum, font* f)
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
     
     //point lights
+    light_setPosition((light*)vector_get(lights, 0), cum->position);
     float* bufferData = (float*)malloc(lights->size * LIGHT_SIZE_IN_VBO);
     light* tempLight;
     for (unsigned int i = 0; i < lights->size; i++)
@@ -442,7 +469,7 @@ void render(camera* cum, font* f)
     light_render(&lightRenderer, 69);
     free(bufferData);
 
-    //Sun Tzu
+    //directional
     bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
     memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
     light_fillRenderer(&lightRenderer, bufferData, 1);
@@ -457,10 +484,12 @@ void render(camera* cum, font* f)
 
 
     //render forward scene --------------------------------------------------------------------------------
+
+    //light kuba
     glUseProgram(forwardPassShader.id);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "view"), 1, GL_FALSE, view.data);
-    for (unsigned int i = 0; i < lights->size; i++)
+    for (unsigned int i = 1; i < lights->size; i++)
     {
         mat4 model = mat4_create(1.0f);
         model = mat4_translate(model, ((light*)vector_get(lights, i))->position);
@@ -470,13 +499,32 @@ void render(camera* cum, font* f)
         render_cube();
     }
 
-    // draw results to screen ------------------------------------------------------------------------------
+    //switch to default fbo ------------------------------------------------------------------------
     glViewport(0, 0, window_getWidth(), window_getHeight());
     glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
-    
+    //glClearColor(0, 0.04f, 0.6f, 1.0f);
+    //glClear(GL_COLOR_BUFFER_BIT);
+
+    //skybox
     glDisable(GL_DEPTH_TEST);
-    glClearColor(0, 0.04f, 0.6f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glFrontFace(GL_CW);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureHandler_getTexture(TEXTURE_SKYBOX));
+    glUseProgram(skyboxShader.id);
+    glUniformMatrix4fv(glGetUniformLocation(skyboxShader.id, "pvm"), 1, GL_FALSE, mat4_multiply(pv, mat4_create2((float[]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, cum->position.x, cum->position.y, cum->position.z, 1 })).data);
+    glBindVertexArray(skyboxMesh.vao);
+    glDrawElements(GL_TRIANGLES, skyboxMesh.indexCount, GL_UNSIGNED_INT, 0);
+
+    glFrontFace(GL_CCW);
+
+    //sun (ide lehet, hogy kell majd blend)
+    sun_render(&szunce, cum, &projection);
+    glEnable(GL_DEPTH_TEST);
+
+    // draw results to screen ----------------------------------------------------------------------------- 
+    glDisable(GL_DEPTH_TEST);
+
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBlendEquation(GL_FUNC_ADD);
@@ -525,19 +573,13 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     event_queue_push((event){ .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
 }
 
-shader program;
 chunkManager cm;
 void init_kuba()
 {
-    program = shader_import("../assets/shaders/chunk/chunkTest.vag", "../assets/shaders/chunk/chunkTest.fag", NULL);
-    shader_use(program.id);
-    shader_setInt(program.id, "tex", 0);
-    shader_use(0);
     cm = chunkManager_create(69, 4);
 }
 
 void end_kuba() {
-    shader_delete(&program);
     chunkManager_destroy(&cm);
 }
 

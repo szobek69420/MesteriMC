@@ -11,6 +11,7 @@ typedef struct {
     float yaw, pitch;
     float fov;
     float move_speed, mouse_sensitivity;
+    mat4 view_matrix;
 } camera;
 
 camera camera_create(vec3 position, vec3 world_up, float yaw, float pitch, float fov, float move_speed, float mouse_sensitivity);

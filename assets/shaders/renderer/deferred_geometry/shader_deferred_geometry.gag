@@ -4,26 +4,38 @@ layout (triangle_strip, max_vertices = 3) out;
 
 in VS_OUT{
     vec2 TexCoords;
+    vec3 viewDir;//view direction in tangent space
     mat3 tangentToView;
 }gs_in[];
 
 out GS_OUT{
     vec2 TexCoords;
+    vec3 viewDir;//view direction in tangent space
     mat3 tangentToView;
 }gs_out;
 
 void main() {   
     gs_out.tangentToView=gs_in[0].tangentToView;
 
+
+
     gl_Position = gl_in[0].gl_Position; 
+
+    gs_out.viewDir=gs_in[0].viewDir;
     gs_out.TexCoords=gs_in[0].TexCoords;
     EmitVertex();
 
+
     gl_Position = gl_in[1].gl_Position;
+
+    gs_out.viewDir=gs_in[1].viewDir;
     gs_out.TexCoords=gs_in[1].TexCoords;
     EmitVertex();
 
+
     gl_Position = gl_in[2].gl_Position;
+
+    gs_out.viewDir=gs_in[2].viewDir;
     gs_out.TexCoords=gs_in[2].TexCoords;
     EmitVertex();
     

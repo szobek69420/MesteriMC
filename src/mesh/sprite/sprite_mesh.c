@@ -1,13 +1,13 @@
-#include "kuba.h"
+#include "sprite_mesh.h"
 #include "../mesh.h"
 
 #include <glad/glad.h>
 
 
-static float vertices[KUBA_VERTEX_VALUE_COUNT];
-static unsigned int indices[KUBA_INDEX_COUNT];
+static float vertices[SPRITE_VERTEX_VALUE_COUNT];
+static unsigned int indices[SPRITE_INDEX_COUNT];
 
-mesh kuba_create()
+mesh spriteMesh_create()
 {
 	mesh m;
 
@@ -22,38 +22,26 @@ mesh kuba_create()
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.ebo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);//position
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3*sizeof(float)));
+	glEnableVertexAttribArray(1);//uv
 
 	glBindVertexArray(0);
 
-	m.indexCount = KUBA_INDEX_COUNT;
+	m.indexCount = SPRITE_INDEX_COUNT;
 
 	return m;
 }
 
 static float vertices[] = {
-	-1, 1, 1,
-	1, 1, 1,
-	1, 1, -1,
-	-1, 1, -1,
-	-1, -1, 1,
-	1, -1, 1,
-	1, -1, -1,
-	-1, -1, -1
+	-1, -1, 0,		1, 0,
+	1, -1, 0,		0, 0,
+	1, 1, 0,		0, 1,
+	-1, 1, 0,		1, 1
 };
 
 static unsigned int indices[] = {
-	0, 2, 1,
-	0, 3, 2,
-	0, 1, 5,
-	0, 5, 4,
-	1, 2, 6,
-	1, 6, 5,
-	2, 7, 6,
-	2, 3, 7,
-	3, 0, 7,
-	7, 0, 4,
-	5, 6, 7,
-	5, 7, 4
+	0, 1, 2,
+	2, 3, 0
 };

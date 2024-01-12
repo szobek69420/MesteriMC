@@ -4,6 +4,7 @@ layout (location = 1) out vec4 gAlbedoSpec;
 
 in GS_OUT{
     vec2 TexCoords;
+    vec3 viewDir;//view direction in tangent space (fragment to player)
     mat3 tangentToView;
 }fs_in;
 
@@ -11,11 +12,131 @@ uniform sampler2D texture_albedo;
 uniform sampler2D texture_normal;
 uniform sampler2D texture_specular;
 
+const float heightScale=0.2;
+
+const float heightStep=0.2;
+const float onePerHeightStep=5.0;
+
+//ha tobb dolog kerul a deferred pipelineba, akkor ez majd uniform lesz
+const float textureWidthInAtlas=0.1;
+const float onePerTextureWidthInAtlas=10;
+
+vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir);
+vec2 parallax();
+
 void main()
 {    
-    vec3 normalTemp=2*(texture(texture_normal,fs_in.TexCoords).rgb-vec3(0.5));
+    //vec2 uv=ParallaxMapping(fs_in.TexCoords, fs_in.viewDir);
+    vec2 uv=parallax();
+
+    vec3 normalTemp=2*(texture(texture_normal,uv).rgb-vec3(0.5));
     gNormal = 0.5*(fs_in.tangentToView*normalTemp)+vec3(0.5);
 
-    gAlbedoSpec.rgb = texture(texture_albedo, fs_in.TexCoords).rgb;
-    gAlbedoSpec.a = texture(texture_specular, fs_in.TexCoords).r;
+    gAlbedoSpec.rgb = texture(texture_albedo, uv).rgb;
+    gAlbedoSpec.a = texture(texture_specular, uv).r;
 }  
+
+vec2 parallax()
+{
+    vec2 textureLowerBorder=textureWidthInAtlas*vec2(
+        floor(onePerTextureWidthInAtlas*fs_in.TexCoords.x)+0.001,
+        floor(onePerTextureWidthInAtlas*fs_in.TexCoords.y)+0.001);
+
+    //azert van ez az egy helyett, hogy nehogy a rossz oldalrol valasszon pixelt a sampler
+    vec2 textureUpperBorder=textureLowerBorder+vec2(0.998*textureWidthInAtlas, 0.998*textureWidthInAtlas);
+
+
+    float stepScale=heightStep*heightScale;
+    vec2 deltaUV=(-textureWidthInAtlas*heightStep*heightScale/fs_in.viewDir.z)*fs_in.viewDir.xy;
+    
+    vec2 currentUV=fs_in.TexCoords;
+
+    float previousDepth, currentDepth;
+    float stepDepth=0;
+
+    previousDepth=1-texture(texture_normal, currentUV).a;
+    currentUV+=deltaUV;
+    stepDepth+=heightStep;
+    currentDepth=1-texture(texture_normal, currentUV).a;
+
+    while(currentDepth>stepDepth&&stepDepth<1)
+    {
+        previousDepth=currentDepth;
+        currentUV+=deltaUV.xy;
+        stepDepth+=heightStep;
+        currentDepth=1-texture(texture_normal, currentUV).a;
+    }
+
+    float afterDepth  = currentDepth - stepDepth;
+    float beforeDepth = previousDepth  - stepDepth + heightStep;
+ 
+    float weight = afterDepth / (afterDepth - beforeDepth);
+    currentUV = currentUV-deltaUV*weight;
+
+    if(currentUV.x<textureLowerBorder.x)
+        currentUV.x=textureLowerBorder.x;
+    if(currentUV.x>textureUpperBorder.x)
+        currentUV.x=textureUpperBorder.x;
+    if(currentUV.y<textureLowerBorder.y)
+        currentUV.y=textureLowerBorder.y;
+    if(currentUV.y>textureUpperBorder.y)
+        currentUV.y=textureUpperBorder.y;
+
+    /*if(currentUV.x<textureLowerBorder.x)
+        discard;
+    if(currentUV.x>textureUpperBorder.x)
+        discard;
+    if(currentUV.y<textureLowerBorder.y)
+        discard;
+    if(currentUV.y>textureUpperBorder.y)
+        discard;*/
+
+    return currentUV;
+}
+
+vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
+{ 
+    vec2 textureLowerBorder=textureWidthInAtlas*vec2(
+        floor(onePerTextureWidthInAtlas*texCoords.x)+0.001,
+        floor(onePerTextureWidthInAtlas*texCoords.y)+0.001);
+
+
+    //azert van ez az egy helyett, hogy nehogy a rossz oldalrol valasszon pixelt a sampler
+    vec2 textureUpperBorder=textureLowerBorder+vec2(0.998*textureWidthInAtlas, 0.998*textureWidthInAtlas);
+
+    float layerDepth = heightStep;
+
+    float currentLayerDepth = 0.0;
+
+    vec2 deltaTexCoords = viewDir.xy / viewDir.z * heightScale * heightStep*textureWidthInAtlas; 
+  
+
+    vec2  currentTexCoords     = texCoords;
+    float currentDepthMapValue = 1-texture(texture_normal, currentTexCoords).a;
+      
+    while(currentLayerDepth < currentDepthMapValue&&currentLayerDepth<1)
+    {
+        currentTexCoords -= deltaTexCoords;
+        currentDepthMapValue = 1-texture(texture_normal, currentTexCoords).a;  
+        currentLayerDepth += layerDepth;  
+    }
+    
+    vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
+
+    float afterDepth  = currentDepthMapValue - currentLayerDepth;
+    float beforeDepth = 1-texture(texture_normal, prevTexCoords).a - currentLayerDepth + layerDepth;
+ 
+    float weight = afterDepth / (afterDepth - beforeDepth);
+    vec2 currentUV = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+
+    if(currentUV.x<textureLowerBorder.x)
+        discard;
+    if(currentUV.x>textureUpperBorder.x)
+        discard;
+    if(currentUV.y<textureLowerBorder.y)
+        discard;
+    if(currentUV.y>textureUpperBorder.y)
+        discard;
+
+    return currentUV;
+}

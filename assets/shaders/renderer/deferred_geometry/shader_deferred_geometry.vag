@@ -7,11 +7,13 @@ layout (location=3) in vec3 aTangent;
 
 out VS_OUT{
     vec2 TexCoords;
+    vec3 viewDir;//view direction in tangent space
     mat3 tangentToView;
 }vs_out;
 
 uniform mat4 model;
-uniform mat4 pv;
+uniform mat4 view;
+uniform mat4 projection;
 uniform mat3 view_normal;
 
 void main()
@@ -19,5 +21,8 @@ void main()
     vs_out.TexCoords=aUV;
     vs_out.tangentToView=view_normal*mat3(aTangent, cross(aNormal,aTangent), aNormal);
 
-    gl_Position=pv*model*vec4(aPos,1);
+    vec4 position=view*model*vec4(aPos,1);
+
+    vs_out.viewDir=-(transpose(vs_out.tangentToView)*position.xyz);
+    gl_Position=projection*position;
 }  
