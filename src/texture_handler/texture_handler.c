@@ -4,13 +4,14 @@
 #include "texture_handler.h"
 
 static unsigned int atlas_albedo=0;
-static unsigned int atlas_specular=0;//https://github.com/rre36/lab-pbr/wiki/Specular-Texture-Details (mi csak az r komponenst használjuk)
+static unsigned int atlas_specular=0;//https://github.com/rre36/lab-pbr/wiki/Specular-Texture-Details (mi csak az r komponenst hasznï¿½ljuk)
 static unsigned int atlas_normal=0;//rgba(normal.x, normal.y, normal.z, height)
 
 static unsigned int skybox = 0;
 static unsigned int sun = 0;
 
 unsigned int textureHandler_loadImage(const char* pathToTexture, GLint internalFormat, GLenum format, int filterType, int flipVertically);
+unsigned int textureHandler_loadSkybox();
 
 int textureHandler_importTextures()
 {
