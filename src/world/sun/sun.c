@@ -52,7 +52,7 @@ sun sun_create()
 	glUseProgram(0);
 
 	sunTzu.model = mat4_create(1);
-	sun_setDirection(&sunTzu, vec3_create2(0.6, 1.3, 0.8));
+	sun_setDirection(&sunTzu, vec3_create2(1,1,-1));
 
 	return sunTzu;
 }
@@ -87,45 +87,39 @@ void sun_render(sun* sunTzu, camera* cum, mat4* projection)
 
 void sun_setDirection(sun* sunTzu, vec3 direction)
 {
-	sunTzu->direction = vec3_normalize(direction);
-	vec3 horizontal = vec3_normalize(vec3_create2(sunTzu->direction.x, 0, sunTzu->direction.z));
+	vec3 temp = vec3_normalize(direction);
+	sunTzu->direction = temp;
+	vec3 horizontal = vec3_normalize(vec3_create2(temp.x, 0, temp.z));
 	
 	float pitch, yaw;
-	float dot = vec3_dot(sunTzu->direction, vec3_create2(0, 1, 0));
-	if (dot > 0.999f)
+	/*yaw = RAD2DEG * atanf(-sunTzu->direction.x / sunTzu->direction.y);
+	pitch = RAD2DEG*atanf(sqrtf(sunTzu->direction.x * sunTzu->direction.x + sunTzu->direction.y * sunTzu->direction.y) / sunTzu->direction.z);*/
+	if (temp.z > 0)
 	{
-		pitch = 90;
-		yaw = 0;
-	}
-	else if (dot < -0.999f)
-	{
-		pitch = 270;
-		yaw = 0;
+		yaw = RAD2DEG * asinf(horizontal.x);
+		pitch = 180 - RAD2DEG * asinf(temp.y);
 	}
 	else
 	{
-		pitch = RAD2DEG * asinf(vec3_dot(sunTzu->direction, vec3_create2(0,1,0)));
-		if (vec3_dot(direction, horizontal) < 0)
-			pitch = 360 - pitch;
-		yaw = RAD2DEG * acosf(vec3_dot(horizontal, vec3_create2(0, 0, -1)));
-		if (vec3_dot(horizontal, vec3_create2(-1, 0, 0)) < 0)
-			yaw = 360 - yaw;
-
-		pitch += 180;
+		yaw = RAD2DEG * asinf(-horizontal.x);
+		pitch = RAD2DEG * asinf(temp.y);
 	}
 
-	sunTzu->model = mat4_rotate(mat4_create(1), vec3_create2(-1, 0, 0), pitch);
-	sunTzu->model = mat4_rotate(sunTzu->model, vec3_create2(0, 1, 0), yaw);
+	vec3_print(&temp);
+	printf("yaw: %.2f\n", yaw);
+	printf("pitch: %.2f\n", pitch);
+	sunTzu->model = mat4_rotate(mat4_create(1), vec3_create2(0, 1, 0),yaw);
+	sunTzu->model = mat4_rotate(sunTzu->model, vec3_create2(1, 0, 0), pitch);
 }
 
 static float vertices[] = {
-	-1*SUN_SIZE, -1 * SUN_SIZE, 100,	1, 0,
-	SUN_SIZE, -1 * SUN_SIZE, 100,		0, 0,
-	SUN_SIZE, SUN_SIZE, 100,			0, 1,
-	-1 * SUN_SIZE, SUN_SIZE, 100,		1, 1
+	-1*SUN_SIZE, -1 * SUN_SIZE, -100,	0, 0,
+	SUN_SIZE, -1 * SUN_SIZE, -100,		1, 0,
+	SUN_SIZE, SUN_SIZE,	-100,			1, 1,
+	-1 * SUN_SIZE, SUN_SIZE, -100,		0, 1
 };
 
 static unsigned int indices[] = {
-	0, 1, 2,
-	2, 3, 0
+	0, 2, 1,
+	2, 0, 3
 };
