@@ -56,7 +56,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 int main()
 {
-    printf("%.2f\n", 57.295779513f * acosf(0.88f));
+    printf("%.2f\n", 57.295779513f * atanf(-1000.0f));
     window_setWidth(1300);
     window_setHeight(800);
     GLFWwindow* window = init_window("amogus", window_getWidth(), window_getHeight());
@@ -65,7 +65,7 @@ int main()
     input_init();
     fontHandler_init();
 
-    camera cum = camera_create(vec3_create2(0, 200, 0), vec3_create2(0, 1, 0), 0, 0, 90, 50, 0.2);
+    camera cum = camera_create(vec3_create2(0, 200, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
     init_kuba();
     init_renderer();
