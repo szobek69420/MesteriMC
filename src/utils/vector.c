@@ -1,161 +1,162 @@
 #include "vector.h"
 #include <stdio.h>
 
-Vector* vector_create(size_t capacity)
+vector* vector_create(size_t capacity)
 {
-	Vector* vector = malloc(sizeof(Vector));
-	if (vector == NULL)
+
+	vector* vec = malloc(sizeof(vector));
+	if (vec == NULL)
 	{
 		printf("failed to allocate memory for vector\n");
 		exit(1);
 	}
 	if (capacity > 0)
 	{
-		vector->data = (void**)malloc(capacity * sizeof(void*));
-		if (vector->data == NULL)
+		vec->data = (void**)malloc(capacity * sizeof(void*));
+		if (vec->data == NULL)
 		{
 			printf("failed to allocate memory for vector data\n");
 			exit(1);
 		}
-		vector->capacity = capacity;
-		vector->size = 0;
+		vec->capacity = capacity;
+		vec->size = 0;
 	}
 	else
 	{
-		vector->data = NULL;
-		vector->capacity = 0;
-		vector->size = 0;
+		vec->data = NULL;
+		vec->capacity = 0;
+		vec->size = 0;
 	}
-	return vector;
+	return vec;
 }
-void vector_destroy(Vector* vector)
+void vector_destroy(vector* vec)
 {
-	if (vector == NULL)
+	if (vec == NULL)
 		return;
-	free(vector->data);
-	free(vector);
+	free(vec->data);
+	free(vec);
 }
 
-void* vector_get(Vector* vector, size_t idx)
+void* vector_get(vector* vec, size_t idx)
 {
-	if (vector == NULL || idx >= vector->size)
+	if (vec == NULL || idx >= vec->size)
 		return NULL;
-	return vector->data[idx];
+	return vec->data[idx];
 }
-void vector_set(Vector* vector, size_t idx, void* value)
+void vector_set(vector* vec, size_t idx, void* value)
 {
-	if (vector == NULL || idx >= vector->size)
+	if (vec == NULL || idx >= vec->size)
 		return;
-	vector->data[idx] = value;
+	vec->data[idx] = value;
 }
-void vector_push_back(Vector* vector, void* value)
+void vector_push_back(vector* vec, void* value)
 {
-	if (vector == NULL)
+	if (vec == NULL)
 		return;
-	if (vector->size == vector->capacity)
+	if (vec->size == vec->capacity)
 	{
-		vector->capacity = vector->capacity == 0 ? 1 : vector->capacity * 2;
-		vector->data = (void**)realloc(vector->data, sizeof(void*) * vector->capacity);
-		if (vector->data == NULL)
+		vec->capacity = vec->capacity == 0 ? 1 : vec->capacity * 2;
+		vec->data = (void**)realloc(vec->data, sizeof(void*) * vec->capacity);
+		if (vec->data == NULL)
 		{
 			printf("failed to allocate memory for vector data\n");
 			exit(1);
 		}
 	}
-	vector->data[vector->size++] = value;
+	vec->data[vec->size++] = value;
 }
-void* vector_pop_back(Vector* vector)
+void* vector_pop_back(vector* vec)
 {
-	if (vector == NULL || vector->size == 0)
+	if (vec == NULL || vec->size == 0)
 		return NULL;
-	vector->size--;
-	return vector->data[vector->size];
+	vec->size--;
+	return vec->data[vec->size];
 }
-void vector_insert(Vector* vector, size_t idx, void* value)
+void vector_insert(vector* vec, size_t idx, void* value)
 {
-	if (vector == NULL || idx > vector->size)
+	if (vec == NULL || idx > vec->size)
 		return;
-	if (vector->size == vector->capacity)
+	if (vec->size == vec->capacity)
 	{
-		vector->capacity = vector->capacity == 0 ? 1 : vector->capacity * 2;
-		vector->data = (void**)realloc(vector->data, sizeof(void*) * vector->capacity);
-		if (vector->data == NULL)
+		vec->capacity = vec->capacity == 0 ? 1 : vec->capacity * 2;
+		vec->data = (void**)realloc(vec->data, sizeof(void*) * vec->capacity);
+		if (vec->data == NULL)
 		{
 			printf("failed to allocate memory for vector data\n");
 			exit(1);
 		}
 	}
-	for (size_t i = vector->size; i > idx; i--)
-		vector->data[i] = vector->data[i - 1];
-	vector->data[idx] = value;
-	vector->size++;
+	for (size_t i = vec->size; i > idx; i--)
+		vec->data[i] = vec->data[i - 1];
+	vec->data[idx] = value;
+	vec->size++;
 }
-bool vector_contains(Vector* vector, void* value)
+bool vector_contains(vector* vec, void* value)
 {
-	if (vector == NULL)
+	if (vec == NULL)
 		return false;
-	for (size_t i = 0; i < vector->size; i++)
-		if (vector->data[i] == value)
+	for (size_t i = 0; i < vec->size; i++)
+		if (vec->data[i] == value)
 			return true;
 	return false;
 }
-int vector_index_of(Vector* vector, void* value)
+int vector_index_of(vector* vec, void* value)
 {
-	if (vector == NULL)
+	if (vec == NULL)
 		return -1;
-	for (size_t i = 0; i < vector->size; i++)
-		if (vector->data[i] == value)
+	for (size_t i = 0; i < vec->size; i++)
+		if (vec->data[i] == value)
 			return i;
 	return -1;
 }
-void vector_remove_at(Vector* vector, size_t idx)
+void vector_remove_at(vector* vec, size_t idx)
 {
-	if (vector == NULL || idx >= vector->size)
+	if (vec == NULL || idx >= vec->size)
 		return;
-	for (size_t i = idx; i < vector->size - 1; i++)
-		vector->data[i] = vector->data[i + 1];
-	vector->size--;
+	for (size_t i = idx; i < vec->size - 1; i++)
+		vec->data[i] = vec->data[i + 1];
+	vec->size--;
 }
-void vector_remove(Vector* vector, void* value)
+void vector_remove(vector* vec, void* value)
 {
-	if (vector == NULL)
+	if (vec == NULL)
 		return;
-	for (size_t i = 0; i < vector->size; i++)
+	for (size_t i = 0; i < vec->size; i++)
 	{
-		if (vector->data[i] == value)
+		if (vec->data[i] == value)
 		{
-			vector_remove_at(vector, i);
+			vector_remove_at(vec, i);
 			return;
 		}
 	}
 }
-void vector_reserve(Vector* vector, size_t capacity)
+void vector_reserve(vector* vec, size_t capacity)
 {
-	if (vector == NULL)
+	if (vec == NULL)
 		return;
-	if (capacity > vector->capacity)
+	if (capacity > vec->capacity)
 	{
-		vector->data = (void**)realloc(vector->data, sizeof(void*) * capacity);
-		if (vector->data == NULL)
+		vec->data = (void**)realloc(vec->data, sizeof(void*) * capacity);
+		if (vec->data == NULL)
 		{
 			printf("failed to allocate memory for vector data\n");
 			exit(1);
 		}
-		vector->capacity = capacity;
+		vec->capacity = capacity;
 	}
 }
-size_t vector_size(Vector* vector)
+size_t vector_size(vector* vec)
 {
-	if (vector == NULL)
+	if (vec == NULL)
 		return 0;
-	return vector->size;
+	return vec->size;
 }
-void vector_clear(Vector* vector)
+void vector_clear(vector* vec)
 {
-	if (vector == NULL)
+	if (vec == NULL)
 		return;
-	free(vector->data);
-	vector->data = NULL;
-	vector->capacity = 0;
-	vector->size = 0;
+	free(vec->data);
+	vec->data = NULL;
+	vec->capacity = 0;
+	vec->size = 0;
 }

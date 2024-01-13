@@ -1,0 +1,61 @@
+#version 330 core
+out float FragColor;
+  
+in vec2 TexCoords;
+
+uniform sampler2D texture_position;
+uniform sampler2D texture_normal;
+uniform sampler2D texture_depth;
+uniform sampler2D texture_noise;
+
+uniform vec3 samples[64];
+uniform mat4 projection;
+uniform mat4 projection_inverse;
+
+// tile noise texture over screen, based on screen dimensions divided by noise size
+const vec2 noiseScale = vec2(800.0/4.0, 600.0/4.0); // screen = 800x600
+
+uniform float onePerScreenWidth;
+uniform float onePerScreenHeight;
+
+//uniform-ként lehet, hogy jobb
+const int kernelSize = 64;
+const float radius = 0.5;
+const float bias = 0.025;
+
+
+void main()
+{
+    vec2 uv=vec2(gl_FragCoord.x*onePerScreenWidth, gl_FragCoord.y*onePerScreenHeight);
+	float depth=texture(texture_depth, uv).r;//getting depth buffer info
+	vec4 pos = projection_inverse * (vec4(uv, depth, 1)* 2 - 1);
+	vec3 viewspace_position = pos.xyz / pos.w;
+    vec3 normal    = texture(texture_normal, TexCoords).rgb;
+    vec3 random_vec = texture(texture_noise, TexCoords * noiseScale).xyz;
+
+    //bázistranszformáció: tangent -> view
+    vec3 tangent   = normalize(random_vec - normal * dot(random_vec, normal));
+    vec3 bitangent = cross(normal, tangent);
+    mat3 TBN       = mat3(tangent, bitangent, normal);  
+
+    float occlusion = 0.0;
+    for(int i = 0; i < kernelSize; ++i)
+    {
+        // get sample position
+        vec3 samplePos = TBN * samples[i]; // from tangent to view-space
+        samplePos = viewspace_position + samplePos * radius;
+
+        // project sample to get position on screen
+        vec4 offset = vec4(samplePos, 1.0);
+        offset      = projection * offset;    // from view to clip-space
+        offset.xyz /= offset.w;               // perspective divide
+        offset.xyz  = offset.xyz * 0.5 + 0.5; // transform to range 0.0 - 1.0
+
+        float sampleDepth = texture(texture_depth, offset.xy).r;
+        float rangeCheck = smoothstep(0.0, 1.0, radius / abs(viewspace_position.z - sampleDepth));
+        occlusion += (sampleDepth >= samplePos.z + bias ? 1.0 : 0.0) * rangeCheck;
+    }
+    occlusion = 1.0 - (occlusion / kernelSize);
+    FragColor = occlusion;
+    //FragColor = pow(occlusion, power); nem muszáj, de néha kellhet, hogy erősebb legyen
+}

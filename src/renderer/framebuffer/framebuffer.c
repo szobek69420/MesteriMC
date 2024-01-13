@@ -9,24 +9,26 @@ void renderer_destroyShadowFBO(shadowFBO shadowBuffer);
 geometryFBO renderer_createGeometryFBO(int width, int height);
 void renderer_destroyGeometryFBO(geometryFBO gBuffer);
 
+ssaoFBO renderer_createSSAOFBO(int width, int height);
+void renderer_destroySSAOFBO();
+
 endFBO renderer_createEndFBO(int width, int height);
 void renderer_destroyEndFBO(endFBO endBuffer);
-
-
 
 renderer renderer_create(int width, int height)
 {
     renderer rendor;
     rendor.shadowBuffer = renderer_createShadowFBO(RENDERER_SHADOW_RESOLUTION,RENDERER_SHADOW_RESOLUTION);
     rendor.gBuffer = renderer_createGeometryFBO(width, height);
+    rendor.ssaoBuffer = renderer_createSSAOFBO(width, height);
     rendor.endBuffer = renderer_createEndFBO(width, height);
     return rendor;
 }
-
 void renderer_destroy(renderer cucc)
 {
     renderer_destroyShadowFBO(cucc.shadowBuffer);
     renderer_destroyGeometryFBO(cucc.gBuffer);
+    renderer_destroySSAOFBO(cucc.ssaoBuffer);
     renderer_destroyEndFBO(cucc.endBuffer);
 }
 
@@ -58,7 +60,6 @@ shadowFBO renderer_createShadowFBO(int width, int height)
 
     return fb;
 }
-
 void renderer_destroyShadowFBO(shadowFBO shadowBuffer)
 {
     glDeleteTextures(1, &shadowBuffer.depthBuffer);
@@ -110,7 +111,6 @@ geometryFBO renderer_createGeometryFBO(int width, int height)
 
     return gBuffer;
 }
-
 void renderer_destroyGeometryFBO(geometryFBO gBuffer)
 {
     //glDeleteTextures(2,&gBuffer.normal);
@@ -120,6 +120,41 @@ void renderer_destroyGeometryFBO(geometryFBO gBuffer)
     glDeleteTextures(1, &gBuffer.depthBuffer);
 
     glDeleteFramebuffers(1, &gBuffer.id);
+}
+
+ssaoFBO renderer_createSSAOFBO(int width, int height)
+{
+    ssaoFBO fb;
+
+    glGenFramebuffers(1, &fb.idColor); glGenFramebuffers(1, &fb.idBlur);
+    // SSAO color buffer
+    glBindFramebuffer(GL_FRAMEBUFFER, fb.idColor);
+    glGenTextures(1, &fb.colorBuffer);
+    glBindTexture(GL_TEXTURE_2D, fb.colorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fb.colorBuffer, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        printf("SSAO Framebuffer not complete!\n");
+    // and blur stage
+    glBindFramebuffer(GL_FRAMEBUFFER, fb.idBlur);
+    glGenTextures(1, &fb.colorBufferBlur);
+    glBindTexture(GL_TEXTURE_2D, fb.colorBufferBlur);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fb.colorBufferBlur, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        printf("SSAO Blur Framebuffer not complete!\n");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+void renderer_destroySSAOFBO(ssaoFBO ssao)
+{
+    glDeleteTextures(1, &ssao.colorBuffer);
+    glDeleteTextures(1, &ssao.colorBufferBlur);
+    glDeleteFramebuffers(1, &ssao.idColor);
+    glDeleteFramebuffers(1, &ssao.idBlur);
 }
 
 endFBO renderer_createEndFBO(int width, int height)
@@ -163,7 +198,6 @@ endFBO renderer_createEndFBO(int width, int height)
 
     return endBuffer;
 }
-
 void renderer_destroyEndFBO(endFBO endBuffer)
 {
     glDeleteTextures(1, &endBuffer.colorBuffer);

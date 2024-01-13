@@ -20,6 +20,14 @@ typedef struct geometryFBO {
 	unsigned int depthBuffer;//texture
 } geometryFBO;
 
+typedef struct ssaoFBO {
+	unsigned int idColor;
+	unsigned int idBlur;
+
+	unsigned int colorBuffer;
+	unsigned int colorBufferBlur;
+} ssaoFBO;
+
 typedef struct shadowFBO {
 	unsigned int id;
 
@@ -36,6 +44,7 @@ typedef struct endFBO {
 typedef struct renderer {
 	shadowFBO shadowBuffer;
 	geometryFBO gBuffer;
+	ssaoFBO ssaoBuffer;
 	endFBO endBuffer;
 } renderer;
 
