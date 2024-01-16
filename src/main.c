@@ -62,7 +62,7 @@ int main()
     window_setWidth(1300);
     window_setHeight(800);
     GLFWwindow* window = init_window("amogus", window_getWidth(), window_getHeight());
-    
+
     event_queue_init();
     input_init();
     fontHandler_init();
@@ -98,7 +98,7 @@ int main()
         event e;
         while ((e = event_queue_poll()).type != NONE)
             handle_event(e);
-        
+
         camera_update(&cum, deltaTime);
 
         update_kuba(&cum);
@@ -148,8 +148,8 @@ GLFWwindow* init_window(const char* name, int width, int height)
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     //check if glad is kaputt
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -287,7 +287,7 @@ void init_renderer()
         NULL
     );
 
-    
+
 
     //rectangle VAO, VBO
     float vertices[] = {
@@ -320,11 +320,11 @@ void init_renderer()
     glGenBuffers(1, &textVBO);
     glBindBuffer(GL_ARRAY_BUFFER, textVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
-    
+
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    
+
     glBindVertexArray(0);
 
     glEnable(GL_DEPTH_TEST);
@@ -450,7 +450,7 @@ void end_renderer()
 }
 
 void render(camera* cum, font* f)
-{    
+{
     //shadow
     glViewport(0, 0, RENDERER_SHADOW_RESOLUTION, RENDERER_SHADOW_RESOLUTION);
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.shadowBuffer.id);
@@ -503,7 +503,7 @@ void render(camera* cum, font* f)
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(ssaoShader.id);
-        // Send kernel + rotation 
+        // Send kernel + rotation
         for (unsigned int i = 0; i < 64; ++i)
         {
             static char buffer[20];
@@ -575,7 +575,7 @@ void render(camera* cum, font* f)
         tempLight = (light*)vector_get(lights, i);
         memcpy(bufferData + i * LIGHT_FLOATS_IN_VBO, &(tempLight->position.x), LIGHT_SIZE_IN_VBO);
     }
-   
+
     light_fillRenderer(&lightRenderer, bufferData, lights->size);
     light_render(&lightRenderer, 69);
     free(bufferData);
@@ -633,7 +633,7 @@ void render(camera* cum, font* f)
     sun_render(&szunce, cum, &projection);
     glEnable(GL_DEPTH_TEST);
 
-    // draw results to screen ----------------------------------------------------------------------------- 
+    // draw results to screen -----------------------------------------------------------------------------
     glDisable(GL_DEPTH_TEST);
 
     glEnable(GL_BLEND);
@@ -717,7 +717,7 @@ void render_text(font* f, const char* text, float x, float y, float scale)
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(textVAO);
     // iterate through all characters
-    for (int i = 0; text[i] != '\0'; i++) 
+    for (int i = 0; text[i] != '\0'; i++)
     {
         character ch = f->characters[text[i]];
 
@@ -729,12 +729,12 @@ void render_text(font* f, const char* text, float x, float y, float scale)
         // update VBO for each character
         float vertices[6][4] = {
             { xpos,     ypos,       0.0f, 1.0f },
-            { xpos,     ypos + h,   0.0f, 0.0f },            
+            { xpos,     ypos + h,   0.0f, 0.0f },
             { xpos + w, ypos,       1.0f, 1.0f },
 
             { xpos + w, ypos,       1.0f, 1.0f },
             { xpos,     ypos + h,   0.0f, 0.0f },
-            { xpos + w, ypos + h,   1.0f, 0.0f }           
+            { xpos + w, ypos + h,   1.0f, 0.0f }
         };
         // render glyph texture over quad
         glBindTexture(GL_TEXTURE_2D, ch.textureID);
@@ -762,7 +762,7 @@ void render_cube()
             // back face
             -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
              1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
-             1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right         
+             1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right
              1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
             -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
             -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f, // top-left
@@ -783,10 +783,10 @@ void render_cube()
             // right face
              1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
              1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
-             1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right         
+             1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right
              1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
              1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
-             1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left     
+             1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left
             // bottom face
             -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
              1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f, // top-left
@@ -797,10 +797,10 @@ void render_cube()
             // top face
             -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
              1.0f,  1.0f , 1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
-             1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right     
+             1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right
              1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
             -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
-            -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left        
+            -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left
         };
         glGenVertexArrays(1, &cubeVAO);
         glGenBuffers(1, &cubeVBO);
@@ -827,4 +827,4 @@ void render_cube()
 double lerp(double a, double b, double f)
 {
     return a + f * (b - a);
-} 
+}

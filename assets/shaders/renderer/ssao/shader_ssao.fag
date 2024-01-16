@@ -12,7 +12,7 @@ uniform mat4 projection;
 uniform mat4 projection_inverse;
 
 // tile noise texture over screen, based on screen dimensions divided by noise size
-const vec2 noiseScale = vec2(800.0/4.0, 600.0/4.0); // screen = 800x600
+const vec2 noiseScale = vec2(1920.0/4.0, 1080.0/4.0);
 
 uniform float onePerScreenWidth;
 uniform float onePerScreenHeight;
@@ -32,7 +32,7 @@ void main()
     vec3 normal    = texture(texture_normal, TexCoords).rgb;
     vec3 random_vec = texture(texture_noise, TexCoords * noiseScale).xyz;
 
-    //bázistranszformáció: tangent -> view
+    //bazistranszformacio: tangent -> view
     vec3 tangent   = normalize(random_vec - normal * dot(random_vec, normal));
     vec3 bitangent = cross(normal, tangent);
     mat3 TBN       = mat3(tangent, bitangent, normal);  
@@ -56,5 +56,5 @@ void main()
     }
     occlusion = 1.0 - (occlusion / kernelSize);
     FragColor = occlusion;
-    //FragColor = pow(occlusion, power); nem muszáj, de néha kellhet, hogy erősebb legyen
+    //FragColor = pow(occlusion, 50); //nem muszaj, de neha kellhet, hogy erosebb legyen
 }

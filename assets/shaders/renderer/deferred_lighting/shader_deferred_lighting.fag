@@ -70,6 +70,9 @@ void main()
 
 	fragColor = vec4(lighting,alpha);
 
+	//if (ambientOcclusion < 0.001)
+	//	fragColor = vec4(1.0, 0.0, 1.0, 1.0);
+
 	//fragColor=vec4(depth, depth, depth,1);
 	//fragColor = vec4(normal, 1.0);
 	//fragColor=vec4(0.005*viewspace_position+0.5,1);
