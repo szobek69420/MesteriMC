@@ -10,7 +10,7 @@ geometryFBO renderer_createGeometryFBO(int width, int height);
 void renderer_destroyGeometryFBO(geometryFBO gBuffer);
 
 ssaoFBO renderer_createSSAOFBO(int width, int height);
-void renderer_destroySSAOFBO();
+void renderer_destroySSAOFBO(ssaoFBO ssao);
 
 endFBO renderer_createEndFBO(int width, int height);
 void renderer_destroyEndFBO(endFBO endBuffer);
@@ -126,7 +126,8 @@ ssaoFBO renderer_createSSAOFBO(int width, int height)
 {
     ssaoFBO fb;
 
-    glGenFramebuffers(1, &fb.idColor); glGenFramebuffers(1, &fb.idBlur);
+    glGenFramebuffers(1, &fb.idColor);
+    glGenFramebuffers(1, &fb.idBlur);
     // SSAO color buffer
     glBindFramebuffer(GL_FRAMEBUFFER, fb.idColor);
     glGenTextures(1, &fb.colorBuffer);
@@ -148,6 +149,8 @@ ssaoFBO renderer_createSSAOFBO(int width, int height)
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         printf("SSAO Blur Framebuffer not complete!\n");
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return fb;
 }
 void renderer_destroySSAOFBO(ssaoFBO ssao)
 {

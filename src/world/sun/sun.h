@@ -7,7 +7,7 @@
 #include "../../glm2/mat4.h"
 #include "../../shader/shader.h"
 
-#define SUN_SIZE 50
+#define SUN_SIZE 30
 
 typedef struct {
 	mesh meh;
