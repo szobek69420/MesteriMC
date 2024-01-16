@@ -10,6 +10,7 @@ uniform sampler2D texture_normal;
 uniform sampler2D texture_albedospec;
 uniform sampler2D texture_shadow;
 uniform sampler2D texture_depth;
+uniform sampler2D texture_ssao;
 
 uniform mat4 projection_inverse;
 
@@ -30,13 +31,18 @@ void main()
 	
 	vec3 normal = texture(texture_normal, uv).rgb * 2 - 1;
 	vec3 albedo = texture(texture_albedospec, uv).rgb;
+    vec3 diffuse = texture(texture_albedospec, uv).rgb;
 	float specular = texture(texture_albedospec, uv).a;
+    float ambientOcclusion = texture(texture_ssao, uv).r;
 	
 	// attenuation
 	float distance = length(lightPosition - viewspace_position);
 	float attenuation = lightAttenuation.x / (1 + lightAttenuation.y * distance + lightAttenuation.z * distance * distance);
 
 	vec3 lighting = albedo * 0.1*attenuation;
+	
+	// ambient
+	vec3 amb = vec3(0.3 * diffuse * ambientOcclusion);
 
 	// albedo
 	vec3 light_dir;
@@ -44,8 +50,8 @@ void main()
 		light_dir=lightPosition;
 	else
 		light_dir=normalize(lightPosition - viewspace_position);
-
 	vec3 alb = max(dot(normal, light_dir), 0.0) * albedo * lightColour;
+
 	// specular
 	vec3 halfway_dir = normalize(light_dir + view_dir);  
 	float sp = pow(max(dot(normal, halfway_dir), 0.0), 16.0);
@@ -53,7 +59,7 @@ void main()
 	
 	alb *= attenuation;
 	spec *= attenuation;
-	lighting += alb + spec;
+	lighting += amb + alb + spec;
 
 	float alpha=1;
 	float distanceFromEye=length(viewspace_position);
@@ -63,8 +69,11 @@ void main()
 		alpha=0;
 
 	fragColor = vec4(lighting,alpha);
-	//fragColor=vec4(depth, depth, depth,1);
 
+	//if (ambientOcclusion < 0.001)
+	//	fragColor = vec4(1.0, 0.0, 1.0, 1.0);
+
+	//fragColor=vec4(depth, depth, depth,1);
 	//fragColor = vec4(normal, 1.0);
 	//fragColor=vec4(0.005*viewspace_position+0.5,1);
 }

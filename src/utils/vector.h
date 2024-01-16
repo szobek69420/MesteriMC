@@ -7,11 +7,11 @@
 /**
  * @brief A generic vector type (dynamic array for void pointers)
  */
-typedef struct Vector {
+typedef struct vector {
 	size_t capacity;
 	size_t size;
 	void** data;
-} Vector;
+} vector;
 
 /**
  * @brief Creates a new vector
@@ -19,13 +19,13 @@ typedef struct Vector {
  * @param capacity The initial capacity of the vector
  * @return Vector* The created vector (must be freed with vector_destroy)
  */
-Vector* vector_create(size_t capacity);
+vector* vector_create(size_t capacity);
 /**
  * @brief Destroys a vector
  * 
  * @param vector The vector to destroy
  */
-void vector_destroy(Vector* vector);
+void vector_destroy(vector* vector);
 /**
  * @brief Gets the value at the specified index
  * 
@@ -33,7 +33,7 @@ void vector_destroy(Vector* vector);
  * @param idx The index of the element to get
  * @return void* The value at the specified index
  */
-void* vector_get(Vector* vector, size_t idx);
+void* vector_get(vector* vector, size_t idx);
 /**
  * @brief Sets the value at the specified index
  * 
@@ -41,21 +41,21 @@ void* vector_get(Vector* vector, size_t idx);
  * @param idx The index of the element to set
  * @param value The value to set
  */
-void vector_set(Vector* vector, size_t idx, void* value);
+void vector_set(vector* vector, size_t idx, void* value);
 /**
  * @brief Pushes a value to the back of the vector
  * 
  * @param vector The vector to push to
  * @param value The value to push
  */
-void vector_push_back(Vector* vector, void* value);
+void vector_push_back(vector* vector, void* value);
 /**
  * @brief Pops a value from the back of the vector
  * 
  * @param vector The vector to pop from
  * @return void* The popped value
  */
-void* vector_pop_back(Vector* vector);
+void* vector_pop_back(vector* vector);
 /**
  * @brief Inserts a value at the specified index
  * 
@@ -63,7 +63,7 @@ void* vector_pop_back(Vector* vector);
  * @param idx The index to insert at
  * @param value The value to insert
  */
-void vector_insert(Vector* vector, size_t idx, void* value);
+void vector_insert(vector* vector, size_t idx, void* value);
 /**
  * @brief Checks if the vector contains a value
  * 
@@ -72,7 +72,7 @@ void vector_insert(Vector* vector, size_t idx, void* value);
  * @return true If the vector contains the value
  * @return false If the vector does not contain the value
  */
-bool vector_contains(Vector* vector, void* value);
+bool vector_contains(vector* vector, void* value);
 /**
  * @brief Returns the index of a value in the vector
  * 
@@ -80,40 +80,40 @@ bool vector_contains(Vector* vector, void* value);
  * @param value The value to search for
  * @return int The index of the value in the vector, or -1 if not found
  */
-int vector_index_of(Vector* vector, void* value);
+int vector_index_of(vector* vector, void* value);
 /**
  * @brief Removes the value at the specified index
  * 
  * @param vector The vector to remove from
  * @param idx The index of the value to remove
  */
-void vector_remove_at(Vector* vector, size_t idx);
+void vector_remove_at(vector* vector, size_t idx);
 /**
  * @brief Removes the first occurence of a value from the vector
  * 
  * @param vector The vector to remove from
  * @param value The value to remove
  */
-void vector_remove(Vector* vector, void* value);
+void vector_remove(vector* vector, void* value);
 /**
  * @brief Reserves a new capacity for the vector
  * 
  * @param vector The vector to reserve for
  * @param size The new capacity of the vector
  */
-void vector_reserve(Vector* vector, size_t capacity);
+void vector_reserve(vector* vector, size_t capacity);
 /**
  * @brief Returns the size of the vector
  * 
  * @param vector The vector to get the size of
  * @return size_t The size of the vector
  */
-size_t vector_size(Vector* vector);
+size_t vector_size(vector* vector);
 /**
  * @brief Clears the vector
  * 
  * @param vector The vector to clear
  */
-void vector_clear(Vector* vector);
+void vector_clear(vector* vector);
 
 #endif

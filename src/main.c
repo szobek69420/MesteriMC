@@ -47,6 +47,8 @@ void update_kuba(camera* cum);
 void render_text(font* f, const char* text, float x, float y, float scale);
 void render_cube();
 
+double lerp(double a, double b, double f);
+
 //glfw callbacks
 void window_size_callback(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -60,7 +62,7 @@ int main()
     window_setWidth(1300);
     window_setHeight(800);
     GLFWwindow* window = init_window("amogus", window_getWidth(), window_getHeight());
-    
+
     event_queue_init();
     input_init();
     fontHandler_init();
@@ -96,7 +98,7 @@ int main()
         event e;
         while ((e = event_queue_poll()).type != NONE)
             handle_event(e);
-        
+
         camera_update(&cum, deltaTime);
 
         update_kuba(&cum);
@@ -146,8 +148,8 @@ GLFWwindow* init_window(const char* name, int width, int height)
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     //check if glad is kaputt
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -180,6 +182,8 @@ void handle_event(event e)
 renderer rendor;
 shader shadowShader;
 shader geometryPassShader;
+shader ssaoShader;
+shader ssaoBlurShader;
 shader lightingPassShader;
 shader forwardPassShader;
 shader finalPassShader;
@@ -192,7 +196,11 @@ unsigned int rectangleVBO;
 unsigned int textVAO;
 unsigned int textVBO;
 
-Vector* lights;
+vector* ssaoKernel;
+vector* ssaoNoise;
+unsigned int noiseTexture;
+
+vector* lights;
 light sunTzu;
 
 light_renderer lightRenderer;
@@ -221,6 +229,26 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(geometryPassShader.id, "texture_normal"), 1);
     glUniform1i(glGetUniformLocation(geometryPassShader.id, "texture_specular"), 2);
 
+    ssaoShader = shader_import(
+        "../assets/shaders/renderer/ssao/shader_ssao.vag",
+        "../assets/shaders/renderer/ssao/shader_ssao.fag",
+        NULL
+    );
+    glUseProgram(ssaoShader.id);
+    glUniform1i(glGetUniformLocation(ssaoShader.id, "texture_normal"), 0);
+    glUniform1i(glGetUniformLocation(ssaoShader.id, "texture_depth"), 1);
+    glUniform1i(glGetUniformLocation(ssaoShader.id, "texture_noise"), 2);
+    glUniform1f(glGetUniformLocation(ssaoShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
+    glUniform1f(glGetUniformLocation(ssaoShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
+
+    ssaoBlurShader = shader_import(
+        "../assets/shaders/renderer/ssao/shader_ssao.vag",
+        "../assets/shaders/renderer/ssao/shader_ssao_blur.fag",
+        NULL
+    );
+    glUseProgram(ssaoBlurShader.id);
+    glUniform1i(glGetUniformLocation(ssaoBlurShader.id, "ssaoInput"), 0);
+
     lightingPassShader = shader_import(
         "../assets/shaders/renderer/deferred_lighting/shader_deferred_lighting.vag",
         "../assets/shaders/renderer/deferred_lighting/shader_deferred_lighting.fag",
@@ -231,6 +259,7 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_albedospec"), 1);
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_shadow"), 2);
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_depth"), 3);
+    glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_ssao"), 4);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 100);
@@ -258,7 +287,7 @@ void init_renderer()
         NULL
     );
 
-    
+
 
     //rectangle VAO, VBO
     float vertices[] = {
@@ -291,11 +320,11 @@ void init_renderer()
     glGenBuffers(1, &textVBO);
     glBindBuffer(GL_ARRAY_BUFFER, textVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
-    
+
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    
+
     glBindVertexArray(0);
 
     glEnable(GL_DEPTH_TEST);
@@ -307,6 +336,47 @@ void init_renderer()
     glFrontFace(GL_CCW);
 
     //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    //ssao shit
+    // generate sample kernel
+    // ----------------------
+    ssaoKernel = vector_create(64);
+    for (unsigned int i = 0; i < 64; ++i)
+    {
+        vec3* sample = (vec3*)malloc(sizeof(vec3));
+        *sample = vec3_create2(
+            (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
+            (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
+            (rand() % 1001) / 1000.0              //random between [ 0.0 - 1.0]
+        );
+        // scale samples s.t. they're more aligned to center of kernel
+        *sample = vec3_normalize(*sample);
+        double scale = i / 64.0;
+        scale = lerp(0.1, 1.0, scale * scale);
+        *sample = vec3_scale(*sample, (rand() % 1001) / 1000.0 * scale); //random between [0.0 - 1.0] * scale
+        vector_push_back(ssaoKernel, sample);
+    }
+    // generate noise texture
+    // ----------------------
+    ssaoNoise = vector_create(16);
+    for (unsigned int i = 0; i < 16; i++)
+    {
+        vec3* noise = (vec3*)malloc(sizeof(vec3));
+        *noise = vec3_create2(
+            (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
+            (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
+            0.0f
+        ); // rotate around z-axis (in tangent space)
+        vector_push_back(ssaoNoise, noise);
+    }
+    glGenTextures(1, &noiseTexture);
+    glBindTexture(GL_TEXTURE_2D, noiseTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, vector_get(ssaoNoise, 0));
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
 
     //light shit
     lightRenderer = light_createRenderer();
@@ -356,11 +426,17 @@ void end_renderer()
     glDeleteVertexArrays(1, &rectangleVAO);
     glDeleteBuffers(1, &rectangleVBO);
 
+    //ssao cleanup
+    for (int i = 0; i < ssaoKernel->size; i++)
+        free((vec3*)vector_get(ssaoKernel, i));
+    vector_destroy(ssaoKernel);
+    for (int i = 0; i < ssaoNoise->size; i++)
+        free((vec3*)vector_get(ssaoNoise, i));
+    vector_destroy(ssaoNoise);
+
     //light cleanup
     for (int i = 0; i < lights->size; i++)
-    {
         free((light*)vector_get(lights, i));
-    }
     vector_destroy(lights);
 
     light_destroyRenderer(lightRenderer);
@@ -374,7 +450,7 @@ void end_renderer()
 }
 
 void render(camera* cum, font* f)
-{    
+{
     //shadow
     glViewport(0, 0, RENDERER_SHADOW_RESOLUTION, RENDERER_SHADOW_RESOLUTION);
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.shadowBuffer.id);
@@ -398,7 +474,7 @@ void render(camera* cum, font* f)
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    //geometry pass
+    //geometry pass ------------------------------------------------------------------------------------------
     glUseProgram(geometryPassShader.id);
 
     glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "view"), 1, GL_FALSE, view.data);
@@ -422,6 +498,38 @@ void render(camera* cum, font* f)
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rendor.endBuffer.id);
     glBlitFramebuffer(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, 0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
+    //ssao pass ------------------------------------------------------------------------------------------
+    // generate SSAO texture
+    glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glUseProgram(ssaoShader.id);
+        // Send kernel + rotation
+        for (unsigned int i = 0; i < 64; ++i)
+        {
+            static char buffer[20];
+            sprintf(buffer, "samples[%d]", i);
+            glUniform3fv(glGetUniformLocation(ssaoShader.id, buffer), 1, (float*)vector_get(ssaoKernel, i));
+        }
+        glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection"), 1, GL_FALSE, projection.data);
+        glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, noiseTexture);
+        glBindVertexArray(rectangleVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // blur SSAO texture to remove noise
+    glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idBlur);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glUseProgram(ssaoBlurShader.id);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBuffer);
+        glBindVertexArray(rectangleVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     //lighting pass ------------------------------------------------------------------------------------------
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
@@ -450,11 +558,14 @@ void render(camera* cum, font* f)
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
 
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBufferBlur);
+
     glUseProgram(lightingPassShader.id);
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "view"), 1, GL_FALSE, view.data);
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
-    
+
     //point lights
     light_setPosition((light*)vector_get(lights, 0), cum->position);
     float* bufferData = (float*)malloc(lights->size * LIGHT_SIZE_IN_VBO);
@@ -464,7 +575,7 @@ void render(camera* cum, font* f)
         tempLight = (light*)vector_get(lights, i);
         memcpy(bufferData + i * LIGHT_FLOATS_IN_VBO, &(tempLight->position.x), LIGHT_SIZE_IN_VBO);
     }
-   
+
     light_fillRenderer(&lightRenderer, bufferData, lights->size);
     light_render(&lightRenderer, 69);
     free(bufferData);
@@ -522,7 +633,7 @@ void render(camera* cum, font* f)
     sun_render(&szunce, cum, &projection);
     glEnable(GL_DEPTH_TEST);
 
-    // draw results to screen ----------------------------------------------------------------------------- 
+    // draw results to screen -----------------------------------------------------------------------------
     glDisable(GL_DEPTH_TEST);
 
     glEnable(GL_BLEND);
@@ -606,7 +717,7 @@ void render_text(font* f, const char* text, float x, float y, float scale)
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(textVAO);
     // iterate through all characters
-    for (int i = 0; text[i] != '\0'; i++) 
+    for (int i = 0; text[i] != '\0'; i++)
     {
         character ch = f->characters[text[i]];
 
@@ -618,12 +729,12 @@ void render_text(font* f, const char* text, float x, float y, float scale)
         // update VBO for each character
         float vertices[6][4] = {
             { xpos,     ypos,       0.0f, 1.0f },
-            { xpos,     ypos + h,   0.0f, 0.0f },            
+            { xpos,     ypos + h,   0.0f, 0.0f },
             { xpos + w, ypos,       1.0f, 1.0f },
 
             { xpos + w, ypos,       1.0f, 1.0f },
             { xpos,     ypos + h,   0.0f, 0.0f },
-            { xpos + w, ypos + h,   1.0f, 0.0f }           
+            { xpos + w, ypos + h,   1.0f, 0.0f }
         };
         // render glyph texture over quad
         glBindTexture(GL_TEXTURE_2D, ch.textureID);
@@ -651,7 +762,7 @@ void render_cube()
             // back face
             -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
              1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
-             1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right         
+             1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right
              1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
             -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
             -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f, // top-left
@@ -672,10 +783,10 @@ void render_cube()
             // right face
              1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
              1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
-             1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right         
+             1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right
              1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
              1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
-             1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left     
+             1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left
             // bottom face
             -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
              1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f, // top-left
@@ -686,10 +797,10 @@ void render_cube()
             // top face
             -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
              1.0f,  1.0f , 1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
-             1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right     
+             1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right
              1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
             -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
-            -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left        
+            -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left
         };
         glGenVertexArrays(1, &cubeVAO);
         glGenBuffers(1, &cubeVBO);
@@ -711,4 +822,9 @@ void render_cube()
     glBindVertexArray(cubeVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
+}
+
+double lerp(double a, double b, double f)
+{
+    return a + f * (b - a);
 }
