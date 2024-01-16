@@ -134,6 +134,7 @@ unsigned int textureHandler_loadSkybox()
                 GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
                 0, GL_SRGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data
             );
+            stbi_image_free(data);
         }
         else
         {
