@@ -10,18 +10,23 @@ uniform sampler2D texture_noise;
 uniform vec3 samples[64];
 uniform mat4 projection;
 uniform mat4 projection_inverse;
+uniform mat3 viewForDirectional;
 
 // tile noise texture over screen, based on screen dimensions divided by noise size
-const vec2 noiseScale = vec2(1920.0/4.0, 1080.0/4.0);
+const vec2 noiseScale = vec2(1920.0/100.0, 1080.0/100.0);
 
 uniform float onePerScreenWidth;
 uniform float onePerScreenHeight;
 
+uniform float projectionNear;
+uniform float projectionFar;
+
 //uniform-ként lehet, hogy jobb
 const int kernelSize = 64;
-const float radius = 0.5;
-const float bias = 0.025;
+const float radius = 0.2;
+const float bias = 0.01;
 
+float linearizeDepth(float); 
 
 void main()
 {
@@ -29,11 +34,11 @@ void main()
 	float depth=texture(texture_depth, uv).r;//getting depth buffer info
 	vec4 pos = projection_inverse * (vec4(uv, depth, 1)* 2 - 1);
 	vec3 viewspace_position = pos.xyz / pos.w;
-    vec3 normal    = texture(texture_normal, TexCoords).rgb;
+    vec3 normal    = 2*texture(texture_normal, TexCoords).rgb-1;
     vec3 random_vec = texture(texture_noise, TexCoords * noiseScale).xyz;
 
     //bazistranszformacio: tangent -> view
-    vec3 tangent   = normalize(random_vec - normal * dot(random_vec, normal));
+    vec3 tangent   = normalize(viewForDirectional*random_vec - normal * dot(random_vec, normal));
     vec3 bitangent = cross(normal, tangent);
     mat3 TBN       = mat3(tangent, bitangent, normal);
 
@@ -50,11 +55,16 @@ void main()
         offset.xyz /= offset.w;               // perspective divide
         offset.xyz  = offset.xyz * 0.5 + 0.5; // transform to range 0.0 - 1.0
 
-        float sampleDepth = texture(texture_depth, offset.xy).r;
-        float rangeCheck = smoothstep(0.0, 1.0, radius / abs(viewspace_position.z - sampleDepth));
-        occlusion += (sampleDepth >= samplePos.z + bias ? 1.0 : 0.0) * rangeCheck;
+        float sampleDepth = linearizeDepth(texture(texture_depth, offset.xy).r);
+        occlusion += (sampleDepth >= linearizeDepth(offset.z) + bias ? 1.0 : 0.0);
     }
-    occlusion = 1.0 - (occlusion / kernelSize);
-    FragColor = occlusion;
-    //FragColor = pow(occlusion, 50); //nem muszaj, de neha kellhet, hogy erosebb legyen
+    //occlusion = 1.0 - (occlusion / kernelSize);
+    FragColor=pow(occlusion/kernelSize, 16);
+    //FragColor = pow(occlusion/kernelSize, 50); //nem muszaj, de neha kellhet, hogy erosebb legyen
+}
+
+float linearizeDepth(float depth) 
+{
+    float z = depth * 2.0 - 1.0; // back to NDC 
+    return (2.0 * projectionNear * projectionFar) / (projectionFar + projectionNear - z * (projectionFar - projectionNear));
 }

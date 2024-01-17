@@ -32,6 +32,9 @@
 #include "utils/list.h"
 #include "utils/vector.h"
 
+#define CLIP_NEAR 0.1f
+#define CLIP_FAR 200.0f
+
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
 
@@ -238,6 +241,8 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(ssaoShader.id, "texture_noise"), 2);
     glUniform1f(glGetUniformLocation(ssaoShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(ssaoShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
+    glUniform1f(glGetUniformLocation(ssaoShader.id, "projectionNear"), CLIP_NEAR);
+    glUniform1f(glGetUniformLocation(ssaoShader.id, "projectionFar"), CLIP_FAR);
 
     ssaoBlurShader = shader_import(
         "../assets/shaders/renderer/ssao/shader_ssao.vag",
@@ -351,8 +356,8 @@ void init_renderer()
     }
     // generate noise texture
     // ----------------------
-    vec3 ssaoNoise[16];
-    for (unsigned int i = 0; i < 16; i++)
+    vec3 ssaoNoise[10000];
+    for (unsigned int i = 0; i < 10000; i++)
     {
         ssaoNoise[i] = vec3_create2(
             (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
@@ -362,7 +367,7 @@ void init_renderer()
     }
     glGenTextures(1, &noiseTexture);
     glBindTexture(GL_TEXTURE_2D, noiseTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 100, 100, 0, GL_RGB, GL_FLOAT, &ssaoNoise);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -446,7 +451,7 @@ void render(camera* cum, font* f)
 
     //matrices
     mat4 view = camera_getViewMatrix(cum);
-    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 200);
+    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
     mat4 pv = mat4_multiply(projection, view);
     mat4 projectionInverse = mat4_inverse(projection);
     mat3 viewNormal = mat3_createFromMat(view);
@@ -487,14 +492,15 @@ void render(camera* cum, font* f)
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(ssaoShader.id);
         // Send kernel + rotation
-        for (unsigned int i = 0; i < 64; ++i)
+        for (unsigned int i = 0; i <64; ++i)
         {
             static char buffer[20];
             sprintf(buffer, "samples[%d]", i);
-            glUniform3fv(glGetUniformLocation(ssaoShader.id, buffer), 1, (float*)&ssaoKernel[i]);
+            glUniform3f(glGetUniformLocation(ssaoShader.id, buffer), 1, ssaoKernel[i].x, ssaoKernel[i].y, ssaoKernel[i].z);
         }
         glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection"), 1, GL_FALSE, projection.data);
         glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
+        glUniformMatrix3fv(glGetUniformLocation(ssaoShader.id, "viewForDirectional"), 1, GL_FALSE, viewNormal.data);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
         glActiveTexture(GL_TEXTURE1);
