@@ -149,7 +149,7 @@ GLFWwindow* init_window(const char* name, int width, int height)
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
-    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     //check if glad is kaputt
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -196,8 +196,7 @@ unsigned int rectangleVBO;
 unsigned int textVAO;
 unsigned int textVBO;
 
-vector* ssaoKernel;
-vector* ssaoNoise;
+vec3 ssaoKernel[64];
 unsigned int noiseTexture;
 
 vector* lights;
@@ -209,7 +208,6 @@ sun szunce;
 
 void init_renderer()
 {
-
     //rendor = renderer_create(window_getWidth(), window_getHeight());
     rendor = renderer_create(1920,1080);
 
@@ -287,8 +285,6 @@ void init_renderer()
         NULL
     );
 
-
-
     //rectangle VAO, VBO
     float vertices[] = {
         1,-1,0,     1,0,
@@ -340,38 +336,33 @@ void init_renderer()
     //ssao shit
     // generate sample kernel
     // ----------------------
-    ssaoKernel = vector_create(64);
     for (unsigned int i = 0; i < 64; ++i)
     {
-        vec3* sample = (vec3*)malloc(sizeof(vec3));
-        *sample = vec3_create2(
+        ssaoKernel[i] = vec3_create2(
             (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
             (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
             (rand() % 1001) / 1000.0              //random between [ 0.0 - 1.0]
         );
         // scale samples s.t. they're more aligned to center of kernel
-        *sample = vec3_normalize(*sample);
+        ssaoKernel[i] = vec3_normalize(ssaoKernel[i]);
         double scale = i / 64.0;
         scale = lerp(0.1, 1.0, scale * scale);
-        *sample = vec3_scale(*sample, (rand() % 1001) / 1000.0 * scale); //random between [0.0 - 1.0] * scale
-        vector_push_back(ssaoKernel, sample);
+        ssaoKernel[i] = vec3_scale(ssaoKernel[i], (rand() % 1001) / 1000.0 * scale); //random between [0.0 - 1.0] * scale
     }
     // generate noise texture
     // ----------------------
-    ssaoNoise = vector_create(16);
+    vec3 ssaoNoise[16];
     for (unsigned int i = 0; i < 16; i++)
     {
-        vec3* noise = (vec3*)malloc(sizeof(vec3));
-        *noise = vec3_create2(
+        ssaoNoise[i] = vec3_create2(
             (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
             (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
             0.0f
         ); // rotate around z-axis (in tangent space)
-        vector_push_back(ssaoNoise, noise);
     }
     glGenTextures(1, &noiseTexture);
     glBindTexture(GL_TEXTURE_2D, noiseTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, vector_get(ssaoNoise, 0));
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -425,14 +416,6 @@ void end_renderer()
 
     glDeleteVertexArrays(1, &rectangleVAO);
     glDeleteBuffers(1, &rectangleVBO);
-
-    //ssao cleanup
-    for (int i = 0; i < ssaoKernel->size; i++)
-        free((vec3*)vector_get(ssaoKernel, i));
-    vector_destroy(ssaoKernel);
-    for (int i = 0; i < ssaoNoise->size; i++)
-        free((vec3*)vector_get(ssaoNoise, i));
-    vector_destroy(ssaoNoise);
 
     //light cleanup
     for (int i = 0; i < lights->size; i++)
@@ -508,7 +491,7 @@ void render(camera* cum, font* f)
         {
             static char buffer[20];
             sprintf(buffer, "samples[%d]", i);
-            glUniform3fv(glGetUniformLocation(ssaoShader.id, buffer), 1, (float*)vector_get(ssaoKernel, i));
+            glUniform3fv(glGetUniformLocation(ssaoShader.id, buffer), 1, (float*)&ssaoKernel[i]);
         }
         glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection"), 1, GL_FALSE, projection.data);
         glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);

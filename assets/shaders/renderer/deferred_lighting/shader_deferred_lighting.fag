@@ -31,7 +31,6 @@ void main()
 	
 	vec3 normal = texture(texture_normal, uv).rgb * 2 - 1;
 	vec3 albedo = texture(texture_albedospec, uv).rgb;
-    vec3 diffuse = texture(texture_albedospec, uv).rgb;
 	float specular = texture(texture_albedospec, uv).a;
     float ambientOcclusion = texture(texture_ssao, uv).r;
 	
@@ -42,7 +41,7 @@ void main()
 	vec3 lighting = albedo * 0.1*attenuation;
 	
 	// ambient
-	vec3 amb = vec3(0.3 * diffuse * ambientOcclusion);
+	vec3 amb = vec3(0.3 * albedo * ambientOcclusion);
 
 	// albedo
 	vec3 light_dir;
@@ -70,8 +69,7 @@ void main()
 
 	fragColor = vec4(lighting,alpha);
 
-	//if (ambientOcclusion < 0.001)
-	//	fragColor = vec4(1.0, 0.0, 1.0, 1.0);
+	//fragColor = vec4(ambientOcclusion, ambientOcclusion, ambientOcclusion, 1.0);	
 
 	//fragColor=vec4(depth, depth, depth,1);
 	//fragColor = vec4(normal, 1.0);
