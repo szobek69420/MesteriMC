@@ -38,4 +38,6 @@ void chunkManager_update(chunkManager* cm);//erledigt an update from pendingUpda
 void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection);//a shader csak átmenetileg van átadva
 void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* projection);
 
+void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjection);
+
 #endif

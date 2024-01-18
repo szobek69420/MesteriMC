@@ -182,6 +182,8 @@ void handle_event(event e)
     }
 }
 
+chunkManager cm;
+
 renderer rendor;
 shader shadowShader;
 shader geometryPassShader;
@@ -268,6 +270,7 @@ void init_renderer()
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 100);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 120);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f/(120-100));
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowBias"), 0.005f);
 
     forwardPassShader = shader_import(
         "../assets/shaders/renderer/forward/shader_forward.vag",
@@ -384,15 +387,15 @@ void init_renderer()
         *lit = light_create(
             vec3_create2((((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5)),
             vec3_create2((((rand() % 100) / 100.0) * 50.0 - 3.0), 25 + (((rand() % 100) / 100.0) * 20.0 - 4.0), (((rand() % 100) / 100.0) * 100.0 - 3.0)),
-            vec3_create2(10, 0.05, 0.05)
+            vec3_create2(10, 0.1, 0.1)
             );
         vector_push_back(lights, lit);
     }
 
     sunTzu = light_create(
         vec3_create2(1, 0.97, 0.4),
-        vec3_create2(0.6, 1.3, 0.8),
-        vec3_create2(3, 0, 0)
+        vec3_create2(0.6, 1, -0.8),
+        vec3_create2(10, 0, 0)
     );
 
     //skybox
@@ -409,6 +412,7 @@ void init_renderer()
 
     //sun
     szunce = sun_create();
+    sun_setDirection(&szunce, vec3_create2(0.6, 1, -0.8));
 }
 
 void end_renderer()
@@ -439,22 +443,42 @@ void end_renderer()
 
 void render(camera* cum, font* f)
 {
-    //shadow
-    glViewport(0, 0, RENDERER_SHADOW_RESOLUTION, RENDERER_SHADOW_RESOLUTION);
-    glBindFramebuffer(GL_FRAMEBUFFER, rendor.shadowBuffer.id);
-
-    glEnable(GL_DEPTH_TEST);
-    glClear(GL_DEPTH_BUFFER_BIT);
-
-    glUseProgram(shadowShader.id);
-
-
     //matrices
     mat4 view = camera_getViewMatrix(cum);
     mat4 projection = mat4_perspective(cum->fov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
     mat4 pv = mat4_multiply(projection, view);
     mat4 projectionInverse = mat4_inverse(projection);
     mat3 viewNormal = mat3_createFromMat(view);
+
+    mat4 shadowViewProjection = mat4_multiply(
+        mat4_ortho(-100,100,-100,100,1,200),
+        mat4_lookAt(
+            vec3_sum(cum->position, vec3_create2(szunce.direction.x*100, szunce.direction.y * 100, szunce.direction.z * 100)),
+            vec3_create2(-1* szunce.direction.x, -1* szunce.direction.y, -1* szunce.direction.z),
+            vec3_create2(0,1,0)
+        )
+    );
+    mat4 shadowLightMatrix = mat4_multiply(shadowViewProjection, mat4_inverse(view));//from the camera's view space to the suns projection space
+
+    //shadow
+    glViewport(0, 0, RENDERER_SHADOW_RESOLUTION, RENDERER_SHADOW_RESOLUTION);
+    glBindFramebuffer(GL_FRAMEBUFFER, rendor.shadowBuffer.id);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    glDisable(GL_CULL_FACE);
+    //glFrontFace(GL_CW);
+
+    glUseProgram(shadowShader.id);
+
+    chunkManager_drawShadow(&cm, &shadowShader, &shadowViewProjection);
+
+    glEnable(GL_CULL_FACE);
+    glFrontFace(GL_CCW);
+
 
     //prepare gbuffer fbo
     glViewport(0, 0, 1920, 1080);
@@ -488,6 +512,7 @@ void render(camera* cum, font* f)
 
     //ssao pass ------------------------------------------------------------------------------------------
     // generate SSAO texture
+    /*
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(ssaoShader.id);
@@ -519,7 +544,7 @@ void render(camera* cum, font* f)
         glBindVertexArray(rectangleVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
+    */
     //lighting pass ------------------------------------------------------------------------------------------
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
     //glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
@@ -556,7 +581,7 @@ void render(camera* cum, font* f)
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
 
     //point lights
-    light_setPosition((light*)vector_get(lights, 0), cum->position);
+    //light_setPosition((light*)vector_get(lights, 0), cum->position);
     float* bufferData = (float*)malloc(lights->size * LIGHT_SIZE_IN_VBO);
     light* tempLight;
     for (unsigned int i = 0; i < lights->size; i++)
@@ -565,11 +590,16 @@ void render(camera* cum, font* f)
         memcpy(bufferData + i * LIGHT_FLOATS_IN_VBO, &(tempLight->position.x), LIGHT_SIZE_IN_VBO);
     }
 
+    glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
+
     light_fillRenderer(&lightRenderer, bufferData, lights->size);
     light_render(&lightRenderer, 69);
     free(bufferData);
 
-    //directional
+    //directional (sun)
+    glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
+    glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
+
     bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
     memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
     light_fillRenderer(&lightRenderer, bufferData, 1);
@@ -589,7 +619,7 @@ void render(camera* cum, font* f)
     glUseProgram(forwardPassShader.id);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "view"), 1, GL_FALSE, view.data);
-    for (unsigned int i = 1; i < lights->size; i++)
+    for (unsigned int i = 0; i < lights->size; i++)
     {
         mat4 model = mat4_create(1.0f);
         model = mat4_translate(model, ((light*)vector_get(lights, i))->position);
@@ -673,7 +703,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     event_queue_push((event){ .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
 }
 
-chunkManager cm;
 void init_kuba()
 {
     cm = chunkManager_create(69, 4);

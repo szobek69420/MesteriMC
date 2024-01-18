@@ -27,7 +27,8 @@ vec2 parallax();
 void main()
 {    
     //vec2 uv=ParallaxMapping(fs_in.TexCoords, fs_in.viewDir);
-    vec2 uv=parallax();
+    //vec2 uv=parallax();
+    vec2 uv=fs_in.TexCoords;
 
     vec3 normalTemp=2*(texture(texture_normal,uv).rgb-vec3(0.5));
     gNormal = 0.5*(fs_in.tangentToView*normalTemp)+vec3(0.5);

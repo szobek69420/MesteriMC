@@ -19,7 +19,7 @@ light light_create(vec3 colour, vec3 position, vec3 attenuation)
 	if (attenuation.y < 0.0001 && attenuation.z < 0.0001)
 		romogus.radius = -69;
 	else
-		romogus.radius = (-attenuation.y + sqrtf(attenuation.y * attenuation.y - 4 * attenuation.z * (1 - (256.0f / 10.0f) * attenuation.x))) / (2.0f * attenuation.z);
+		romogus.radius = (-attenuation.y + sqrtf(attenuation.y * attenuation.y - 4 * attenuation.z * (1 - (256.0f / 5.0f) * attenuation.x))) / (2.0f * attenuation.z);
 
 	romogus.position = position;
 	if (romogus.radius < 0)
@@ -65,7 +65,7 @@ void light_setAttenuation(light* lit, vec3 attenuation)
 	if (attenuation.y < 0.00001 && attenuation.z < 0.00001)
 		lit->radius = -69;
 	else
-		lit->radius = (-attenuation.y + sqrtf(attenuation.y * attenuation.y - 4 * attenuation.z * (1 - (256.0f /10.0f) * attenuation.x))) / (2.0f * attenuation.z);
+		lit->radius = (-attenuation.y + sqrtf(attenuation.y * attenuation.y - 4 * attenuation.z * (1 - (256.0f /5.0f) * attenuation.x))) / (2.0f * attenuation.z);
 
 	if (lit->radius < 0)
 		lit->model = mat4_create(1);

@@ -246,7 +246,7 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 				temp = vec4_multiplyWithMatrix(pv, temp);
 				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
 
-				if (temp.x * temp.x < 1 || temp.y * temp.y < 1 || temp.z * temp.z < 1)
+				if (temp.x * temp.x < 1 && temp.y * temp.y < 1 && (temp.z < 1 && temp.z>0))
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
 					chunk_drawTerrain(chomk);
@@ -255,6 +255,50 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 			}
 		}
 
+		//it=it->next;
+		it = list_next(it);
+	}
+}
+
+void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjection)
+{
+	chunk* chomk;
+	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
+	char isInFrustum;
+	float basedX, basedY, basedZ;
+	vec4 temp;
+
+	glUniformMatrix4fv(glGetUniformLocation(shit->id, "lightMatrix"), 1, GL_FALSE, viewProjection->data);
+	//shader_setMat4(shit->id, "view", camera_getViewMatrix(cum));
+	//shader_setMat4(shit->id, "projection", *projection);
+
+	listElement* it = list_get_iterator(&(cm->loadedChunks));
+	while (it != NULL)
+	{
+		chomk = ((chunk*)it->data);
+		if (chomk->isThereNormalMesh)
+		{
+			basedX = chomk->chunkX * CHUNK_WIDTH;
+			basedY = chomk->chunkY * CHUNK_HEIGHT;
+			basedZ = chomk->chunkZ * CHUNK_WIDTH;
+
+			for (int i = 0; i < 24; )
+			{
+				temp.x = basedX + chunkBounds[i++];
+				temp.y = basedY + chunkBounds[i++];
+				temp.z = basedZ + chunkBounds[i++];
+				temp.w = 1;
+				temp = vec4_multiplyWithMatrix(*viewProjection, temp);
+				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
+
+				if (temp.x * temp.x < 1 && temp.y * temp.y < 1 && (temp.z <1&&temp.z>0))
+				{
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
+					chunk_drawTerrain(chomk);
+					break;
+				}
+			}
+		}
 		//it=it->next;
 		it = list_next(it);
 	}
