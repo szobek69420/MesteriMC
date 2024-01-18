@@ -58,9 +58,9 @@ void main()
 	float distance = length(lightPosition - viewspace_position);
 	float attenuation = lightAttenuation.x;
 	if(isDirectional==0)
-		lightAttenuation.x / (1 + lightAttenuation.y * distance + lightAttenuation.z * distance * distance);
+		attenuation=lightAttenuation.x / (1 + lightAttenuation.y * distance + lightAttenuation.z * distance * distance);
 
-	vec3 lighting = albedo * 0.1*attenuation;
+	vec3 lighting = vec3(0);
 	
 	// ambient
 	vec3 amb = vec3(0.3 * albedo * ambientOcclusion);
