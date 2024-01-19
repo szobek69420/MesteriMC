@@ -21,7 +21,6 @@ const float onePerHeightStep=5.0;
 const float textureWidthInAtlas=0.1;
 const float onePerTextureWidthInAtlas=10;
 
-vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir);
 vec2 parallax();
 
 void main()
@@ -74,61 +73,14 @@ vec2 parallax()
     float weight = afterDepth / (afterDepth - beforeDepth);
     currentUV = currentUV-deltaUV*weight;
 
-    if(currentUV.x<textureLowerBorder.x)
+    /*if(currentUV.x<textureLowerBorder.x)
         currentUV.x=textureLowerBorder.x;
     if(currentUV.x>textureUpperBorder.x)
         currentUV.x=textureUpperBorder.x;
     if(currentUV.y<textureLowerBorder.y)
         currentUV.y=textureLowerBorder.y;
     if(currentUV.y>textureUpperBorder.y)
-        currentUV.y=textureUpperBorder.y;
-
-    /*if(currentUV.x<textureLowerBorder.x)
-        discard;
-    if(currentUV.x>textureUpperBorder.x)
-        discard;
-    if(currentUV.y<textureLowerBorder.y)
-        discard;
-    if(currentUV.y>textureUpperBorder.y)
-        discard;*/
-
-    return currentUV;
-}
-
-vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
-{ 
-    vec2 textureLowerBorder=textureWidthInAtlas*vec2(
-        floor(onePerTextureWidthInAtlas*texCoords.x)+0.001,
-        floor(onePerTextureWidthInAtlas*texCoords.y)+0.001);
-
-
-    //azert van ez az egy helyett, hogy nehogy a rossz oldalrol valasszon pixelt a sampler
-    vec2 textureUpperBorder=textureLowerBorder+vec2(0.998*textureWidthInAtlas, 0.998*textureWidthInAtlas);
-
-    float layerDepth = heightStep;
-
-    float currentLayerDepth = 0.0;
-
-    vec2 deltaTexCoords = viewDir.xy / viewDir.z * heightScale * heightStep*textureWidthInAtlas; 
-  
-
-    vec2  currentTexCoords     = texCoords;
-    float currentDepthMapValue = 1-texture(texture_normal, currentTexCoords).a;
-      
-    while(currentLayerDepth < currentDepthMapValue&&currentLayerDepth<1)
-    {
-        currentTexCoords -= deltaTexCoords;
-        currentDepthMapValue = 1-texture(texture_normal, currentTexCoords).a;  
-        currentLayerDepth += layerDepth;  
-    }
-    
-    vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
-
-    float afterDepth  = currentDepthMapValue - currentLayerDepth;
-    float beforeDepth = 1-texture(texture_normal, prevTexCoords).a - currentLayerDepth + layerDepth;
- 
-    float weight = afterDepth / (afterDepth - beforeDepth);
-    vec2 currentUV = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+        currentUV.y=textureUpperBorder.y;*/
 
     if(currentUV.x<textureLowerBorder.x)
         discard;

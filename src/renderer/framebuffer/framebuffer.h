@@ -41,11 +41,18 @@ typedef struct endFBO {
 	unsigned int depthBuffer;//texture
 } endFBO;
 
+typedef struct screenFBO {
+	unsigned int id;
+
+	unsigned int colorBuffer;//rgb
+} screenFBO;//a legutolso framebuffer a kepernyo elott
+
 typedef struct renderer {
 	shadowFBO shadowBuffer;
 	geometryFBO gBuffer;
 	ssaoFBO ssaoBuffer;
 	endFBO endBuffer;
+	screenFBO screenBuffer;
 } renderer;
 
 renderer renderer_create(int width, int height);

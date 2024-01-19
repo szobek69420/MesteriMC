@@ -15,6 +15,9 @@ void renderer_destroySSAOFBO(ssaoFBO ssao);
 endFBO renderer_createEndFBO(int width, int height);
 void renderer_destroyEndFBO(endFBO endBuffer);
 
+screenFBO renderer_createScreenFBO(int width, int height);
+void renderer_destroyScreenFBO(screenFBO screenBuffer);
+
 renderer renderer_create(int width, int height)
 {
     renderer rendor;
@@ -22,6 +25,7 @@ renderer renderer_create(int width, int height)
     rendor.gBuffer = renderer_createGeometryFBO(width, height);
     rendor.ssaoBuffer = renderer_createSSAOFBO(width, height);
     rendor.endBuffer = renderer_createEndFBO(width, height);
+    rendor.screenBuffer = renderer_createScreenFBO(width, height);
     return rendor;
 }
 void renderer_destroy(renderer cucc)
@@ -30,6 +34,7 @@ void renderer_destroy(renderer cucc)
     renderer_destroyGeometryFBO(cucc.gBuffer);
     renderer_destroySSAOFBO(cucc.ssaoBuffer);
     renderer_destroyEndFBO(cucc.endBuffer);
+    renderer_destroyScreenFBO(cucc.screenBuffer);
 }
 
 
@@ -207,4 +212,36 @@ void renderer_destroyEndFBO(endFBO endBuffer)
     //glDeleteRenderbuffers(1, &endBuffer.depthBuffer);
     glDeleteTextures(1, &endBuffer.depthBuffer);
     glDeleteFramebuffers(1, &endBuffer.id);
+}
+
+screenFBO renderer_createScreenFBO(int width, int height)
+{
+    screenFBO screenBuffer;
+
+    glGenFramebuffers(1, &(screenBuffer.id));
+    glBindFramebuffer(GL_FRAMEBUFFER, screenBuffer.id);
+
+    glGenTextures(1, &(screenBuffer.colorBuffer));
+    glBindTexture(GL_TEXTURE_2D, screenBuffer.colorBuffer);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenBuffer.colorBuffer, 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        printf("something is fucked with the screen framebuffer");
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return screenBuffer;
+}
+void renderer_destroyScreenFBO(screenFBO screenBuffer)
+{
+    glDeleteTextures(1, &screenBuffer.colorBuffer);
+
+    glDeleteFramebuffers(1, &screenBuffer.id);
 }

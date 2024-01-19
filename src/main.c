@@ -192,6 +192,7 @@ shader ssaoBlurShader;
 shader lightingPassShader;
 shader forwardPassShader;
 shader finalPassShader;
+shader fxaaShader;
 shader textShader;
 shader skyboxShader; mesh skyboxMesh;
 
@@ -284,7 +285,16 @@ void init_renderer()
     );
     glUseProgram(finalPassShader.id);
     glUniform1i(glGetUniformLocation(finalPassShader.id, "tex"), 0);
-    glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 0.3);
+    glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 0.2);
+
+    fxaaShader = shader_import(
+        "../assets/shaders/renderer/fxaa/shader_fxaa.vag",
+        "../assets/shaders/renderer/fxaa/shader_fxaa.fag",
+        NULL
+    );
+    glUseProgram(fxaaShader.id);
+    glUniform1i(glGetUniformLocation(fxaaShader.id, "tex"), 0);
+    glUniform2f(glGetUniformLocation(fxaaShader.id, "onePerResolution"), 1.0f/RENDERER_WIDTH, 1.0f/RENDERER_HEIGHT);
 
     textShader = shader_import(
         "../assets/shaders/renderer2D/text/shader_text.vag",
@@ -480,7 +490,7 @@ void render(camera* cum, font* f)
 
 
     //prepare gbuffer fbo
-    glViewport(0, 0, 1920, 1080);
+    glViewport(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT);
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.gBuffer.id);
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -628,11 +638,8 @@ void render(camera* cum, font* f)
         render_cube();
     }
 
-    //switch to default fbo ------------------------------------------------------------------------
-    glViewport(0, 0, window_getWidth(), window_getHeight());
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
-    //glClearColor(0, 0.04f, 0.6f, 1.0f);
-    //glClear(GL_COLOR_BUFFER_BIT);
+    //switch to screen fbo ------------------------------------------------------------------------
+    glBindFramebuffer(GL_FRAMEBUFFER, rendor.screenBuffer.id);//default framebuffer
 
     //skybox
     glDisable(GL_DEPTH_TEST);
@@ -651,7 +658,7 @@ void render(camera* cum, font* f)
     sun_render(&szunce, cum, &projection);
     glEnable(GL_DEPTH_TEST);
 
-    // draw results to screen -----------------------------------------------------------------------------
+    // draw the content of endfbo to screenfbo -----------------------------------------------------------------------------
     glDisable(GL_DEPTH_TEST);
 
     glEnable(GL_BLEND);
@@ -666,6 +673,18 @@ void render(camera* cum, font* f)
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
     glDisable(GL_BLEND);
+
+    //switch to default fbo ------------------------------------------------------------------------
+    glViewport(0, 0, window_getWidth(), window_getHeight());
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
+
+    //fxaa
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, rendor.screenBuffer.colorBuffer);
+
+    glUseProgram(fxaaShader.id);
+    glBindVertexArray(rectangleVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 
     //render 2d stuff (only text yet)
     //everything is inside render_text like use shader bing VAO etc. (inefficient but good enough for now)

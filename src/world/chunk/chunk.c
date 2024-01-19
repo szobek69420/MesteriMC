@@ -54,7 +54,8 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 		{
 			heightHelper = fnlGetNoise2D(&(cm->noise), basedX + i, basedZ + j);
 			heightHelper *= 100*heightHelper;
-			heightHelper -= basedY - 20;
+			heightHelper += 20;
+			heightHelper -= basedY;
 			heightMap[i][j] = heightHelper;
 		}
 	}
