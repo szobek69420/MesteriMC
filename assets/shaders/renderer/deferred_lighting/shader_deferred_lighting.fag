@@ -14,7 +14,7 @@ uniform sampler2D texture_ssao;
 
 uniform int shadowOn;
 uniform mat4 shadow_lightMatrix; //from the camera's view space to the light's projection space
-const float shadowBias=0.002;
+const float shadowBias=0.005;
 const vec2 shadowSampleOffsets[9]=vec2[9](
 	vec2(-0.001, -0.001),
 	vec2(-0.001, 0),

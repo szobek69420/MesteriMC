@@ -25,14 +25,19 @@ void camera_update(camera* cam, float delta_time)
 {
     //keyboard
     float velocity = cam->move_speed * delta_time;
+    vec3 forward = vec3_normalize(vec3_create2(cam->front.x, 0, cam->front.z));
     if (input_is_key_down(GLFW_KEY_W))
-        cam->position = vec3_sum(cam->position, vec3_scale(cam->front, velocity));
+        cam->position = vec3_sum(cam->position, vec3_scale(forward, velocity));
     if (input_is_key_down(GLFW_KEY_S))
-        cam->position = vec3_sum(cam->position, vec3_scale(cam->front, -velocity));
+        cam->position = vec3_sum(cam->position, vec3_scale(forward, -velocity));
     if (input_is_key_down(GLFW_KEY_A))
         cam->position = vec3_sum(cam->position, vec3_scale(cam->right, -velocity));
     if (input_is_key_down(GLFW_KEY_D))
         cam->position = vec3_sum(cam->position, vec3_scale(cam->right, velocity));
+    if (input_is_key_down(GLFW_KEY_LEFT_SHIFT))
+        cam->position = vec3_sum(cam->position, vec3_create2(0,-velocity,0));
+    if (input_is_key_down(GLFW_KEY_SPACE))
+        cam->position = vec3_sum(cam->position, vec3_create2(0, velocity, 0));
 
     //mouse movement
     double dx, dy;

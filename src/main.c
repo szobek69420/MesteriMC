@@ -270,7 +270,6 @@ void init_renderer()
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 100);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 120);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f/(120-100));
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowBias"), 0.005f);
 
     forwardPassShader = shader_import(
         "../assets/shaders/renderer/forward/shader_forward.vag",

@@ -9,6 +9,8 @@
 
 #include <glad/glad.h>
 
+char chunkManager_checkIfInFrustum(vec4* vec, char* frustumX, char* frustumY, char* frustumZ);
+
 chunkManager chunkManager_create(int seed, int renderDistance)
 {
 	chunkManager cm;
@@ -227,6 +229,11 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 	//shader_setMat4(shit->id, "view", camera_getViewMatrix(cum));
 	//shader_setMat4(shit->id, "projection", *projection);
 
+	char frustumX[3] = { 0,0,0 };//volt-e olyan bounding point, ami x<-1 vagy -1<=x<=1 vagy x>1
+	char frustumY[3] = { 0,0,0 };//volt-e olyan bounding point, ami y<-1 vagy -1<=y<=1 vagy y>1
+	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
+	char isPointInFrustum = 0;
+
 	listElement* it = list_get_iterator(&(cm->loadedChunks));
 	while (it != NULL)
 	{
@@ -237,6 +244,10 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 			basedY = chomk->chunkY * CHUNK_HEIGHT;
 			basedZ = chomk->chunkZ * CHUNK_WIDTH;
 
+			frustumX[0] = 0;	frustumX[1] = 0;	frustumX[2] = 0;
+			frustumY[0] = 0;	frustumY[1] = 0;	frustumY[2] = 0;
+			frustumZ[0] = 0;	frustumZ[1] = 0;	frustumZ[2] = 0;
+
 			for (int i = 0; i < 24; )
 			{
 				temp.x = basedX + chunkBounds[i++];
@@ -245,16 +256,29 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 				temp.w = 1;
 				temp = vec4_multiplyWithMatrix(pv, temp);
 				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
+				
+				//frustum cull
+				isPointInFrustum = chunkManager_checkIfInFrustum(&temp, frustumX, frustumY, frustumZ);
 
-				if (temp.x * temp.x < 1 && temp.y * temp.y < 1 && (temp.z < 1 && temp.z>0))
+				if (isPointInFrustum)
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
 					chunk_drawTerrain(chomk);
 					break;
 				}
 			}
-		}
 
+			if (!isPointInFrustum)//ha nincs pont benne a kamera frustumban
+			{
+				if (((frustumX[0] && frustumX[2]) || frustumX[1]) &&
+					((frustumY[0] && frustumY[2]) || frustumY[1]) &&
+					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
+				{
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
+					chunk_drawTerrain(chomk);
+				}
+			}
+		}
 		//it=it->next;
 		it = list_next(it);
 	}
@@ -271,6 +295,11 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 	glUniformMatrix4fv(glGetUniformLocation(shit->id, "lightMatrix"), 1, GL_FALSE, viewProjection->data);
 	//shader_setMat4(shit->id, "view", camera_getViewMatrix(cum));
 	//shader_setMat4(shit->id, "projection", *projection);
+
+	char frustumX[3] = { 0,0,0 };//volt-e olyan bounding point, ami x<-1 vagy -1<=x<=1 vagy x>1
+	char frustumY[3] = { 0,0,0 };//volt-e olyan bounding point, ami y<-1 vagy -1<=y<=1 vagy y>1
+	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
+	char isPointInFrustum = 0;
 
 	listElement* it = list_get_iterator(&(cm->loadedChunks));
 	while (it != NULL)
@@ -291,16 +320,70 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 				temp = vec4_multiplyWithMatrix(*viewProjection, temp);
 				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
 
-				if (temp.x * temp.x < 1 && temp.y * temp.y < 1 && (temp.z <1&&temp.z>0))
+				//frustum cull
+				isPointInFrustum = chunkManager_checkIfInFrustum(&temp, frustumX, frustumY, frustumZ);
+
+				if (isPointInFrustum)
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
 					chunk_drawTerrain(chomk);
 					break;
 				}
 			}
+
+			if (!isPointInFrustum)//ha nincs pont benne a kamera frustumban
+			{
+				if (((frustumX[0] && frustumX[2]) || frustumX[1]) &&
+					((frustumY[0] && frustumY[2]) || frustumY[1]) &&
+					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
+				{
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
+					chunk_drawTerrain(chomk);
+				}
+			}
 		}
 		//it=it->next;
 		it = list_next(it);
 	}
+}
+
+char chunkManager_checkIfInFrustum(vec4* point, char* frustumX, char* frustumY, char* frustumZ)//0-t ad vissza, ha nincs benne a pont a frustumban
+{
+	//frustum cull
+	char isPointInFrustum = 0;
+
+	if (point->x < -1)
+		frustumX[0] = 69;
+	else if (point->x < 1)
+	{
+		frustumX[1] = 69;
+		isPointInFrustum++;
+	}
+	else
+		frustumX[2] = 69;
+
+	if (point->y < -1)
+		frustumY[0] = 69;
+	else if (point->y < 1)
+	{
+		frustumY[1] = 69;
+		isPointInFrustum++;
+	}
+	else
+		frustumY[2] = 69;
+
+	if (point->z < 0)
+		frustumZ[0] = 69;
+	else if (point->z < 1)
+	{
+		frustumZ[1] = 69;
+		isPointInFrustum++;
+	}
+	else
+		frustumZ[2] = 69;
+
+	if (isPointInFrustum == 3)
+		return 69;
+	return 0;
 }
 
