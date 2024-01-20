@@ -14,17 +14,17 @@ uniform sampler2D texture_ssao;
 
 uniform int shadowOn;
 uniform mat4 shadow_lightMatrix; //from the camera's view space to the light's projection space
-const float shadowBias=0.005;
+const float shadowBias=0.003;
 const vec2 shadowSampleOffsets[9]=vec2[9](
-	vec2(-0.001, -0.001),
-	vec2(-0.001, 0),
-	vec2(-0.001, 0.001),
-	vec2(0, -0.001),
+	vec2(-0.0002, -0.0002),
+	vec2(-0.0002, 0),
+	vec2(-0.0002, 0.0002),
+	vec2(0, -0.0002),
 	vec2(0, 0),
-	vec2(0, 0.001),
-	vec2(0.001, -0.001),
-	vec2(0.001, 0),
-	vec2(0.001, 0.001)
+	vec2(0, 0.0002),
+	vec2(0.0002, -0.0002),
+	vec2(0.0002, 0),
+	vec2(0.0002, 0.0002)
 );
 
 uniform mat4 projection_inverse;
@@ -51,8 +51,7 @@ void main()
 	vec3 normal = texture(texture_normal, uv).rgb * 2 - 1;
 	vec3 albedo = texture(texture_albedospec, uv).rgb;
 	float specular = texture(texture_albedospec, uv).a;
-    //float ambientOcclusion = texture(texture_ssao, uv).r;
-	float ambientOcclusion=1;
+    float ambientOcclusion = texture(texture_ssao, uv).r;
 	
 	// attenuation
 	float distance = length(lightPosition - viewspace_position);
@@ -63,7 +62,7 @@ void main()
 	vec3 lighting = vec3(0);
 	
 	// ambient
-	vec3 amb = vec3(0.3 * albedo * ambientOcclusion);
+	vec3 amb = 0.3*attenuation*ambientOcclusion*albedo;
 
 	// albedo
 	vec3 light_dir;

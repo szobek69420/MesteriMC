@@ -368,8 +368,8 @@ void init_renderer()
     }
     // generate noise texture
     // ----------------------
-    vec3 ssaoNoise[10000];
-    for (unsigned int i = 0; i < 10000; i++)
+    vec3 ssaoNoise[16];
+    for (unsigned int i = 0; i < 16; i++)
     {
         ssaoNoise[i] = vec3_create2(
             (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
@@ -379,7 +379,7 @@ void init_renderer()
     }
     glGenTextures(1, &noiseTexture);
     glBindTexture(GL_TEXTURE_2D, noiseTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 100, 100, 0, GL_RGB, GL_FLOAT, &ssaoNoise);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -521,39 +521,37 @@ void render(camera* cum, font* f)
 
     //ssao pass ------------------------------------------------------------------------------------------
     // generate SSAO texture
-    /*
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glUseProgram(ssaoShader.id);
-        // Send kernel + rotation
-        for (unsigned int i = 0; i <64; ++i)
-        {
-            static char buffer[20];
-            sprintf(buffer, "samples[%d]", i);
-            glUniform3f(glGetUniformLocation(ssaoShader.id, buffer), 1, ssaoKernel[i].x, ssaoKernel[i].y, ssaoKernel[i].z);
-        }
-        glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection"), 1, GL_FALSE, projection.data);
-        glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
-        glUniformMatrix3fv(glGetUniformLocation(ssaoShader.id, "viewForDirectional"), 1, GL_FALSE, viewNormal.data);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, noiseTexture);
-        glBindVertexArray(rectangleVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glUseProgram(ssaoShader.id);
+    // Send kernel + rotation
+    for (unsigned int i = 0; i <64; ++i)
+    {
+        static char buffer[20];
+        sprintf(buffer, "samples[%d]", i);
+        glUniform3f(glGetUniformLocation(ssaoShader.id, buffer), 1, ssaoKernel[i].x, ssaoKernel[i].y, ssaoKernel[i].z);
+    }
+    glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection"), 1, GL_FALSE, projection.data);
+    glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
+    glUniformMatrix3fv(glGetUniformLocation(ssaoShader.id, "viewForDirectional"), 1, GL_FALSE, viewNormal.data);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, noiseTexture);
+    glBindVertexArray(rectangleVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
     // blur SSAO texture to remove noise
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idBlur);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glUseProgram(ssaoBlurShader.id);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBuffer);
-        glBindVertexArray(rectangleVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    */
+    glClear(GL_COLOR_BUFFER_BIT);
+    glUseProgram(ssaoBlurShader.id);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBuffer);
+    glBindVertexArray(rectangleVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+   
     //lighting pass ------------------------------------------------------------------------------------------
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
     //glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
