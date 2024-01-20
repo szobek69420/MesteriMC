@@ -24,4 +24,6 @@ void main()
 	gl_Position=vec4(aPos,1);
 	if(w>0.00001)
 		gl_Position=projection*view*modelMatrix*gl_Position;
+	else
+		gl_Position.z=1;
 }

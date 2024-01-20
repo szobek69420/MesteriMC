@@ -1,7 +1,7 @@
 #ifndef FRAMEBUFFER_H
 #define FRAMEBUFFER_H
 
-#define RENDERER_SHADOW_RESOLUTION 1024
+#define RENDERER_SHADOW_RESOLUTION 3000
 #define RENDERER_WIDTH 1920
 #define RENDERER_HEIGHT 1080
 
@@ -41,11 +41,18 @@ typedef struct endFBO {
 	unsigned int depthBuffer;//texture
 } endFBO;
 
+typedef struct screenFBO {
+	unsigned int id;
+
+	unsigned int colorBuffer;//rgb
+} screenFBO;//a legutolso framebuffer a kepernyo elott
+
 typedef struct renderer {
 	shadowFBO shadowBuffer;
 	geometryFBO gBuffer;
 	ssaoFBO ssaoBuffer;
 	endFBO endBuffer;
+	screenFBO screenBuffer;
 } renderer;
 
 renderer renderer_create(int width, int height);

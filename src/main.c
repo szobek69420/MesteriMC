@@ -32,6 +32,9 @@
 #include "utils/list.h"
 #include "utils/vector.h"
 
+#define CLIP_NEAR 0.1f
+#define CLIP_FAR 200.0f
+
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
 
@@ -179,6 +182,8 @@ void handle_event(event e)
     }
 }
 
+chunkManager cm;
+
 renderer rendor;
 shader shadowShader;
 shader geometryPassShader;
@@ -187,6 +192,7 @@ shader ssaoBlurShader;
 shader lightingPassShader;
 shader forwardPassShader;
 shader finalPassShader;
+shader fxaaShader;
 shader textShader;
 shader skyboxShader; mesh skyboxMesh;
 
@@ -238,6 +244,8 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(ssaoShader.id, "texture_noise"), 2);
     glUniform1f(glGetUniformLocation(ssaoShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(ssaoShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
+    glUniform1f(glGetUniformLocation(ssaoShader.id, "projectionNear"), CLIP_NEAR);
+    glUniform1f(glGetUniformLocation(ssaoShader.id, "projectionFar"), CLIP_FAR);
 
     ssaoBlurShader = shader_import(
         "../assets/shaders/renderer/ssao/shader_ssao.vag",
@@ -277,7 +285,16 @@ void init_renderer()
     );
     glUseProgram(finalPassShader.id);
     glUniform1i(glGetUniformLocation(finalPassShader.id, "tex"), 0);
-    glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 0.3);
+    glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 0.2);
+
+    fxaaShader = shader_import(
+        "../assets/shaders/renderer/fxaa/shader_fxaa.vag",
+        "../assets/shaders/renderer/fxaa/shader_fxaa.fag",
+        NULL
+    );
+    glUseProgram(fxaaShader.id);
+    glUniform1i(glGetUniformLocation(fxaaShader.id, "tex"), 0);
+    glUniform2f(glGetUniformLocation(fxaaShader.id, "onePerResolution"), 1.0f/RENDERER_WIDTH, 1.0f/RENDERER_HEIGHT);
 
     textShader = shader_import(
         "../assets/shaders/renderer2D/text/shader_text.vag",
@@ -362,7 +379,7 @@ void init_renderer()
     }
     glGenTextures(1, &noiseTexture);
     glBindTexture(GL_TEXTURE_2D, noiseTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -379,15 +396,15 @@ void init_renderer()
         *lit = light_create(
             vec3_create2((((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5), (((rand() % 100) / 200.0f) + 0.5)),
             vec3_create2((((rand() % 100) / 100.0) * 50.0 - 3.0), 25 + (((rand() % 100) / 100.0) * 20.0 - 4.0), (((rand() % 100) / 100.0) * 100.0 - 3.0)),
-            vec3_create2(10, 0.05, 0.05)
+            vec3_create2(10, 0.1, 0.1)
             );
         vector_push_back(lights, lit);
     }
 
     sunTzu = light_create(
         vec3_create2(1, 0.97, 0.4),
-        vec3_create2(0.6, 1.3, 0.8),
-        vec3_create2(3, 0, 0)
+        vec3_create2(0.6, 1, -0.8),
+        vec3_create2(10, 0, 0)
     );
 
     //skybox
@@ -404,6 +421,7 @@ void init_renderer()
 
     //sun
     szunce = sun_create();
+    sun_setDirection(&szunce, vec3_create2(0.6, 1, -0.8));
 }
 
 void end_renderer()
@@ -434,25 +452,45 @@ void end_renderer()
 
 void render(camera* cum, font* f)
 {
+    //matrices
+    mat4 view = camera_getViewMatrix(cum);
+    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
+    mat4 pv = mat4_multiply(projection, view);
+    mat4 projectionInverse = mat4_inverse(projection);
+    mat3 viewNormal = mat3_createFromMat(view);
+
+    mat4 shadowViewProjection = mat4_multiply(
+        mat4_ortho(-100,100,-100,100,1,200),
+        mat4_lookAt(
+            vec3_sum(cum->position, vec3_create2(szunce.direction.x*100, szunce.direction.y * 100, szunce.direction.z * 100)),
+            vec3_create2(-1* szunce.direction.x, -1* szunce.direction.y, -1* szunce.direction.z),
+            vec3_create2(0,1,0)
+        )
+    );
+    mat4 shadowLightMatrix = mat4_multiply(shadowViewProjection, mat4_inverse(view));//from the camera's view space to the suns projection space
+
     //shadow
     glViewport(0, 0, RENDERER_SHADOW_RESOLUTION, RENDERER_SHADOW_RESOLUTION);
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.shadowBuffer.id);
 
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
     glClear(GL_DEPTH_BUFFER_BIT);
+
+    glDisable(GL_CULL_FACE);
+    //glFrontFace(GL_CW);
 
     glUseProgram(shadowShader.id);
 
+    chunkManager_drawShadow(&cm, &shadowShader, &shadowViewProjection);
 
-    //matrices
-    mat4 view = camera_getViewMatrix(cum);
-    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), 0.1, 200);
-    mat4 pv = mat4_multiply(projection, view);
-    mat4 projectionInverse = mat4_inverse(projection);
-    mat3 viewNormal = mat3_createFromMat(view);
+    glEnable(GL_CULL_FACE);
+    glFrontFace(GL_CCW);
+
 
     //prepare gbuffer fbo
-    glViewport(0, 0, 1920, 1080);
+    glViewport(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT);
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.gBuffer.id);
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -484,36 +522,37 @@ void render(camera* cum, font* f)
     //ssao pass ------------------------------------------------------------------------------------------
     // generate SSAO texture
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glUseProgram(ssaoShader.id);
-        // Send kernel + rotation
-        for (unsigned int i = 0; i < 64; ++i)
-        {
-            static char buffer[20];
-            sprintf(buffer, "samples[%d]", i);
-            glUniform3fv(glGetUniformLocation(ssaoShader.id, buffer), 1, (float*)&ssaoKernel[i]);
-        }
-        glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection"), 1, GL_FALSE, projection.data);
-        glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, noiseTexture);
-        glBindVertexArray(rectangleVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glClear(GL_COLOR_BUFFER_BIT);
+    glUseProgram(ssaoShader.id);
+    // Send kernel + rotation
+    for (unsigned int i = 0; i <64; ++i)
+    {
+        static char buffer[20];
+        sprintf(buffer, "samples[%d]", i);
+        glUniform3f(glGetUniformLocation(ssaoShader.id, buffer), 1, ssaoKernel[i].x, ssaoKernel[i].y, ssaoKernel[i].z);
+    }
+    glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection"), 1, GL_FALSE, projection.data);
+    glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
+    glUniformMatrix3fv(glGetUniformLocation(ssaoShader.id, "viewForDirectional"), 1, GL_FALSE, viewNormal.data);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, noiseTexture);
+    glBindVertexArray(rectangleVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+  
     // blur SSAO texture to remove noise
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idBlur);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glUseProgram(ssaoBlurShader.id);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBuffer);
-        glBindVertexArray(rectangleVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
+    glClear(GL_COLOR_BUFFER_BIT);
+    glUseProgram(ssaoBlurShader.id);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBuffer);
+    glBindVertexArray(rectangleVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+   
     //lighting pass ------------------------------------------------------------------------------------------
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
     //glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
@@ -550,7 +589,7 @@ void render(camera* cum, font* f)
     glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
 
     //point lights
-    light_setPosition((light*)vector_get(lights, 0), cum->position);
+    //light_setPosition((light*)vector_get(lights, 0), cum->position);
     float* bufferData = (float*)malloc(lights->size * LIGHT_SIZE_IN_VBO);
     light* tempLight;
     for (unsigned int i = 0; i < lights->size; i++)
@@ -559,11 +598,16 @@ void render(camera* cum, font* f)
         memcpy(bufferData + i * LIGHT_FLOATS_IN_VBO, &(tempLight->position.x), LIGHT_SIZE_IN_VBO);
     }
 
+    glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
+
     light_fillRenderer(&lightRenderer, bufferData, lights->size);
     light_render(&lightRenderer, 69);
     free(bufferData);
 
-    //directional
+    //directional (sun)
+    glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
+    glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
+
     bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
     memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
     light_fillRenderer(&lightRenderer, bufferData, 1);
@@ -583,7 +627,7 @@ void render(camera* cum, font* f)
     glUseProgram(forwardPassShader.id);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "projection"), 1, GL_FALSE, projection.data);
     glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "view"), 1, GL_FALSE, view.data);
-    for (unsigned int i = 1; i < lights->size; i++)
+    for (unsigned int i = 0; i < lights->size; i++)
     {
         mat4 model = mat4_create(1.0f);
         model = mat4_translate(model, ((light*)vector_get(lights, i))->position);
@@ -593,11 +637,8 @@ void render(camera* cum, font* f)
         render_cube();
     }
 
-    //switch to default fbo ------------------------------------------------------------------------
-    glViewport(0, 0, window_getWidth(), window_getHeight());
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
-    //glClearColor(0, 0.04f, 0.6f, 1.0f);
-    //glClear(GL_COLOR_BUFFER_BIT);
+    //switch to screen fbo ------------------------------------------------------------------------
+    glBindFramebuffer(GL_FRAMEBUFFER, rendor.screenBuffer.id);//default framebuffer
 
     //skybox
     glDisable(GL_DEPTH_TEST);
@@ -616,7 +657,7 @@ void render(camera* cum, font* f)
     sun_render(&szunce, cum, &projection);
     glEnable(GL_DEPTH_TEST);
 
-    // draw results to screen -----------------------------------------------------------------------------
+    // draw the content of endfbo to screenfbo -----------------------------------------------------------------------------
     glDisable(GL_DEPTH_TEST);
 
     glEnable(GL_BLEND);
@@ -631,6 +672,18 @@ void render(camera* cum, font* f)
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
     glDisable(GL_BLEND);
+
+    //switch to default fbo ------------------------------------------------------------------------
+    glViewport(0, 0, window_getWidth(), window_getHeight());
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
+
+    //fxaa
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, rendor.screenBuffer.colorBuffer);
+
+    glUseProgram(fxaaShader.id);
+    glBindVertexArray(rectangleVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 
     //render 2d stuff (only text yet)
     //everything is inside render_text like use shader bing VAO etc. (inefficient but good enough for now)
@@ -667,7 +720,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     event_queue_push((event){ .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
 }
 
-chunkManager cm;
 void init_kuba()
 {
     cm = chunkManager_create(69, 4);

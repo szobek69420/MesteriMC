@@ -12,6 +12,21 @@ uniform sampler2D texture_shadow;
 uniform sampler2D texture_depth;
 uniform sampler2D texture_ssao;
 
+uniform int shadowOn;
+uniform mat4 shadow_lightMatrix; //from the camera's view space to the light's projection space
+const float shadowBias=0.003;
+const vec2 shadowSampleOffsets[9]=vec2[9](
+	vec2(-0.0002, -0.0002),
+	vec2(-0.0002, 0),
+	vec2(-0.0002, 0.0002),
+	vec2(0, -0.0002),
+	vec2(0, 0),
+	vec2(0, 0.0002),
+	vec2(0.0002, -0.0002),
+	vec2(0.0002, 0),
+	vec2(0.0002, 0.0002)
+);
+
 uniform mat4 projection_inverse;
 
 uniform float onePerScreenWidth;
@@ -23,6 +38,10 @@ uniform float fogHelper;//1/(fogEnd-fogStart)
 
 void main()
 {
+	int isDirectional=0;
+	if(lightAttenuation.y<0.00001&&lightAttenuation.z<0.00001)
+		isDirectional=69;
+
 	vec2 uv=vec2(gl_FragCoord.x*onePerScreenWidth, gl_FragCoord.y*onePerScreenHeight);
 	float depth=texture(texture_depth, uv).r;//getting depth buffer info
 	vec4 pos = projection_inverse * (vec4(uv, depth, 1)* 2 - 1);
@@ -36,28 +55,53 @@ void main()
 	
 	// attenuation
 	float distance = length(lightPosition - viewspace_position);
-	float attenuation = lightAttenuation.x / (1 + lightAttenuation.y * distance + lightAttenuation.z * distance * distance);
+	float attenuation = lightAttenuation.x;
+	if(isDirectional==0)
+		attenuation=lightAttenuation.x / (1 + lightAttenuation.y * distance + lightAttenuation.z * distance * distance);
 
-	vec3 lighting = albedo * 0.1*attenuation;
+	vec3 lighting = vec3(0);
 	
 	// ambient
-	vec3 amb = vec3(0.3 * albedo * ambientOcclusion);
+	vec3 amb = 0.3*attenuation*ambientOcclusion*albedo;
 
 	// albedo
 	vec3 light_dir;
-	if(lightAttenuation.y<0.00001&&lightAttenuation.z<0.00001)//directional
+	if(isDirectional!=0)//directional
 		light_dir=lightPosition;
 	else
 		light_dir=normalize(lightPosition - viewspace_position);
+
 	vec3 alb = max(dot(normal, light_dir), 0.0) * albedo * lightColour;
 
 	// specular
 	vec3 halfway_dir = normalize(light_dir + view_dir);  
 	float sp = pow(max(dot(normal, halfway_dir), 0.0), 16.0);
 	vec3 spec = lightColour * sp * specular;
+
+	//shadow check
+	float oneMinusShadowStrength=1;
+	if(shadowOn!=0)
+	{
+		vec4 shadowPos=shadow_lightMatrix*vec4(viewspace_position, 1);
+		shadowPos.xyz/=shadowPos.w;
+		shadowPos=0.5*shadowPos+0.5;
+		float shadowDepth=texture(texture_shadow, shadowPos.xy).r;
+
+
+		if(shadowPos.x<=1&&shadowPos.x>=0&&shadowPos.y<=1&&shadowPos.y>=0&&shadowDepth<0.9999)
+		{
+			oneMinusShadowStrength=0;
+			for(int i=0;i<9;i++)
+			{
+				if(texture(texture_shadow, shadowPos.xy+shadowSampleOffsets[i]).r>shadowPos.z-shadowBias)
+					oneMinusShadowStrength++;
+			}
+			oneMinusShadowStrength*=0.111111;
+		}
+	}
 	
-	alb *= attenuation;
-	spec *= attenuation;
+	alb *= attenuation*oneMinusShadowStrength;
+	spec *= attenuation*oneMinusShadowStrength;
 	lighting += amb + alb + spec;
 
 	float alpha=1;
@@ -68,8 +112,6 @@ void main()
 		alpha=0;
 
 	fragColor = vec4(lighting,alpha);
-
-	//fragColor = vec4(ambientOcclusion, ambientOcclusion, ambientOcclusion, 1.0);	
 
 	//fragColor=vec4(depth, depth, depth,1);
 	//fragColor = vec4(normal, 1.0);
