@@ -113,9 +113,6 @@ void main()
 
 	fragColor = vec4(lighting,alpha);
 
-	//fragColor = vec4(oneMinusShadowStrength, oneMinusShadowStrength, oneMinusShadowStrength, 1.0);	
-	//fragColor = vec4(ambientOcclusion, ambientOcclusion, ambientOcclusion, 1.0);	
-
 	//fragColor=vec4(depth, depth, depth,1);
 	//fragColor = vec4(normal, 1.0);
 	//fragColor=vec4(0.005*viewspace_position+0.5,1);

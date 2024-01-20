@@ -522,6 +522,7 @@ void render(camera* cum, font* f)
     //ssao pass ------------------------------------------------------------------------------------------
     // generate SSAO texture
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
+
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(ssaoShader.id);
     // Send kernel + rotation
@@ -542,7 +543,7 @@ void render(camera* cum, font* f)
     glBindTexture(GL_TEXTURE_2D, noiseTexture);
     glBindVertexArray(rectangleVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-
+  
     // blur SSAO texture to remove noise
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idBlur);
     glClear(GL_COLOR_BUFFER_BIT);
