@@ -51,7 +51,8 @@ void main()
 	vec3 normal = texture(texture_normal, uv).rgb * 2 - 1;
 	vec3 albedo = texture(texture_albedospec, uv).rgb;
 	float specular = texture(texture_albedospec, uv).a;
-    float ambientOcclusion = texture(texture_ssao, uv).r;
+    //float ambientOcclusion = texture(texture_ssao, uv).r;
+	float ambientOcclusion=1;
 	
 	// attenuation
 	float distance = length(lightPosition - viewspace_position);
@@ -112,6 +113,9 @@ void main()
 		alpha=0;
 
 	fragColor = vec4(lighting,alpha);
+
+	//fragColor = vec4(oneMinusShadowStrength, oneMinusShadowStrength, oneMinusShadowStrength, 1.0);	
+	//fragColor = vec4(ambientOcclusion, ambientOcclusion, ambientOcclusion, 1.0);	
 
 	//fragColor=vec4(depth, depth, depth,1);
 	//fragColor = vec4(normal, 1.0);

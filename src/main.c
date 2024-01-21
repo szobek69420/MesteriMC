@@ -25,6 +25,8 @@
 
 #include "font_handler/font_handler.h"
 
+#include "post_processing/lens_flare/flare.h"
+
 #include "glm2/mat4.h"
 #include "glm2/vec3.h"
 #include "glm2/mat3.h"
@@ -211,6 +213,8 @@ light sunTzu;
 light_renderer lightRenderer;
 
 sun szunce;
+
+flare lensFlare;
 
 void init_renderer()
 {
@@ -409,12 +413,17 @@ void init_renderer()
 
     //skybox
     skyboxShader = shader_import(
-        "../assets/shaders/skybox/shader_skybox.vag",
-        "../assets/shaders/skybox/shader_skybox.fag",
+        "../assets/shaders/sky_procedural/shader_sky_procedural.vag",
+        "../assets/shaders/sky_procedural/shader_sky_procedural.fag",
         NULL
     );
     glUseProgram(skyboxShader.id);
-    glUniform1i(glGetUniformLocation(skyboxShader.id, "skybox"), 0);
+    glUniform1i(glGetUniformLocation(skyboxShader.id, "texture_gradient"), 0);
+    glUniform3f(glGetUniformLocation(skyboxShader.id, "sunDirectionNormalized"), sunTzu.position.x, sunTzu.position.y, sunTzu.position.z);
+    glUniform3f(glGetUniformLocation(skyboxShader.id, "sunColour"), 1,1,1);
+    glUniform3f(glGetUniformLocation(skyboxShader.id, "skyColour0"), 0,0.8f,1.0f);
+    glUniform3f(glGetUniformLocation(skyboxShader.id, "skyColour1"), 1, 1, 1);
+    glUniform3f(glGetUniformLocation(skyboxShader.id, "skyColour2"), 0, 0.8f, 1.0f);
     glUseProgram(0);
 
     skyboxMesh = kuba_create();
@@ -422,6 +431,9 @@ void init_renderer()
     //sun
     szunce = sun_create();
     sun_setDirection(&szunce, vec3_create2(0.6, 1, -0.8));
+
+    //lens flare
+    lensFlare = flare_create(0.4f);
 }
 
 void end_renderer()
@@ -448,6 +460,9 @@ void end_renderer()
 
     //sun
     sun_destroy(&szunce);
+
+    //lens flare
+    flare_destroy(&lensFlare);
 }
 
 void render(camera* cum, font* f)
@@ -521,8 +536,7 @@ void render(camera* cum, font* f)
 
     //ssao pass ------------------------------------------------------------------------------------------
     // generate SSAO texture
-    glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
-
+    /*glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(ssaoShader.id);
     // Send kernel + rotation
@@ -543,7 +557,7 @@ void render(camera* cum, font* f)
     glBindTexture(GL_TEXTURE_2D, noiseTexture);
     glBindVertexArray(rectangleVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-  
+
     // blur SSAO texture to remove noise
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idBlur);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -551,7 +565,7 @@ void render(camera* cum, font* f)
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBuffer);
     glBindVertexArray(rectangleVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glDrawArrays(GL_TRIANGLES, 0, 6);*/
    
     //lighting pass ------------------------------------------------------------------------------------------
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
@@ -565,7 +579,7 @@ void render(camera* cum, font* f)
     glFrontFace(GL_CW);
 
     glEnable(GL_BLEND);
-    glBlendFuncSeparate(GL_ONE, GL_ONE, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ONE, GL_ZERO);//az alpha azert GL_ONE/GL_ZERO, hogy felulirja a korabbi erteket az uj ertek (ugyis ugyanaz, de igy nem latszik a korvonala a gomboknek a distance fog-ban)
     glBlendEquation(GL_FUNC_ADD);
 
     glActiveTexture(GL_TEXTURE0);
@@ -637,25 +651,26 @@ void render(camera* cum, font* f)
         render_cube();
     }
 
+    //get lens flare data
+    flare_queryQueryResult(&lensFlare);
+    flare_query(&lensFlare, &pv, cum->position, sunTzu.position, window_getAspect());
+
     //switch to screen fbo ------------------------------------------------------------------------
-    glBindFramebuffer(GL_FRAMEBUFFER, rendor.screenBuffer.id);//default framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, rendor.screenBuffer.id);
 
     //skybox
     glDisable(GL_DEPTH_TEST);
     glFrontFace(GL_CW);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, textureHandler_getTexture(TEXTURE_SKYBOX));
+    glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT));
+
     glUseProgram(skyboxShader.id);
     glUniformMatrix4fv(glGetUniformLocation(skyboxShader.id, "pvm"), 1, GL_FALSE, mat4_multiply(pv, mat4_create2((float[]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, cum->position.x, cum->position.y, cum->position.z, 1 })).data);
     glBindVertexArray(skyboxMesh.vao);
     glDrawElements(GL_TRIANGLES, skyboxMesh.indexCount, GL_UNSIGNED_INT, 0);
 
     glFrontFace(GL_CCW);
-
-    //sun (ide lehet, hogy kell majd blend)
-    sun_render(&szunce, cum, &projection);
-    glEnable(GL_DEPTH_TEST);
 
     // draw the content of endfbo to screenfbo -----------------------------------------------------------------------------
     glDisable(GL_DEPTH_TEST);
@@ -672,6 +687,9 @@ void render(camera* cum, font* f)
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
     glDisable(GL_BLEND);
+
+    //lens flare
+    flare_render(&lensFlare, &pv, cum->position, sunTzu.position, window_getAspect());
 
     //switch to default fbo ------------------------------------------------------------------------
     glViewport(0, 0, window_getWidth(), window_getHeight());
