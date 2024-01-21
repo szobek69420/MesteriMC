@@ -1,0 +1,37 @@
+#version 330 core
+
+in vec3 pos;
+
+out vec4 fragColour;
+
+uniform sampler2D texture_gradient;
+
+uniform vec3 sunDirectionNormalized;
+uniform vec3 sunColour;
+
+uniform vec3 skyColour0;//top
+uniform vec3 skyColour1;//middle
+uniform vec3 skyColour2;//bottom
+
+const float sunInnerCutOff=0.999;
+const float sunOuterCutOff=0.7;
+const float onePerDeltaCutOff=1/(sunInnerCutOff-sunOuterCutOff);
+
+void main()
+{
+	vec3 dir=normalize(pos);
+	
+	vec2 uv=vec2(0.5*dot(dir, vec3(0,1,0))+0.5,0.5);
+	vec3 gradient=texture(texture_gradient,uv).rgb;
+	//gradient/=gradient.x+gradient.y+gradient.z;
+
+	vec3 sky=gradient.x*skyColour0+gradient.y*skyColour1+gradient.z*skyColour2;
+
+	float sunDot=dot(sunDirectionNormalized, dir);
+	if(sunDot>sunOuterCutOff)
+	{
+		sky=mix(sky, sunColour, pow(min((sunDot-sunOuterCutOff)*onePerDeltaCutOff,1),32));
+	}
+
+	fragColour=vec4(sky,1);
+}

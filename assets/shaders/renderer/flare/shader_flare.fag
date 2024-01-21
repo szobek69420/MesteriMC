@@ -1,0 +1,14 @@
+#version 330 core
+
+in vec2 uv;
+
+out vec4 fragColour;
+
+uniform sampler2D tex;
+uniform float brightness;
+
+void main()
+{
+	fragColour=texture(tex, uv);
+	fragColour.a*=brightness;
+}

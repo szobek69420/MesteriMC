@@ -1,0 +1,15 @@
+#version 330 core
+
+layout (location=0) in vec2 aPos;
+layout (location=1) in vec2 aUV;
+
+out vec2 uv;
+
+uniform vec2 pos;//screen space position
+uniform vec2 scale;
+
+void main()
+{
+	uv=aUV;
+	gl_Position=vec4(scale.x*aPos.x+pos.x, scale.y*aPos.y+pos.y, 0.9999,1);
+}
