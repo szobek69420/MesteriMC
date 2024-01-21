@@ -6,7 +6,7 @@
 //https://youtu.be/LMpw7foANNA?si=8mqjwuxBAFy_WTcg
 
 #define FLARE_TEXTURE_COUNT 9
-#define FLARE_QUERY_COUNT 50
+#define FLARE_QUERY_COUNT 20
 #define FLARE_MAX_SAMPLES_PASSED 8500 /*ez egyelore csak 1920x1080-nal ennyi, ezzel majd kell vmit kezdeni*/
 
 #include "../../glm2/vec3.h"
