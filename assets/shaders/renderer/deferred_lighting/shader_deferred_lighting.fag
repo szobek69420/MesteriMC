@@ -16,15 +16,15 @@ uniform int shadowOn;
 uniform mat4 shadow_lightMatrix; //from the camera's view space to the light's projection space
 const float shadowBias=0.003;
 const vec2 shadowSampleOffsets[9]=vec2[9](
-	vec2(-0.0002, -0.0002),
-	vec2(-0.0002, 0),
-	vec2(-0.0002, 0.0002),
-	vec2(0, -0.0002),
+	vec2(-0.0001, -0.0001),
+	vec2(-0.0001, 0),
+	vec2(-0.0001, 0.0001),
+	vec2(0, -0.0001),
 	vec2(0, 0),
-	vec2(0, 0.0002),
-	vec2(0.0002, -0.0002),
-	vec2(0.0002, 0),
-	vec2(0.0002, 0.0002)
+	vec2(0, 0.0001),
+	vec2(0.0001, -0.0001),
+	vec2(0.0001, 0),
+	vec2(0.0001, 0.0001)
 );
 
 uniform mat4 projection_inverse;
