@@ -1,5 +1,6 @@
-#ifndef SEQUENTIAL_VECTOR_H
-#define SEQUENTIAL_VECTOR_H
+//sequential vector
+#ifndef SEQTOR_H
+#define SEQTOR_H
 
 #include <stdlib.h>
 #include <stdio.h>
