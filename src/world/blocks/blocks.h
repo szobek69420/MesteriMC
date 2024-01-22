@@ -11,10 +11,19 @@
 
 //block types
 #define BLOCK_AIR 0
-#define BLOCK_WATER 1
-#define BLOCK_STONE 2
-#define BLOCK_DIRT 3
-#define BLOCK_GRASS 4
+#define BLOCK_STONE 1
+#define BLOCK_DIRT 2
+#define BLOCK_GRASS 3
+#define BLOCK_OAK_LOG 4
+//from here only transparent blocks
+#define BLOCK_TRANSPARENCY_START 5
+#define BLOCK_WATER BLOCK_TRANSPARENCY_START
+#define BLOCK_OAK_LEAVES (BLOCK_TRANSPARENCY_START+1)
+
+typedef struct blockModel {
+	int x, y, z;
+	int type;//blocktype
+} blockModel;
 
 //block: blokktipus, side: melyik oldal, index: az oldalon belul hanyadik csucs (4 csucs per oldal)
 void blocks_getUV(int block, int side, int index, float* uvx, float* uvy);

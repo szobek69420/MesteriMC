@@ -7,7 +7,7 @@
 
 #define FLARE_TEXTURE_COUNT 9
 #define FLARE_QUERY_COUNT 20
-#define FLARE_MAX_SAMPLES_PASSED 8500 /*ez egyelore csak 1920x1080-nal ennyi, ezzel majd kell vmit kezdeni*/
+#define FLARE_MAX_SAMPLES_PASSED 7200 /*ez egyelore csak 1920x1080-nal ennyi, ezzel majd kell vmit kezdeni*/
 
 #include "../../glm2/vec3.h"
 #include "../../glm2/mat4.h"
@@ -38,8 +38,8 @@ ez most egy sor akar lenni
 flare flare_create(float spacing);
 void flare_destroy(flare* sus);
 
-void flare_render(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, float aspectXY);
+void flare_render(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, float aspectYX);
 void flare_queryQueryResult(flare* sus);
-void flare_query(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, float aspectXY);
+void flare_query(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, float aspectYX);
 
 #endif

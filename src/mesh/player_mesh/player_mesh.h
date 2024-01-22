@@ -6,6 +6,11 @@
 #include "../../glm2/mat4.h"
 #include "../../glm2/vec3.h"
 
+#define PLAYER_MESH_ANIMATION_SPEED 10
+
+#define PLAYER_MESH_ANIMATION_IDLE 69420
+#define PLAYER_MESH_ANIMATION_WALK 69421
+
 typedef struct {
 	mesh torso;
 	mesh head;
@@ -30,6 +35,8 @@ typedef struct {
 	float rotLegLeftX, rotLegLeftY;
 	float rotLegRightX, rotLegRightY;
 
+	float animationTime;
+
 	unsigned int albedo;
 	unsigned int specular;
 	unsigned int normal;
@@ -41,6 +48,7 @@ void playerMesh_destroy(playerMesh* pm);
 void playerMesh_calculateOuterModelMatrix(playerMesh* pm);
 void playerMesh_calculateInnerModelMatrices(playerMesh* pm);
 
+void playerMesh_animate(playerMesh* pm, unsigned int animation, float deltaTime);
 void playerMesh_render(playerMesh* pm, shader* shit);
 
 #endif

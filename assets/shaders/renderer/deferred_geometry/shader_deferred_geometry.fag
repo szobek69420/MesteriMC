@@ -29,11 +29,15 @@ void main()
     //vec2 uv=parallax();
     vec2 uv=fs_in.TexCoords;
 
+    vec4 albedo=texture(texture_albedo, uv);
+    if(albedo.a<0.1)
+        discard;
+    gAlbedoSpec.rgb = albedo.rgb;
+    gAlbedoSpec.a = texture(texture_specular, uv).r;
+
     vec3 normalTemp=2*(texture(texture_normal,uv).rgb-vec3(0.5));
     gNormal = 0.5*(fs_in.tangentToView*normalTemp)+vec3(0.5);
 
-    gAlbedoSpec.rgb = texture(texture_albedo, uv).rgb;
-    gAlbedoSpec.a = texture(texture_specular, uv).r;
 }  
 
 vec2 parallax()

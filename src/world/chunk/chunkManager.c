@@ -22,6 +22,11 @@ chunkManager chunkManager_create(int seed, int renderDistance)
 	cm.noise.frequency = 0.0017;
 	cm.noise.seed = seed;
 
+	cm.noise2 = fnlCreateState();
+	cm.noise2.noise_type = FNL_NOISE_OPENSIMPLEX2;
+	cm.noise2.frequency = 0.0083;
+	cm.noise2.seed = seed*seed+seed;
+
 	cm.pendingUpdates = list_create();
 	cm.loadedChunks = list_create();
 

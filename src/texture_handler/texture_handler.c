@@ -17,7 +17,7 @@ unsigned int textureHandler_loadSkybox();
 int textureHandler_importTextures()
 {
     int problem = 0;
-    atlas_albedo = textureHandler_loadImage("../assets/textures/atlas_albedo.png",GL_SRGB, GL_RGBA,GL_NEAREST,69);
+    atlas_albedo = textureHandler_loadImage("../assets/textures/atlas_albedo.png",GL_SRGB_ALPHA, GL_RGBA,GL_NEAREST,69);
     if (atlas_albedo == 0)
         problem++;
 

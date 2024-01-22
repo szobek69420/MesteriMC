@@ -28,7 +28,7 @@ const int texture_index_in_render_order[] = {
 };
 
 const float texture_size_in_render_order[] = {
-	0.5f, 0.23f, 0.1f, 0.05f, 0.06f, 0.07f, 0.2f, 0.07f, 0.3f, 0.4f, 0.6f
+	1.0f, 0.46f, 0.2f, 0.1f, 0.12f, 0.14f, 0.4f, 0.14f, 0.6f, 0.8f, 1.2f
 };
 
 const float vertices[] = {
@@ -94,7 +94,7 @@ void flare_destroy(flare* sus)
 	glDeleteQueries(FLARE_QUERY_COUNT, &sus->queries);
 }
 
-void flare_render(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, float aspectXY)
+void flare_render(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, float aspectYX)
 {
 	//render flare
 	float brightness = 1;
@@ -129,7 +129,7 @@ void flare_render(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, fl
 		x += spacing.x;
 		y += spacing.y;
 		glUniform2f(pos, x, y);
-		glUniform2f(scale, texture_size_in_render_order[i], aspectXY*texture_size_in_render_order[i]);
+		glUniform2f(scale, aspectYX*texture_size_in_render_order[i], texture_size_in_render_order[i]);
 		glBindTexture(GL_TEXTURE_2D, sus->textures[texture_index_in_render_order[i]]);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 	}
@@ -158,14 +158,14 @@ void flare_queryQueryResult(flare* sus)
 	}
 }
 
-void flare_query(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, float aspectXY)
+void flare_query(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, float aspectYX)
 {
 	vec4 sunScreen = vec4_multiplyWithMatrix(*projectionView, vec4_create2(sunDir.x + cumPos.x, sunDir.y + cumPos.y, sunDir.z + cumPos.z, 1));
 	sunScreen = vec4_scale(sunScreen, 1 / sunScreen.w);//perspective division
 
 	glUseProgram(sus->shaderQuery.id);
 	glUniform2f(glGetUniformLocation(sus->shaderQuery.id, "pos"), sunScreen.x, sunScreen.y);
-	glUniform2f(glGetUniformLocation(sus->shaderQuery.id, "scale"), 0.1f, 0.1f*aspectXY);
+	glUniform2f(glGetUniformLocation(sus->shaderQuery.id, "scale"), aspectYX*0.15f, 0.15f);
 
 	glBeginQuery(GL_SAMPLES_PASSED, sus->queries[sus->nextQuery]);
 

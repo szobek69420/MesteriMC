@@ -6,6 +6,9 @@
 #include "../../glm2/vec3.h"
 #include "../../glm2/mat4.h"
 
+static blockModel model_oak_tree[67];
+
+
 void chunk_drawTerrain(chunk* chomk)
 {
 	if (chomk->isThereNormalMesh == 0)
@@ -52,8 +55,8 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 	{
 		for (int j = 0; j < CHUNK_WIDTH + 2; j++)
 		{
-			heightHelper = fnlGetNoise2D(&(cm->noise), basedX + i, basedZ + j);
-			heightHelper *= 100*heightHelper;
+			heightHelper = fnlGetNoise2D(&(cm->noise), basedX + i, basedZ + j)*fnlGetNoise2D(&(cm->noise2),basedX+i, basedZ+j);
+			heightHelper *= 200*heightHelper;
 			heightHelper += 20;
 			heightHelper -= basedY;
 			heightMap[i][j] = heightHelper;
@@ -81,6 +84,28 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 		}
 	}
 
+	//adding trees
+	srand(1000000 * chunkX + 1000 * chunkY + chunkZ);
+	for (int i = 2; i < CHUNK_WIDTH-2; i++)
+	{
+		for (int j = 2; j < CHUNK_WIDTH-2;j++)
+		{
+			int height = heightMap[i + 1][j + 1];
+			if (height >= 0 && height < CHUNK_HEIGHT-6)
+			{
+				float szam = (float)rand() / RAND_MAX;
+				if (chomk.blocks[height][i][j] == BLOCK_GRASS&&szam>0.995f)
+				{
+					for (int k = 0; k < sizeof(model_oak_tree) / sizeof(blockModel); k++)
+					{
+						blockModel bm = model_oak_tree[k];
+						chomk.blocks[height + bm.y][i + bm.x][j + bm.z] = bm.type;
+					}
+				}
+			}
+		}
+	}
+
 	//generating mesh
 	//egyelore csak chunkon belul keres megjelenitendo oldalakat
 	int sideCount = 0;
@@ -94,27 +119,27 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 					continue;
 
 				//pos z
-				if ((k == CHUNK_WIDTH - 1 && heightMap[j+1][CHUNK_WIDTH + 1]<i) || (k != CHUNK_WIDTH - 1 &&chomk.blocks[i][j][k + 1] == BLOCK_AIR))
+				if ((k == CHUNK_WIDTH - 1 && heightMap[j+1][CHUNK_WIDTH + 1]<i) || (k != CHUNK_WIDTH - 1 && chomk.blocks[i][j][k + 1] !=chomk.blocks[i][j][k]&&(chomk.blocks[i][j][k + 1] == BLOCK_AIR||  chomk.blocks[i][j][k + 1] >= BLOCK_TRANSPARENCY_START)))
 					sideCount++;
 
 				//pos x
-				if ((j == CHUNK_WIDTH - 1 && heightMap[CHUNK_WIDTH + 1][k+1]<i) || (j!=CHUNK_WIDTH-1 &&chomk.blocks[i][j+1][k] == BLOCK_AIR))
+				if ((j == CHUNK_WIDTH - 1 && heightMap[CHUNK_WIDTH + 1][k+1]<i) || (j!=CHUNK_WIDTH-1 && chomk.blocks[i][j + 1][k] != chomk.blocks[i][j][k] &&(chomk.blocks[i][j+1][k] == BLOCK_AIR||  chomk.blocks[i][j + 1][k] >= BLOCK_TRANSPARENCY_START)))
 					sideCount++;
 
 				//neg z
-				if ((k == 0 && heightMap[j+1][0]<i) || (k!=0&&chomk.blocks[i][j][k -1] == BLOCK_AIR))
+				if ((k == 0 && heightMap[j+1][0]<i) || (k!=0&& chomk.blocks[i][j][k - 1] != chomk.blocks[i][j][k] &&(chomk.blocks[i][j][k -1] == BLOCK_AIR|| chomk.blocks[i][j][k - 1] >= BLOCK_TRANSPARENCY_START)))
 					sideCount++;
 
 				//neg x
-				if ((j == 0 &&heightMap[0][k+1]<i) || (j!=0&&chomk.blocks[i][j - 1][k] == BLOCK_AIR))
+				if ((j == 0 &&heightMap[0][k+1]<i) || (j!=0&& chomk.blocks[i][j - 1][k] != chomk.blocks[i][j][k] &&(chomk.blocks[i][j - 1][k] == BLOCK_AIR|| chomk.blocks[i][j - 1][k] >= BLOCK_TRANSPARENCY_START)))
 					sideCount++;
 
 				//pos y
-				if ((i == CHUNK_HEIGHT - 1 && heightMap[j+1][k+1] ==CHUNK_HEIGHT-1) || (i!=CHUNK_HEIGHT-1&&chomk.blocks[i + 1][j][k] == BLOCK_AIR))
+				if ((i == CHUNK_HEIGHT - 1 && heightMap[j+1][k+1] ==CHUNK_HEIGHT-1) || (i!=CHUNK_HEIGHT-1&& chomk.blocks[i + 1][j][k] != chomk.blocks[i][j][k] &&(chomk.blocks[i + 1][j][k] == BLOCK_AIR ||  chomk.blocks[i + 1][j][k] >= BLOCK_TRANSPARENCY_START)))
 					sideCount++;
 
 				//neg y
-				if ((i == 0 &&basedY==0) || (i!=0&&chomk.blocks[i - 1][j][k] == BLOCK_AIR))
+				if ((i == 0 &&basedY==0) || (i!=0&& chomk.blocks[i - 1][j][k] != chomk.blocks[i][j][k] &&(chomk.blocks[i - 1][j][k] == BLOCK_AIR || i != 0 && chomk.blocks[i - 1][j][k] >= BLOCK_TRANSPARENCY_START)))
 					sideCount++;
 			}
 		}
@@ -143,7 +168,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 					continue;
 
 				//pos z
-				if ((k == CHUNK_WIDTH - 1 && heightMap[j + 1][CHUNK_WIDTH + 1] < i) || (k != CHUNK_WIDTH - 1 && chomk.blocks[i][j][k + 1] == BLOCK_AIR))
+				if ((k == CHUNK_WIDTH - 1 && heightMap[j + 1][CHUNK_WIDTH + 1] < i) || (k != CHUNK_WIDTH - 1 && chomk.blocks[i][j][k + 1] != chomk.blocks[i][j][k] && (chomk.blocks[i][j][k + 1] == BLOCK_AIR || chomk.blocks[i][j][k + 1] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -186,7 +211,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 				}
 
 				//pos x
-				if ((j == CHUNK_WIDTH - 1 && heightMap[CHUNK_WIDTH + 1][k + 1] < i) || (j != CHUNK_WIDTH - 1 && chomk.blocks[i][j + 1][k] == BLOCK_AIR))
+				if ((j == CHUNK_WIDTH - 1 && heightMap[CHUNK_WIDTH + 1][k + 1] < i) || (j != CHUNK_WIDTH - 1 && chomk.blocks[i][j + 1][k] != chomk.blocks[i][j][k] && (chomk.blocks[i][j + 1][k] == BLOCK_AIR || chomk.blocks[i][j + 1][k] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -228,7 +253,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 				}
 
 				//neg z
-				if ((k == 0 && heightMap[j + 1][0] < i) || (k != 0 && chomk.blocks[i][j][k - 1] == BLOCK_AIR))
+				if ((k == 0 && heightMap[j + 1][0] < i) || (k != 0 && chomk.blocks[i][j][k - 1] != chomk.blocks[i][j][k] && (chomk.blocks[i][j][k - 1] == BLOCK_AIR || chomk.blocks[i][j][k - 1] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -270,7 +295,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 				}
 
 				//neg x
-				if ((j == 0 && heightMap[0][k + 1] < i) || (j != 0 && chomk.blocks[i][j - 1][k] == BLOCK_AIR))
+				if ((j == 0 && heightMap[0][k + 1] < i) || (j != 0 && chomk.blocks[i][j - 1][k] != chomk.blocks[i][j][k] && (chomk.blocks[i][j - 1][k] == BLOCK_AIR || chomk.blocks[i][j - 1][k] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -312,7 +337,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 				}
 
 				//pos y
-				if ((i == CHUNK_HEIGHT - 1 && heightMap[j + 1][k + 1] == CHUNK_HEIGHT - 1) || (i != CHUNK_HEIGHT - 1 && chomk.blocks[i + 1][j][k] == BLOCK_AIR))
+				if ((i == CHUNK_HEIGHT - 1 && heightMap[j + 1][k + 1] == CHUNK_HEIGHT - 1) || (i != CHUNK_HEIGHT - 1 && chomk.blocks[i + 1][j][k] != chomk.blocks[i][j][k] && (chomk.blocks[i + 1][j][k] == BLOCK_AIR || chomk.blocks[i + 1][j][k] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -354,7 +379,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 				}
 
 				//neg y
-				if ((i == 0 && basedY == 0) || (i != 0 && chomk.blocks[i - 1][j][k] == BLOCK_AIR))
+				if ((i == 0 && basedY == 0) || (i != 0 && chomk.blocks[i - 1][j][k] != chomk.blocks[i][j][k] && (chomk.blocks[i - 1][j][k] == BLOCK_AIR || i != 0 && chomk.blocks[i - 1][j][k] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
 					normalVertexIndices[vertexIndexIndex++] = currentVertex;
@@ -484,3 +509,73 @@ void chunk_getChunkFromPos(vec3 pos, int* chunkX, int* chunkY, int* chunkZ)
 		*chunkZ = ((int)(pos.z)) / CHUNK_WIDTH;
 	}
 }
+
+static blockModel model_oak_tree[] = {
+	{0,0,0,BLOCK_DIRT},
+	{0,1,0,BLOCK_OAK_LOG},
+	{0,2,0,BLOCK_OAK_LOG},
+	{0,3,0,BLOCK_OAK_LOG},
+	{0,4,0,BLOCK_OAK_LOG},
+	{0,5,0,BLOCK_OAK_LOG},
+	{-2,3,-2, BLOCK_OAK_LEAVES},
+	{-2,3,-1, BLOCK_OAK_LEAVES},
+	{-2,3,0, BLOCK_OAK_LEAVES},
+	{-2,3,1, BLOCK_OAK_LEAVES},
+	{-2,3,2, BLOCK_OAK_LEAVES},
+	{-1,3,-2, BLOCK_OAK_LEAVES},
+	{-1,3,-1, BLOCK_OAK_LEAVES},
+	{-1,3,0, BLOCK_OAK_LEAVES},
+	{-1,3,1, BLOCK_OAK_LEAVES},
+	{-1,3,2, BLOCK_OAK_LEAVES},
+	{0,3,-2, BLOCK_OAK_LEAVES},
+	{0,3,-1, BLOCK_OAK_LEAVES},
+	{0,3,1, BLOCK_OAK_LEAVES},
+	{0,3,2, BLOCK_OAK_LEAVES},
+	{1,3,-2, BLOCK_OAK_LEAVES},
+	{1,3,-1, BLOCK_OAK_LEAVES},
+	{1,3,0, BLOCK_OAK_LEAVES},
+	{1,3,1, BLOCK_OAK_LEAVES},
+	{1,3,2, BLOCK_OAK_LEAVES},
+	{2,3,-2, BLOCK_OAK_LEAVES},
+	{2,3,-1, BLOCK_OAK_LEAVES},
+	{2,3,0, BLOCK_OAK_LEAVES},
+	{2,3,1, BLOCK_OAK_LEAVES},
+	{2,3,2, BLOCK_OAK_LEAVES},
+	{-2,4,-2, BLOCK_OAK_LEAVES},
+	{-2,4,-1, BLOCK_OAK_LEAVES},
+	{-2,4,0, BLOCK_OAK_LEAVES},
+	{-2,4,1, BLOCK_OAK_LEAVES},
+	{-2,4,2, BLOCK_OAK_LEAVES},
+	{-1,4,-2, BLOCK_OAK_LEAVES},
+	{-1,4,-1, BLOCK_OAK_LEAVES},
+	{-1,4,0, BLOCK_OAK_LEAVES},
+	{-1,4,1, BLOCK_OAK_LEAVES},
+	{-1,4,2, BLOCK_OAK_LEAVES},
+	{0,4,-2, BLOCK_OAK_LEAVES},
+	{0,4,-1, BLOCK_OAK_LEAVES},
+	{0,4,1, BLOCK_OAK_LEAVES},
+	{0,4,2, BLOCK_OAK_LEAVES},
+	{1,4,-2, BLOCK_OAK_LEAVES},
+	{1,4,-1, BLOCK_OAK_LEAVES},
+	{1,4,0, BLOCK_OAK_LEAVES},
+	{1,4,1, BLOCK_OAK_LEAVES},
+	{1,4,2, BLOCK_OAK_LEAVES},
+	{2,4,-2, BLOCK_OAK_LEAVES},
+	{2,4,-1, BLOCK_OAK_LEAVES},
+	{2,4,0, BLOCK_OAK_LEAVES},
+	{2,4,1, BLOCK_OAK_LEAVES},
+	{2,4,2, BLOCK_OAK_LEAVES},
+	{-1,5,-1, BLOCK_OAK_LEAVES},
+	{-1,5,-0, BLOCK_OAK_LEAVES},
+	{-1,5,1, BLOCK_OAK_LEAVES},
+	{0,5,-1, BLOCK_OAK_LEAVES},
+	{0,5,1, BLOCK_OAK_LEAVES},
+	{1,5,-1, BLOCK_OAK_LEAVES},
+	{1,5,0, BLOCK_OAK_LEAVES},
+	{1,5,1, BLOCK_OAK_LEAVES},
+	{0,6,-1, BLOCK_OAK_LEAVES},
+	{0,6,1, BLOCK_OAK_LEAVES},
+	{-1,6,0, BLOCK_OAK_LEAVES},
+	{1,6,0, BLOCK_OAK_LEAVES},
+	{0,6,0, BLOCK_OAK_LEAVES}
+};
