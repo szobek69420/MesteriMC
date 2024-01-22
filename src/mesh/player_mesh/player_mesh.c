@@ -8,6 +8,9 @@
 
 #include <glad/glad.h>
 #include <stdlib.h>
+#include <math.h>
+
+#define lerp(X,Y,I) ((X)+(I)*((Y)-(X)))
 
 static float vertices_torso[264];
 static float vertices_head[264];
@@ -43,7 +46,9 @@ playerMesh playerMesh_create()
 	pm.rotLegLeftX = 0; pm.rotLegLeftY = 0;
 	pm.rotLegRightX = 0; pm.rotLegRightX = 0;
 
-	playerMesh_calculateInnerModelMatrices(&pm);
+	pm.animationTime = 0;
+
+	playerMesh_calculateOuterModelMatrix(&pm);
 	playerMesh_calculateInnerModelMatrices(&pm);
 
 	return pm;
@@ -65,13 +70,73 @@ void playerMesh_calculateOuterModelMatrix(playerMesh* pm)
 
 void playerMesh_calculateInnerModelMatrices(playerMesh* pm)
 {
-	//egyelore csak az offsetek vannak benne
-	pm->modelTorso= mat4_translate(mat4_create(1), position_torso);
+	pm->modelTorso = mat4_translate(mat4_create(1), position_torso);
+	pm->modelTorso= mat4_rotate(pm->modelTorso, (vec3) { 0, 1, 0 }, pm->rotTorsoY);
+	pm->modelTorso = mat4_rotate(pm->modelTorso, (vec3) { 1, 0, 0 }, pm->rotTorsoX);
+
 	pm->modelHead = mat4_translate(mat4_create(1), position_head);
+	pm->modelHead = mat4_rotate(pm->modelHead, (vec3) { 0, 1, 0 }, pm->rotHeadY);
+	pm->modelHead = mat4_rotate(pm->modelHead, (vec3) { 1, 0, 0 }, pm->rotHeadX);
+
 	pm->modelArmLeft = mat4_translate(mat4_create(1), position_arm_left);
+	pm->modelArmLeft = mat4_rotate(pm->modelArmLeft, (vec3) { 0, 1, 0 }, pm->rotArmLeftY);
+	pm->modelArmLeft = mat4_rotate(pm->modelArmLeft, (vec3) { 1, 0, 0 }, pm->rotArmLeftX);
+
 	pm->modelArmRight = mat4_translate(mat4_create(1), position_arm_right);
+	pm->modelArmRight = mat4_rotate(pm->modelArmRight, (vec3) { 0, 1, 0 }, pm->rotArmRightY);
+	pm->modelArmRight = mat4_rotate(pm->modelArmRight, (vec3) { 1, 0, 0 }, pm->rotArmRightX);
+
 	pm->modelLegLeft = mat4_translate(mat4_create(1), position_leg_left);
+	pm->modelLegLeft = mat4_rotate(pm->modelLegLeft, (vec3) { 0, 1, 0 }, pm->rotLegLeftY);
+	pm->modelLegLeft = mat4_rotate(pm->modelLegLeft, (vec3) { 1, 0, 0 }, pm->rotLegLeftX);
+
 	pm->modelLegRight = mat4_translate(mat4_create(1), position_leg_right);
+	pm->modelLegRight = mat4_rotate(pm->modelLegRight, (vec3) { 0, 1, 0 }, pm->rotLegRightY);
+	pm->modelLegRight = mat4_rotate(pm->modelLegRight, (vec3) { 1, 0, 0 }, pm->rotLegRightX);
+}
+
+void playerMesh_animate(playerMesh* pm, unsigned int animation, float deltaTime)
+{
+	switch (animation)
+	{
+	case PLAYER_MESH_ANIMATION_WALK:
+		pm->animationTime += deltaTime;
+		
+		pm->rotTorsoX = lerp(pm->rotTorsoX, 0, 0.2f);
+		pm->rotTorsoY = lerp(pm->rotTorsoY, 0, 0.2f);
+
+		//a fejet nem allitja be, mert arra nem hat az animacio
+
+		pm->rotArmLeftX = lerp(pm->rotArmLeftX, 45 * sinf(PLAYER_MESH_ANIMATION_SPEED*pm->animationTime), 0.2f);
+		pm->rotArmLeftY = lerp(pm->rotArmLeftY, 0, 0.2f);
+		pm->rotArmRightX = lerp(pm->rotArmRightX, 45 * sinf(-PLAYER_MESH_ANIMATION_SPEED * pm->animationTime), 0.2f);
+		pm->rotArmRightY = lerp(pm->rotArmRightY, 0, 0.2f);
+
+		pm->rotLegLeftX = lerp(pm->rotLegLeftX, 45 * sinf(-PLAYER_MESH_ANIMATION_SPEED * pm->animationTime), 0.2f);
+		pm->rotLegLeftY = lerp(pm->rotLegLeftY, 0, 0.2f);
+		pm->rotLegRightX = lerp(pm->rotLegRightX, 45 * sinf(PLAYER_MESH_ANIMATION_SPEED * pm->animationTime), 0.2f);
+		pm->rotLegRightY = lerp(pm->rotLegRightY, 0, 0.2f);
+		break;
+
+	default://idle
+		pm->animationTime =0;
+
+		pm->rotTorsoX = lerp(pm->rotTorsoX, 0, 0.2f);
+		pm->rotTorsoY = lerp(pm->rotTorsoY, 0, 0.2f);
+
+		//a fejet nem allitja be, mert arra nem hat az animacio
+
+		pm->rotArmLeftX = lerp(pm->rotArmLeftX, 0, 0.2f);
+		pm->rotArmLeftY = lerp(pm->rotArmLeftY, 0, 0.2f);
+		pm->rotArmRightX = lerp(pm->rotArmRightX, 0, 0.2f);
+		pm->rotArmRightY = lerp(pm->rotArmRightY, 0, 0.2f);
+
+		pm->rotLegLeftX = lerp(pm->rotLegLeftX, 0, 0.2f);
+		pm->rotLegLeftY = lerp(pm->rotLegLeftY, 0, 0.2f);
+		pm->rotLegRightX = lerp(pm->rotLegRightX, 0, 0.2f);
+		pm->rotLegRightY = lerp(pm->rotLegRightY, 0, 0.2f);
+		break;
+	}
 }
 
 void playerMesh_render(playerMesh* pm, shader* shit)

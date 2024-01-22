@@ -24,7 +24,7 @@ typedef struct {
 	list loadedChunks;//list of chunks
 	list pendingUpdates;//list of chunk updates
 
-	fnl_state noise;//terrain generation
+	fnl_state noise, noise2;//terrain generation
 } chunkManager;
 
 

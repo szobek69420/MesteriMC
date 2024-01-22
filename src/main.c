@@ -110,7 +110,8 @@ int main()
     input_init();
     fontHandler_init();
 
-    camera cum = camera_create(vec3_create2(0, 200, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
+    vec3 previousCumPosition = vec3_create2(0, 200, 0);
+    camera cum = camera_create(previousCumPosition, vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
     init_kuba();
     init_renderer();
@@ -142,11 +143,17 @@ int main()
         while ((e = event_queue_poll()).type != NONE)
             handle_event(e);
 
+        previousCumPosition = cum.position;
         camera_update(&cum, deltaTime);
+
+        //player animation
         pm.position = (vec3){ cum.position.x, cum.position.y - 1.6f, cum.position.z };
         pm.rotX = cum.pitch;
         pm.rotY = cum.yaw;
+        pm.rotHeadX = cum.pitch;
+        playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) {previousCumPosition.x-cum.position.x,0, previousCumPosition.z-cum.position.z})>deltaTime)?PLAYER_MESH_ANIMATION_WALK:PLAYER_MESH_ANIMATION_IDLE, deltaTime);
         playerMesh_calculateOuterModelMatrix(&pm);
+        playerMesh_calculateInnerModelMatrices(&pm);
 
         update_kuba(&cum);
 
@@ -492,7 +499,7 @@ void render(camera* cum, font* f)
     mat3 viewNormal = mat3_createFromMat(view);
 
     mat4 shadowViewProjection = mat4_multiply(
-        mat4_ortho(-100,100,-100,100,1,200),
+        mat4_ortho(-80,80,-80,80,1,200),
         mat4_lookAt(
             vec3_sum(cum->position, vec3_create2(szunce.direction.x*100, szunce.direction.y * 100, szunce.direction.z * 100)),
             vec3_create2(-1* szunce.direction.x, -1* szunce.direction.y, -1* szunce.direction.z),
@@ -671,8 +678,7 @@ void render(camera* cum, font* f)
 
     //get lens flare data
     flare_queryQueryResult(&lensFlare);
-    flare_query(&lensFlare, &pv, cum->position, sunTzu.position, window_getAspect());
-
+    flare_query(&lensFlare, &pv, cum->position, sunTzu.position, 1.0f/window_getAspect());
     //switch to screen fbo ------------------------------------------------------------------------
     glBindFramebuffer(GL_FRAMEBUFFER, rendor.screenBuffer.id);
 
@@ -707,7 +713,7 @@ void render(camera* cum, font* f)
     glDisable(GL_BLEND);
 
     //lens flare
-    flare_render(&lensFlare, &pv, cum->position, sunTzu.position, window_getAspect());
+    flare_render(&lensFlare, &pv, cum->position, sunTzu.position, 1.0f / window_getAspect());
 
     //switch to default fbo ------------------------------------------------------------------------
     glViewport(0, 0, window_getWidth(), window_getHeight());

@@ -16,15 +16,26 @@ uniform int shadowOn;
 uniform mat4 shadow_lightMatrix; //from the camera's view space to the light's projection space
 const float shadowBias=0.003;
 const vec2 shadowSampleOffsets[9]=vec2[9](
-	vec2(-0.0001, -0.0001),
-	vec2(-0.0001, 0),
-	vec2(-0.0001, 0.0001),
-	vec2(0, -0.0001),
+	vec2(-0.00005, -0.00005),
+	vec2(-0.00005, 0),
+	vec2(-0.00005, 0.00005),
+	vec2(0, -0.00005),
 	vec2(0, 0),
-	vec2(0, 0.0001),
-	vec2(0.0001, -0.0001),
-	vec2(0.0001, 0),
-	vec2(0.0001, 0.0001)
+	vec2(0, 0.00005),
+	vec2(0.00005, -0.00005),
+	vec2(0.00005, 0),
+	vec2(0.00005, 0.00005)
+);
+const float shadowSampleStrength[9]=float[9](
+	0.05,
+	0.12,
+	0.05,
+	0.12,
+	0.32,
+	0.12,
+	0.05,
+	0.12,
+	0.05
 );
 
 uniform mat4 projection_inverse;
@@ -92,12 +103,8 @@ void main()
 		if(shadowPos.x<=1&&shadowPos.x>=0&&shadowPos.y<=1&&shadowPos.y>=0&&shadowDepth<0.9999)
 		{
 			oneMinusShadowStrength=0;
-			for(int i=0;i<9;i++)
-			{
-				if(texture(texture_shadow, shadowPos.xy+shadowSampleOffsets[i]).r>shadowPos.z-shadowBias)
-					oneMinusShadowStrength++;
-			}
-			oneMinusShadowStrength*=0.111111;
+			if(texture(texture_shadow, shadowPos.xy).r>shadowPos.z-shadowBias)
+					oneMinusShadowStrength=1;
 		}
 	}
 	
