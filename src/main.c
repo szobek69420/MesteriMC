@@ -22,6 +22,7 @@
 #include "renderer/light/light.h"
 #include "mesh/sphere/sphere.h"
 #include "mesh/kuba/kuba.h"
+#include "mesh/player_mesh/player_mesh.h"
 
 #include "font_handler/font_handler.h"
 
@@ -33,10 +34,47 @@
 
 #include "utils/list.h"
 #include "utils/vector.h"
+#include "utils/lista.h"
 
 #define CLIP_NEAR 0.1f
 #define CLIP_FAR 200.0f
 
+//global variable
+chunkManager cm;
+
+renderer rendor;
+shader shadowShader;
+shader geometryPassShader;
+shader ssaoShader;
+shader ssaoBlurShader;
+shader lightingPassShader;
+shader forwardPassShader;
+shader finalPassShader;
+shader fxaaShader;
+shader textShader;
+shader skyboxShader; mesh skyboxMesh;
+
+unsigned int rectangleVAO;
+unsigned int rectangleVBO;
+
+unsigned int textVAO;
+unsigned int textVBO;
+
+vec3 ssaoKernel[64];
+unsigned int noiseTexture;
+
+vector* lights;
+light sunTzu;
+
+light_renderer lightRenderer;
+
+sun szunce;
+
+flare lensFlare;
+
+playerMesh pm;
+
+//function prototypes
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
 
@@ -105,6 +143,10 @@ int main()
             handle_event(e);
 
         camera_update(&cum, deltaTime);
+        pm.position = (vec3){ cum.position.x, cum.position.y - 1.6f, cum.position.z };
+        pm.rotX = cum.pitch;
+        pm.rotY = cum.yaw;
+        playerMesh_calculateOuterModelMatrix(&pm);
 
         update_kuba(&cum);
 
@@ -184,37 +226,6 @@ void handle_event(event e)
     }
 }
 
-chunkManager cm;
-
-renderer rendor;
-shader shadowShader;
-shader geometryPassShader;
-shader ssaoShader;
-shader ssaoBlurShader;
-shader lightingPassShader;
-shader forwardPassShader;
-shader finalPassShader;
-shader fxaaShader;
-shader textShader;
-shader skyboxShader; mesh skyboxMesh;
-
-unsigned int rectangleVAO;
-unsigned int rectangleVBO;
-
-unsigned int textVAO;
-unsigned int textVBO;
-
-vec3 ssaoKernel[64];
-unsigned int noiseTexture;
-
-vector* lights;
-light sunTzu;
-
-light_renderer lightRenderer;
-
-sun szunce;
-
-flare lensFlare;
 
 void init_renderer()
 {
@@ -434,6 +445,9 @@ void init_renderer()
 
     //lens flare
     lensFlare = flare_create(0.4f);
+
+    //player mesh
+    pm=playerMesh_create();
 }
 
 void end_renderer()
@@ -463,6 +477,9 @@ void end_renderer()
 
     //lens flare
     flare_destroy(&lensFlare);
+
+    //player mesh
+    playerMesh_destroy(&pm);
 }
 
 void render(camera* cum, font* f)
@@ -499,6 +516,7 @@ void render(camera* cum, font* f)
     glUseProgram(shadowShader.id);
 
     chunkManager_drawShadow(&cm, &shadowShader, &shadowViewProjection);
+    playerMesh_render(&pm, &shadowShader);
 
     glEnable(GL_CULL_FACE);
     glFrontFace(GL_CCW);
