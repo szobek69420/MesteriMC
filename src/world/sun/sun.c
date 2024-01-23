@@ -22,6 +22,7 @@ sun sun_create()
 {
 	sun sunTzu;
 
+
 	glGenVertexArrays(1, &sunTzu.meh.vao);
 	glBindVertexArray(sunTzu.meh.vao);
 
