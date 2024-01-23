@@ -42,7 +42,21 @@
 #define CLIP_FAR 200.0f
 
 //global variable
+GLFWwindow* window;
+int windowShouldClose = 0;
+
+pthread_t thread_render;
+pthread_t thread_generation;
+pthread_t thread_physics;
+
+pthread_t mutex_input;//mutex for glfwPollEvents
+pthread_t mutex_swap;//mutex for glfwSwapBuffers
+int shouldPoll, shouldSwap;
+
 chunkManager cm;
+pthread_mutex_t cm_mutex;
+
+camera cum;
 
 renderer rendor;
 shader shadowShader;
@@ -55,6 +69,8 @@ shader finalPassShader;
 shader fxaaShader;
 shader textShader;
 shader skyboxShader; mesh skyboxMesh;
+
+font f;
 
 unsigned int rectangleVAO;
 unsigned int rectangleVBO;
@@ -79,6 +95,10 @@ playerMesh pm;
 //function prototypes
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
+
+void* loop_render(void* arg);
+void* loop_generation(void* arg);
+void* loop_physics(void* arg);
 
 void init_renderer();
 void end_renderer();
@@ -116,25 +136,111 @@ int main()
 
     window_setWidth(1300);
     window_setHeight(800);
-    GLFWwindow* window = init_window("amogus", window_getWidth(), window_getHeight());
+    window = init_window("amogus", window_getWidth(), window_getHeight());
 
     event_queue_init();
     input_init();
     fontHandler_init();
 
-    vec3 previousCumPosition = vec3_create2(0, 200, 0);
-    camera cum = camera_create(previousCumPosition, vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
+    cum = camera_create(vec3_create2(0, 200, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
     init_kuba();
     init_renderer();
 
     textureHandler_importTextures();
-    font f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
+    f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
 
+    //threading
+    shouldPoll = 0;
+    shouldSwap = 0;
+
+    pthread_mutex_init(&cm_mutex, NULL);
+    pthread_mutex_init(&mutex_input, NULL);
+    pthread_mutex_init(&mutex_swap, NULL);
+
+    pthread_create(&thread_generation, NULL, loop_generation, NULL);
+    pthread_create(&thread_render, NULL, loop_render, NULL);
+
+    while (!glfwWindowShouldClose(window))
+    {
+        //check if should poll
+        pthread_mutex_lock(&mutex_input);
+        if (shouldPoll)
+        {
+            glfwPollEvents();
+            shouldPoll = 0;
+        }
+        pthread_mutex_unlock(&mutex_input);
+
+        //check if should swap buffers
+        pthread_mutex_lock(&mutex_swap);
+        if (shouldSwap)
+        {
+            glfwSwapBuffers(window);
+            shouldSwap = 0;
+        }
+        pthread_mutex_unlock(&mutex_swap);
+    }
+
+    pthread_join(thread_generation, NULL);
+    pthread_join(thread_render, NULL);
+
+    pthread_mutex_destroy(&cm_mutex);
+    pthread_mutex_destroy(&mutex_input, NULL);
+    pthread_mutex_destroy(&mutex_swap, NULL);
+
+    end_kuba();
+    textureHandler_destroyTextures();
+    fontHandler_close();
+    end_renderer();
+
+    glfwTerminate();
+    return 69;
+}
+
+void* loop_render(void* arg)
+{
     float deltaTime;
-    float lastFrame=glfwGetTime();
+    float lastFrame = glfwGetTime();
     float lastSecond = 0;//az fps szamolashoz
     int framesInLastSecond = 0;
+    while (!glfwWindowShouldClose(window))
+    {
+        deltaTime = glfwGetTime() - lastFrame;
+        lastFrame = glfwGetTime();
+        lastSecond += deltaTime;
+        framesInLastSecond++;
+        if (lastSecond > 1)
+        {
+            //printf("FPS: %d\n", framesInLastSecond);
+            //printf("Pos: %d %d %d\n\n", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
+            lastSecond = 0;
+            framesInLastSecond = 0;
+        }
+        //render
+        render(&cum, &f);
+        static char buffer[50];
+        sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
+        render_text(&f, buffer, 15, window_getHeight() - 34, 0.5);
+        sprintf(buffer, "Pos: %d %d %d", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
+        render_text(&f, buffer, 15, window_getHeight() - 69, 0.5);
+
+        pthread_mutex_lock(&mutex_swap);
+        shouldSwap = 69;
+        pthread_mutex_unlock(&mutex_swap);
+        while (shouldSwap);
+    }
+
+    return NULL;
+}
+
+void* loop_generation(void* arg)
+{
+    float deltaTime;
+    float lastFrame = glfwGetTime();
+    float lastSecond = 0;//az fps szamolashoz
+    int framesInLastSecond = 0;
+    vec3 previousCumPosition = vec3_create2(0, 200, 0);;
     while (!glfwWindowShouldClose(window))
     {
         deltaTime = glfwGetTime() - lastFrame;
@@ -163,31 +269,26 @@ int main()
         pm.rotX = cum.pitch;
         pm.rotY = cum.yaw;
         pm.rotHeadX = cum.pitch;
-        playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) {previousCumPosition.x-cum.position.x,0, previousCumPosition.z-cum.position.z})>deltaTime)?PLAYER_MESH_ANIMATION_WALK:PLAYER_MESH_ANIMATION_IDLE, deltaTime);
+        playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) { previousCumPosition.x - cum.position.x, 0, previousCumPosition.z - cum.position.z }) > deltaTime) ? PLAYER_MESH_ANIMATION_WALK : PLAYER_MESH_ANIMATION_IDLE, deltaTime);
         playerMesh_calculateOuterModelMatrix(&pm);
         playerMesh_calculateInnerModelMatrices(&pm);
 
+        pthread_mutex_lock(&cm_mutex);
         update_kuba(&cum);
+        pthread_mutex_unlock(&cm_mutex);
 
-        //render
-        render(&cum, &f);
-        static char buffer[50];
-        sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
-        render_text(&f, buffer, 15, window_getHeight() - 34, 0.5);
-        sprintf(buffer, "Pos: %d %d %d", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
-        render_text(&f, buffer, 15, window_getHeight() - 69, 0.5);
-
-        glfwPollEvents();
-        glfwSwapBuffers(window);
+        pthread_mutex_lock(&mutex_input);
+        shouldPoll = 69;
+        pthread_mutex_unlock(&mutex_input);
+        while (shouldPoll);
     }
 
-    end_kuba();
-    textureHandler_destroyTextures();
-    fontHandler_close();
-    end_renderer();
+    return NULL;
+}
 
-    glfwTerminate();
-    return 69;
+void* loop_physics(void* arg)
+{
+    return NULL;
 }
 
 GLFWwindow* init_window(const char* name, int width, int height)
@@ -240,7 +341,7 @@ void handle_event(event e)
     default:
         input_handle_event(e);
         if (e.type == KEY_PRESSED && e.data.key_pressed.key_code == GLFW_KEY_ESCAPE)
-            glfwSetWindowShouldClose(glfwGetCurrentContext(), GLFW_TRUE);
+            glfwSetWindowShouldClose(window, 69);
         break;
     }
 }
@@ -534,8 +635,11 @@ void render(camera* cum, font* f)
 
     glUseProgram(shadowShader.id);
 
+    pthread_mutex_lock(&cm_mutex);
     chunkManager_drawShadow(&cm, &shadowShader, &shadowViewProjection);
-    playerMesh_render(&pm, &shadowShader);
+    pthread_mutex_unlock(&cm_mutex);
+
+    //playerMesh_render(&pm, &shadowShader);
 
     glEnable(GL_CULL_FACE);
     glFrontFace(GL_CCW);
@@ -563,7 +667,9 @@ void render(camera* cum, font* f)
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_SPECULAR));
 
+    pthread_mutex_lock(&cm_mutex);
     draw_kuba(cum, &projection);
+    pthread_mutex_unlock(&cm_mutex);
 
     //copy depth buffer
     glEnable(GL_DEPTH_TEST);
