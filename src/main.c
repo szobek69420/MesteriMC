@@ -6,7 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <omp.h>
+
+#include <pthread.h>
 
 #include "window/window.h"
 #include "camera/camera.h"
@@ -100,10 +101,18 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
+void* pthread_test(int* param)
+{
+    printf("amogus %d\n", *param);
+}
+
 int main()
 {
-    //openMP test
-    printf("Hello from thread nummero %d\n", omp_get_thread_num());
+    //pthread.h
+    pthread_t thread;
+    int nyehehe = 69;
+    pthread_create(&thread, NULL, pthread_test, &nyehehe);
+    pthread_join(thread, NULL);
 
     window_setWidth(1300);
     window_setHeight(800);
