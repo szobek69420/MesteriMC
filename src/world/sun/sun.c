@@ -105,9 +105,6 @@ void sun_setDirection(sun* sunTzu, vec3 direction)
 		pitch = RAD2DEG * asinf(temp.y);
 	}
 
-	vec3_print(&temp);
-	printf("yaw: %.2f\n", yaw);
-	printf("pitch: %.2f\n", pitch);
 	sunTzu->model = mat4_rotate(mat4_create(1), vec3_create2(0, 1, 0),yaw);
 	sunTzu->model = mat4_rotate(sunTzu->model, vec3_create2(1, 0, 0), pitch);
 }
