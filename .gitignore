@@ -2,6 +2,8 @@
 /MesteriMC.vcxproj.filters
 /MesteriMC.vcxproj.user
 /x64
+/src/pthreadGC2.dll
+/src/pthreadVC2.dll
 
 .vscode
 build
