@@ -42,7 +42,23 @@
 #define CLIP_FAR 200.0f
 
 //global variable
+GLFWwindow* window;
+int windowShouldClose = 0;
+
+pthread_t thread_render;
+pthread_t thread_generation;
+pthread_t thread_physics;
+
+pthread_t mutex_input;//mutex for glfwPollEvents
+pthread_t mutex_swap;//mutex for glfwSwapBuffers
+pthread_t mutex_exit;//mutex for glfwWindowShouldClose check
+int shouldPoll, shouldSwap, shouldExit;
+
 chunkManager cm;
+pthread_mutex_t cm_mutex;
+
+camera cum;
+pthread_mutex_t mutex_cum;
 
 renderer rendor;
 shader shadowShader;
@@ -55,6 +71,8 @@ shader finalPassShader;
 shader fxaaShader;
 shader textShader;
 shader skyboxShader; mesh skyboxMesh;
+
+font f;
 
 unsigned int rectangleVAO;
 unsigned int rectangleVBO;
@@ -80,13 +98,14 @@ playerMesh pm;
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
 
+void* loop_render(void* arg);
+void* loop_generation(void* arg);
+void* loop_physics(void* arg);
+
 void init_renderer();
 void end_renderer();
 void render(camera* cum, font* f);
 
-void init_kuba();
-void end_kuba();
-void draw_kuba(camera* cum, mat4* projection);
 void update_kuba(camera* cum);
 
 void render_text(font* f, const char* text, float x, float y, float scale);
@@ -101,41 +120,149 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
-void* pthread_test(int* param)
-{
-    printf("amogus %d\n", *param);
-}
-
 int main()
 {
-    //pthread.h
-    pthread_t thread;
-    int nyehehe = 69;
-    pthread_create(&thread, NULL, pthread_test, &nyehehe);
-    pthread_join(thread, NULL);
-
     window_setWidth(1300);
     window_setHeight(800);
-    GLFWwindow* window = init_window("amogus", window_getWidth(), window_getHeight());
+    window = init_window("amogus", window_getWidth(), window_getHeight());
 
     event_queue_init();
     input_init();
     fontHandler_init();
 
-    vec3 previousCumPosition = vec3_create2(0, 200, 0);
-    camera cum = camera_create(previousCumPosition, vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
+    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
-    init_kuba();
+    cm = chunkManager_create(69, 4);
     init_renderer();
 
     textureHandler_importTextures();
-    font f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
+    f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
+
+    glfwMakeContextCurrent(NULL);
+
+    //threading
+    shouldPoll = 0;
+    shouldSwap = 0;
+    shouldExit = 0;
+
+    pthread_mutex_init(&cm_mutex, NULL);
+    pthread_mutex_init(&mutex_cum, NULL);
+    pthread_mutex_init(&mutex_input, NULL);
+    pthread_mutex_init(&mutex_swap, NULL);
+    pthread_mutex_init(&mutex_exit, NULL);
+
+    pthread_create(&thread_generation, NULL, loop_generation, NULL);
+    pthread_create(&thread_render, NULL, loop_render, NULL);
+
+    while (69)
+    {
+        //check if should poll
+        pthread_mutex_lock(&mutex_input);
+        if (shouldPoll)
+        {
+            glfwPollEvents();
+            shouldPoll = 0;
+        }
+        pthread_mutex_unlock(&mutex_input);
+
+        //check if it should quit
+        int shouldExit2 = 0;
+        pthread_mutex_lock(&mutex_exit);
+        shouldExit2 = shouldExit;
+        pthread_mutex_unlock(&mutex_exit);
+        if (shouldExit2)
+            break;
+    }
+
+    pthread_join(thread_generation, NULL);
+    pthread_join(thread_render, NULL);
+
+    pthread_mutex_destroy(&cm_mutex);
+    pthread_mutex_destroy(&mutex_cum);
+    pthread_mutex_destroy(&mutex_input);
+    pthread_mutex_destroy(&mutex_swap);
+    pthread_mutex_destroy(&mutex_exit);
+
+    chunkManager_destroy(&cm);
+    textureHandler_destroyTextures();
+    fontHandler_close();
+    end_renderer();
+
+    glfwTerminate();
+    return 69;
+}
+
+void* loop_render(void* arg)
+{
+    glfwMakeContextCurrent(window);
 
     float deltaTime;
-    float lastFrame=glfwGetTime();
+    float lastFrame = glfwGetTime();
     float lastSecond = 0;//az fps szamolashoz
     int framesInLastSecond = 0;
-    while (!glfwWindowShouldClose(window))
+
+    camera cum_render;
+    while (69)
+    {
+        deltaTime = glfwGetTime() - lastFrame;
+        lastFrame = glfwGetTime();
+        lastSecond += deltaTime;
+        framesInLastSecond++;
+        if (lastSecond > 1)
+        {
+            //printf("FPS: %d\n", framesInLastSecond);
+            //printf("Pos: %d %d %d\n\n", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
+            lastSecond = 0;
+            framesInLastSecond = 0;
+        }
+
+        //get cum info
+        pthread_mutex_lock(&mutex_cum);
+        cum_render = cum;
+        pthread_mutex_unlock(&mutex_cum);
+
+        //update chunk mesh data in gpu
+        pthread_mutex_lock(&cm_mutex);
+        chunkManager_updateMesh(&cm);
+        chunkManager_updateMesh(&cm);
+        chunkManager_updateMesh(&cm);
+        chunkManager_updateMesh(&cm);
+        chunkManager_updateMesh(&cm);
+        pthread_mutex_unlock(&cm_mutex);
+
+        //render
+        render(&cum_render, &f);
+        static char buffer[50];
+        sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
+        render_text(&f, buffer, 15, window_getHeight() - 34, 0.5);
+        sprintf(buffer, "Pos: %d %d %d", (int)cum_render.position.x, (int)cum_render.position.y, (int)cum_render.position.z);
+        render_text(&f, buffer, 15, window_getHeight() - 69, 0.5);
+
+
+        glfwSwapBuffers(window);
+
+        
+        //query shouldExit
+        int shouldExit2 = 0;
+        pthread_mutex_lock(&mutex_exit);
+        shouldExit2 = shouldExit;
+        pthread_mutex_unlock(&mutex_exit);
+        if (shouldExit2)
+            break;
+    }
+
+    return NULL;
+}
+
+void* loop_generation(void* arg)
+{
+    float deltaTime;
+    float lastFrame = glfwGetTime();
+    float lastSecond = 0;//az fps szamolashoz
+    int framesInLastSecond = 0;
+    vec3 previousCumPosition =cum.position;
+
+    while (69)
     {
         deltaTime = glfwGetTime() - lastFrame;
         lastFrame = glfwGetTime();
@@ -155,39 +282,55 @@ int main()
         while ((e = event_queue_poll()).type != NONE)
             handle_event(e);
 
+        pthread_mutex_lock(&mutex_cum);
         previousCumPosition = cum.position;
         camera_update(&cum, deltaTime);
+        pthread_mutex_unlock(&mutex_cum);
 
         //player animation
         pm.position = (vec3){ cum.position.x, cum.position.y - 1.6f, cum.position.z };
         pm.rotX = cum.pitch;
         pm.rotY = cum.yaw;
         pm.rotHeadX = cum.pitch;
-        playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) {previousCumPosition.x-cum.position.x,0, previousCumPosition.z-cum.position.z})>deltaTime)?PLAYER_MESH_ANIMATION_WALK:PLAYER_MESH_ANIMATION_IDLE, deltaTime);
+        playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) { previousCumPosition.x - cum.position.x, 0, previousCumPosition.z - cum.position.z }) > deltaTime) ? PLAYER_MESH_ANIMATION_WALK : PLAYER_MESH_ANIMATION_IDLE, deltaTime);
         playerMesh_calculateOuterModelMatrix(&pm);
         playerMesh_calculateInnerModelMatrices(&pm);
 
+        pthread_mutex_lock(&cm_mutex);
         update_kuba(&cum);
+        pthread_mutex_unlock(&cm_mutex);
 
-        //render
-        render(&cum, &f);
-        static char buffer[50];
-        sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
-        render_text(&f, buffer, 15, window_getHeight() - 34, 0.5);
-        sprintf(buffer, "Pos: %d %d %d", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
-        render_text(&f, buffer, 15, window_getHeight() - 69, 0.5);
+        pthread_mutex_lock(&mutex_input);
+        shouldPoll = 69;
+        pthread_mutex_unlock(&mutex_input);
+        
 
-        glfwPollEvents();
-        glfwSwapBuffers(window);
+        int shouldExit2 = 0;
+        int shouldPoll2 = 0;
+        while (69)
+        {
+            //query shouldExit
+            pthread_mutex_lock(&mutex_exit);
+            shouldExit2 = shouldExit;
+            pthread_mutex_unlock(&mutex_exit);
+
+            //query shouldPoll
+            pthread_mutex_lock(&mutex_input);
+            shouldPoll2 = shouldPoll;
+            pthread_mutex_unlock(&mutex_input);
+
+            if (shouldExit2 || !shouldPoll2)
+                break;
+        }
+        if (shouldExit2)
+            break;
     }
+    return NULL;
+}
 
-    end_kuba();
-    textureHandler_destroyTextures();
-    fontHandler_close();
-    end_renderer();
-
-    glfwTerminate();
-    return 69;
+void* loop_physics(void* arg)
+{
+    return NULL;
 }
 
 GLFWwindow* init_window(const char* name, int width, int height)
@@ -240,7 +383,11 @@ void handle_event(event e)
     default:
         input_handle_event(e);
         if (e.type == KEY_PRESSED && e.data.key_pressed.key_code == GLFW_KEY_ESCAPE)
-            glfwSetWindowShouldClose(glfwGetCurrentContext(), GLFW_TRUE);
+        {
+            pthread_mutex_lock(&mutex_exit);
+            shouldExit = 69;
+            pthread_mutex_unlock(&mutex_exit);
+        }
         break;
     }
 }
@@ -534,8 +681,11 @@ void render(camera* cum, font* f)
 
     glUseProgram(shadowShader.id);
 
+    pthread_mutex_lock(&cm_mutex);
     chunkManager_drawShadow(&cm, &shadowShader, &shadowViewProjection);
-    playerMesh_render(&pm, &shadowShader);
+    pthread_mutex_unlock(&cm_mutex);
+
+    //playerMesh_render(&pm, &shadowShader);
 
     glEnable(GL_CULL_FACE);
     glFrontFace(GL_CCW);
@@ -563,14 +713,16 @@ void render(camera* cum, font* f)
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_SPECULAR));
 
-    draw_kuba(cum, &projection);
+    pthread_mutex_lock(&cm_mutex);
+    chunkManager_drawTerrain(&cm, &geometryPassShader, &cum, &projection);
+    pthread_mutex_unlock(&cm_mutex);
 
     //copy depth buffer
     glEnable(GL_DEPTH_TEST);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rendor.endBuffer.id);
     glBlitFramebuffer(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, 0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-
+    
     //ssao pass ------------------------------------------------------------------------------------------
     // generate SSAO texture
     /*glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
@@ -687,7 +839,7 @@ void render(camera* cum, font* f)
         glUniform3fv(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, (float*)&(((light*)vector_get(lights, i))->colour.x));
         render_cube();
     }
-
+    
     //get lens flare data
     flare_queryQueryResult(&lensFlare);
     flare_query(&lensFlare, &pv, cum->position, sunTzu.position, 1.0f/window_getAspect());
@@ -774,18 +926,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     event_queue_push((event){ .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
 }
 
-void init_kuba()
-{
-    cm = chunkManager_create(69, 4);
-}
-
-void end_kuba() {
-    chunkManager_destroy(&cm);
-}
-
-void draw_kuba(camera* cum, mat4* projection) {
-    chunkManager_drawTerrain(&cm, &geometryPassShader, cum, projection);
-}
 
 void update_kuba(camera* cum)
 {

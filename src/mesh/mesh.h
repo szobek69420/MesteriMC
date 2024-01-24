@@ -9,6 +9,14 @@ typedef struct {
 	unsigned int indexCount;
 } mesh;
 
+typedef struct {
+	float* vertices;
+	unsigned int* indices;
+	unsigned int sizeVertices;
+	unsigned int sizeIndices;
+	unsigned int indexCount;
+}meshRaw;
+
 void mesh_destroy(mesh m);
 
 #endif

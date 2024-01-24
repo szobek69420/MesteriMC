@@ -9,6 +9,13 @@
 
 #include <glad/glad.h>
 
+struct chunkMeshUpdate{
+	struct chunk chomk;
+	meshRaw meshNormal;
+	meshRaw meshWalter;
+	int type;// load/unload/reload
+};
+
 char chunkManager_checkIfInFrustum(vec4* vec, char* frustumX, char* frustumY, char* frustumZ);
 
 chunkManager chunkManager_create(int seed, int renderDistance)
@@ -28,6 +35,7 @@ chunkManager chunkManager_create(int seed, int renderDistance)
 	cm.noise2.seed = seed*seed+seed;
 
 	cm.pendingUpdates = list_create();
+	cm.pendingMeshUpdates = list_create();
 	cm.loadedChunks = list_create();
 
 	return cm;
@@ -36,7 +44,8 @@ chunkManager chunkManager_create(int seed, int renderDistance)
 void chunkManager_destroy(chunkManager* cm)
 {
 	chunk* chomk;
-	chunkUpdate* chomkUp;
+	chunkGenerationUpdate* chomkUp;
+	chunkMeshUpdate* chomkDown;
 
 	while (69)
 	{
@@ -52,14 +61,40 @@ void chunkManager_destroy(chunkManager* cm)
 
 	while (69)
 	{
-		chomkUp = (chunkUpdate*)list_get(&(cm->pendingUpdates), 0);
+		chomkUp = (chunkGenerationUpdate*)list_get(&(cm->pendingUpdates), 0);
 		if (chomkUp == NULL)
 			break;
 
 		list_remove_at(&(cm->pendingUpdates), 0);
 
-		chunk_destroy(chomkUp);
 		free(chomkUp);
+	}
+
+	while (69)
+	{
+		chomkDown = (chunkMeshUpdate*)list_get(&(cm->pendingMeshUpdates), 0);
+		if (chomkDown == NULL)
+			break;
+
+		list_remove_at(&(cm->pendingMeshUpdates), 0);
+
+		switch (chomkDown->type)
+		{
+		case CHUNKMANAGER_LOAD_CHUNK:
+			if (chomkDown->meshNormal.indexCount != 0)
+			{
+				free(chomkDown->meshNormal.vertices);
+				free(chomkDown->meshNormal.indices);
+			}
+			if (chomkDown->meshWalter.indexCount != 0)
+			{
+				free(chomkDown->meshWalter.vertices);
+				free(chomkDown->meshWalter.indices);
+			}
+			chunk_destroy(&chomkDown->chomk);
+			break;
+		}
+		free(chomkDown);
 	}
 }
 
@@ -84,7 +119,16 @@ int chunkManager_isChunkPending(chunkManager* cm, int chunkX, int chunkY, int ch
 
 	while (iterator != NULL)
 	{
-		if (((chunkUpdate*)(iterator->data))->chunkX == chunkX && ((chunkUpdate*)(iterator->data))->chunkY == chunkY && ((chunkUpdate*)(iterator->data))->chunkZ == chunkZ)
+		if (((chunkGenerationUpdate*)(iterator->data))->chunkX == chunkX && ((chunkGenerationUpdate*)(iterator->data))->chunkY == chunkY && ((chunkGenerationUpdate*)(iterator->data))->chunkZ == chunkZ)
+			return 69;
+
+		iterator = list_next(iterator);
+	}
+
+	iterator = list_get_iterator(&(cm->pendingMeshUpdates));
+	while (iterator != NULL)
+	{
+		if (((chunkMeshUpdate*)(iterator->data))->chomk.chunkX == chunkX && ((chunkMeshUpdate*)(iterator->data))->chomk.chunkY == chunkY && ((chunkMeshUpdate*)(iterator->data))->chomk.chunkZ == chunkZ)
 			return 69;
 
 		iterator = list_next(iterator);
@@ -113,7 +157,7 @@ void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playe
 						&&
 						chunkManager_isChunkPending(cm, playerChunkX + x, playerChunkY + y, playerChunkZ + z) == 0)
 					{
-						chunkUpdate* ceu = (chunkUpdate*)malloc(sizeof(chunkUpdate));
+						chunkGenerationUpdate* ceu = (chunkGenerationUpdate*)malloc(sizeof(chunkGenerationUpdate));
 						ceu->chunkX = playerChunkX + x;
 						ceu->chunkY = playerChunkY + y;
 						ceu->chunkZ = playerChunkZ + z;
@@ -141,7 +185,7 @@ exit_load:
 		{
 			if (chunkManager_isChunkPending(cm, ((chunk*)iterator->data)->chunkX, ((chunk*)iterator->data)->chunkY, ((chunk*)iterator->data)->chunkZ)==0)
 			{
-				chunkUpdate* ceu = (chunkUpdate*)malloc(sizeof(chunkUpdate));
+				chunkGenerationUpdate* ceu = (chunkGenerationUpdate*)malloc(sizeof(chunkGenerationUpdate));
 				ceu->chunkX = ((chunk*)iterator->data)->chunkX;
 				ceu->chunkY = ((chunk*)iterator->data)->chunkY;
 				ceu->chunkZ = ((chunk*)iterator->data)->chunkZ;
@@ -167,8 +211,10 @@ void chunkManager_update(chunkManager* cm)
 	listElement* iterator;
 	int index;
 	chunk* chomk;
-	chunkUpdate* ceu = (chunkUpdate*)list_get(&(cm->pendingUpdates), 0);
+	chunkMeshUpdate* cmu = (chunkMeshUpdate*)malloc(sizeof(chunkMeshUpdate));
 
+	chunkGenerationUpdate* ceu = (chunkGenerationUpdate*)list_get(&(cm->pendingUpdates), 0);
+	
 	if (ceu == NULL)
 		return;
 
@@ -177,9 +223,9 @@ void chunkManager_update(chunkManager* cm)
 	switch (ceu->type)
 	{
 		case CHUNKMANAGER_LOAD_CHUNK:
-			chomk= (chunk*)malloc(sizeof(chunk));
-			*chomk=chunk_generate(cm, ceu->chunkX, ceu->chunkY, ceu->chunkZ);
-			list_push_back(&(cm->loadedChunks), (void*)chomk);
+			cmu->chomk=chunk_generate(cm, ceu->chunkX, ceu->chunkY, ceu->chunkZ, &cmu->meshNormal, &cmu->meshWalter);
+			cmu->type = CHUNKMANAGER_LOAD_CHUNK;
+			list_push_back(&cm->pendingMeshUpdates, cmu);
 			break;
 
 		case CHUNKMANAGER_UNLOAD_CHUNK:
@@ -191,8 +237,11 @@ void chunkManager_update(chunkManager* cm)
 				if (chomk->chunkX == ceu->chunkX && chomk->chunkY == ceu->chunkY && chomk->chunkZ == ceu->chunkZ)
 				{
 					//list_remove_at(&(cm->loadedChunks), index);
+					cmu->chomk = *chomk;
+					cmu->type = CHUNKMANAGER_UNLOAD_CHUNK;
+					list_push_back(&cm->pendingMeshUpdates, cmu);
+
 					list_remove_at(&(cm->loadedChunks), index);
-					chunk_destroy(chomk);
 					free(chomk);
 					break;
 				}
@@ -204,11 +253,58 @@ void chunkManager_update(chunkManager* cm)
 
 
 		case CHUNKMANAGER_RELOAD_CHUNK:
-
+			//unload and load
 			break;
 	}
 
 	free(ceu);
+}
+
+void chunkManager_updateMesh(chunkManager* cm)
+{
+	listElement* iterator;
+	int index;
+
+	chunk* chomk;
+	chunkMeshUpdate* cmu = (chunkMeshUpdate*)list_get(&(cm->pendingMeshUpdates), 0);
+
+	if (cmu == NULL)
+	{
+		return;
+	}
+
+	list_remove_at(&(cm->pendingMeshUpdates), 0);
+
+	switch (cmu->type)
+	{
+	case CHUNKMANAGER_LOAD_CHUNK:
+		chunk_loadMeshInGPU(&cmu->chomk, cmu->meshNormal, cmu->meshWalter);
+		chomk = (chunk*)malloc(sizeof(chunk));
+		*chomk = cmu->chomk;
+		list_push_back(&cm->loadedChunks, (void*)chomk);
+
+		if (cmu->meshNormal.indexCount != 0)
+		{
+			free(cmu->meshNormal.vertices);
+			free(cmu->meshNormal.indices);
+		}
+		if (cmu->meshWalter.indexCount != 0)
+		{
+			free(cmu->meshWalter.vertices);
+			free(cmu->meshWalter.indices);
+		}
+		break;
+
+	case CHUNKMANAGER_UNLOAD_CHUNK:
+		chunk_destroy(&cmu->chomk);
+		break;
+
+
+	case CHUNKMANAGER_RELOAD_CHUNK:
+		break;
+	}
+
+	free(cmu);
 }
 
 static float chunkBounds[24] = {
@@ -331,7 +427,7 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 				if (isPointInFrustum)
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					chunk_drawTerrain(chomk);
+					//chunk_drawTerrain(chomk);
 					break;
 				}
 			}
@@ -343,7 +439,7 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					chunk_drawTerrain(chomk);
+					//chunk_drawTerrain(chomk);
 				}
 			}
 		}
