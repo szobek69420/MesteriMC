@@ -58,6 +58,7 @@ chunkManager cm;
 pthread_mutex_t cm_mutex;
 
 camera cum;
+pthread_mutex_t mutex_cum;
 
 renderer rendor;
 shader shadowShader;
@@ -145,6 +146,7 @@ int main()
     shouldExit = 0;
 
     pthread_mutex_init(&cm_mutex, NULL);
+    pthread_mutex_init(&mutex_cum, NULL);
     pthread_mutex_init(&mutex_input, NULL);
     pthread_mutex_init(&mutex_swap, NULL);
     pthread_mutex_init(&mutex_exit, NULL);
@@ -176,8 +178,10 @@ int main()
     pthread_join(thread_render, NULL);
 
     pthread_mutex_destroy(&cm_mutex);
-    pthread_mutex_destroy(&mutex_input, NULL);
-    pthread_mutex_destroy(&mutex_swap, NULL);
+    pthread_mutex_destroy(&mutex_cum);
+    pthread_mutex_destroy(&mutex_input);
+    pthread_mutex_destroy(&mutex_swap);
+    pthread_mutex_destroy(&mutex_exit);
 
     chunkManager_destroy(&cm);
     textureHandler_destroyTextures();
@@ -196,6 +200,8 @@ void* loop_render(void* arg)
     float lastFrame = glfwGetTime();
     float lastSecond = 0;//az fps szamolashoz
     int framesInLastSecond = 0;
+
+    camera cum_render;
     while (69)
     {
         deltaTime = glfwGetTime() - lastFrame;
@@ -210,17 +216,26 @@ void* loop_render(void* arg)
             framesInLastSecond = 0;
         }
 
+        //get cum info
+        pthread_mutex_lock(&mutex_cum);
+        cum_render = cum;
+        pthread_mutex_unlock(&mutex_cum);
+
         //update chunk mesh data in gpu
         pthread_mutex_lock(&cm_mutex);
+        chunkManager_updateMesh(&cm);
+        chunkManager_updateMesh(&cm);
+        chunkManager_updateMesh(&cm);
+        chunkManager_updateMesh(&cm);
         chunkManager_updateMesh(&cm);
         pthread_mutex_unlock(&cm_mutex);
 
         //render
-        render(&cum, &f);
+        render(&cum_render, &f);
         static char buffer[50];
         sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
         render_text(&f, buffer, 15, window_getHeight() - 34, 0.5);
-        sprintf(buffer, "Pos: %d %d %d", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
+        sprintf(buffer, "Pos: %d %d %d", (int)cum_render.position.x, (int)cum_render.position.y, (int)cum_render.position.z);
         render_text(&f, buffer, 15, window_getHeight() - 69, 0.5);
 
 
@@ -245,7 +260,8 @@ void* loop_generation(void* arg)
     float lastFrame = glfwGetTime();
     float lastSecond = 0;//az fps szamolashoz
     int framesInLastSecond = 0;
-    vec3 previousCumPosition = vec3_create2(0, 50, 0);;
+    vec3 previousCumPosition =cum.position;
+
     while (69)
     {
         deltaTime = glfwGetTime() - lastFrame;
@@ -266,8 +282,10 @@ void* loop_generation(void* arg)
         while ((e = event_queue_poll()).type != NONE)
             handle_event(e);
 
+        pthread_mutex_lock(&mutex_cum);
         previousCumPosition = cum.position;
         camera_update(&cum, deltaTime);
+        pthread_mutex_unlock(&mutex_cum);
 
         //player animation
         pm.position = (vec3){ cum.position.x, cum.position.y - 1.6f, cum.position.z };

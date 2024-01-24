@@ -45,6 +45,7 @@ void chunkManager_destroy(chunkManager* cm)
 {
 	chunk* chomk;
 	chunkGenerationUpdate* chomkUp;
+	chunkMeshUpdate* chomkDown;
 
 	while (69)
 	{
@@ -67,6 +68,33 @@ void chunkManager_destroy(chunkManager* cm)
 		list_remove_at(&(cm->pendingUpdates), 0);
 
 		free(chomkUp);
+	}
+
+	while (69)
+	{
+		chomkDown = (chunkMeshUpdate*)list_get(&(cm->pendingMeshUpdates), 0);
+		if (chomkDown == NULL)
+			break;
+
+		list_remove_at(&(cm->pendingMeshUpdates), 0);
+
+		switch (chomkDown->type)
+		{
+		case CHUNKMANAGER_LOAD_CHUNK:
+			if (chomkDown->meshNormal.indexCount != 0)
+			{
+				free(chomkDown->meshNormal.vertices);
+				free(chomkDown->meshNormal.indices);
+			}
+			if (chomkDown->meshWalter.indexCount != 0)
+			{
+				free(chomkDown->meshWalter.vertices);
+				free(chomkDown->meshWalter.indices);
+			}
+			chunk_destroy(&chomkDown->chomk);
+			break;
+		}
+		free(chomkDown);
 	}
 }
 
@@ -241,7 +269,9 @@ void chunkManager_updateMesh(chunkManager* cm)
 	chunkMeshUpdate* cmu = (chunkMeshUpdate*)list_get(&(cm->pendingMeshUpdates), 0);
 
 	if (cmu == NULL)
+	{
 		return;
+	}
 
 	list_remove_at(&(cm->pendingMeshUpdates), 0);
 
@@ -252,6 +282,17 @@ void chunkManager_updateMesh(chunkManager* cm)
 		chomk = (chunk*)malloc(sizeof(chunk));
 		*chomk = cmu->chomk;
 		list_push_back(&cm->loadedChunks, (void*)chomk);
+
+		if (cmu->meshNormal.indexCount != 0)
+		{
+			free(cmu->meshNormal.vertices);
+			free(cmu->meshNormal.indices);
+		}
+		if (cmu->meshWalter.indexCount != 0)
+		{
+			free(cmu->meshWalter.vertices);
+			free(cmu->meshWalter.indices);
+		}
 		break;
 
 	case CHUNKMANAGER_UNLOAD_CHUNK:
@@ -323,7 +364,7 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 				if (isPointInFrustum)
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					//chunk_drawTerrain(chomk);
+					chunk_drawTerrain(chomk);
 					break;
 				}
 			}
@@ -335,7 +376,7 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					//chunk_drawTerrain(chomk);
+					chunk_drawTerrain(chomk);
 				}
 			}
 		}

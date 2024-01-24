@@ -2,6 +2,7 @@
 #include "chunkManager.h"
 #include "../blocks/blocks.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <glad/glad.h>
 #include "../../glm2/vec3.h"
 #include "../../glm2/mat4.h"
@@ -452,6 +453,7 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 	if (meshNormal.indexCount == 0)
 	{
 		chomk->isThereNormalMesh = 0;
+		chomk->normalMesh.indexCount = 0;
 	}
 	else
 	{
@@ -479,6 +481,7 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 
 		glBindVertexArray(0);
 
+		chomk->normalMesh.indexCount = meshNormal.indexCount;
 		chomk->isThereNormalMesh = 69;
 	}
 
@@ -486,6 +489,7 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 	if (meshWalter.indexCount == 0)
 	{
 		chomk->isThereWaterMesh = 0;
+		chomk->waterMesh.indexCount = 0;
 	}
 	else
 	{
@@ -513,6 +517,7 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 
 		glBindVertexArray(0);
 
+		chomk->waterMesh.indexCount = meshWalter.indexCount;
 		chomk->isThereWaterMesh = 69;
 	}
 }
