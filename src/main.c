@@ -51,7 +51,8 @@ pthread_t thread_physics;
 
 pthread_t mutex_input;//mutex for glfwPollEvents
 pthread_t mutex_swap;//mutex for glfwSwapBuffers
-int shouldPoll, shouldSwap;
+pthread_t mutex_exit;//mutex for glfwWindowShouldClose check
+int shouldPoll, shouldSwap, shouldExit;
 
 chunkManager cm;
 pthread_mutex_t cm_mutex;
@@ -104,9 +105,6 @@ void init_renderer();
 void end_renderer();
 void render(camera* cum, font* f);
 
-void init_kuba();
-void end_kuba();
-void draw_kuba(camera* cum, mat4* projection);
 void update_kuba(camera* cum);
 
 void render_text(font* f, const char* text, float x, float y, float scale);
@@ -121,19 +119,8 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
-void* pthread_test(int* param)
-{
-    printf("amogus %d\n", *param);
-}
-
 int main()
 {
-    //pthread.h
-    pthread_t thread;
-    int nyehehe = 69;
-    pthread_create(&thread, NULL, pthread_test, &nyehehe);
-    pthread_join(thread, NULL);
-
     window_setWidth(1300);
     window_setHeight(800);
     window = init_window("amogus", window_getWidth(), window_getHeight());
@@ -142,26 +129,30 @@ int main()
     input_init();
     fontHandler_init();
 
-    cum = camera_create(vec3_create2(0, 200, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
+    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
-    init_kuba();
+    cm = chunkManager_create(69, 4);
     init_renderer();
 
     textureHandler_importTextures();
     f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
 
+    glfwMakeContextCurrent(NULL);
+
     //threading
     shouldPoll = 0;
     shouldSwap = 0;
+    shouldExit = 0;
 
     pthread_mutex_init(&cm_mutex, NULL);
     pthread_mutex_init(&mutex_input, NULL);
     pthread_mutex_init(&mutex_swap, NULL);
+    pthread_mutex_init(&mutex_exit, NULL);
 
     pthread_create(&thread_generation, NULL, loop_generation, NULL);
     pthread_create(&thread_render, NULL, loop_render, NULL);
 
-    while (!glfwWindowShouldClose(window))
+    while (69)
     {
         //check if should poll
         pthread_mutex_lock(&mutex_input);
@@ -172,14 +163,13 @@ int main()
         }
         pthread_mutex_unlock(&mutex_input);
 
-        //check if should swap buffers
-        pthread_mutex_lock(&mutex_swap);
-        if (shouldSwap)
-        {
-            glfwSwapBuffers(window);
-            shouldSwap = 0;
-        }
-        pthread_mutex_unlock(&mutex_swap);
+        //check if it should quit
+        int shouldExit2 = 0;
+        pthread_mutex_lock(&mutex_exit);
+        shouldExit2 = shouldExit;
+        pthread_mutex_unlock(&mutex_exit);
+        if (shouldExit2)
+            break;
     }
 
     pthread_join(thread_generation, NULL);
@@ -189,7 +179,7 @@ int main()
     pthread_mutex_destroy(&mutex_input, NULL);
     pthread_mutex_destroy(&mutex_swap, NULL);
 
-    end_kuba();
+    chunkManager_destroy(&cm);
     textureHandler_destroyTextures();
     fontHandler_close();
     end_renderer();
@@ -200,11 +190,13 @@ int main()
 
 void* loop_render(void* arg)
 {
+    glfwMakeContextCurrent(window);
+
     float deltaTime;
     float lastFrame = glfwGetTime();
     float lastSecond = 0;//az fps szamolashoz
     int framesInLastSecond = 0;
-    while (!glfwWindowShouldClose(window))
+    while (69)
     {
         deltaTime = glfwGetTime() - lastFrame;
         lastFrame = glfwGetTime();
@@ -217,6 +209,12 @@ void* loop_render(void* arg)
             lastSecond = 0;
             framesInLastSecond = 0;
         }
+
+        //update chunk mesh data in gpu
+        pthread_mutex_lock(&cm_mutex);
+        chunkManager_updateMesh(&cm);
+        pthread_mutex_unlock(&cm_mutex);
+
         //render
         render(&cum, &f);
         static char buffer[50];
@@ -225,10 +223,17 @@ void* loop_render(void* arg)
         sprintf(buffer, "Pos: %d %d %d", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
         render_text(&f, buffer, 15, window_getHeight() - 69, 0.5);
 
-        pthread_mutex_lock(&mutex_swap);
-        shouldSwap = 69;
-        pthread_mutex_unlock(&mutex_swap);
-        while (shouldSwap);
+
+        glfwSwapBuffers(window);
+
+        
+        //query shouldExit
+        int shouldExit2 = 0;
+        pthread_mutex_lock(&mutex_exit);
+        shouldExit2 = shouldExit;
+        pthread_mutex_unlock(&mutex_exit);
+        if (shouldExit2)
+            break;
     }
 
     return NULL;
@@ -240,8 +245,8 @@ void* loop_generation(void* arg)
     float lastFrame = glfwGetTime();
     float lastSecond = 0;//az fps szamolashoz
     int framesInLastSecond = 0;
-    vec3 previousCumPosition = vec3_create2(0, 200, 0);;
-    while (!glfwWindowShouldClose(window))
+    vec3 previousCumPosition = vec3_create2(0, 50, 0);;
+    while (69)
     {
         deltaTime = glfwGetTime() - lastFrame;
         lastFrame = glfwGetTime();
@@ -280,9 +285,28 @@ void* loop_generation(void* arg)
         pthread_mutex_lock(&mutex_input);
         shouldPoll = 69;
         pthread_mutex_unlock(&mutex_input);
-        while (shouldPoll);
-    }
+        
 
+        int shouldExit2 = 0;
+        int shouldPoll2 = 0;
+        while (69)
+        {
+            //query shouldExit
+            pthread_mutex_lock(&mutex_exit);
+            shouldExit2 = shouldExit;
+            pthread_mutex_unlock(&mutex_exit);
+
+            //query shouldPoll
+            pthread_mutex_lock(&mutex_input);
+            shouldPoll2 = shouldPoll;
+            pthread_mutex_unlock(&mutex_input);
+
+            if (shouldExit2 || !shouldPoll2)
+                break;
+        }
+        if (shouldExit2)
+            break;
+    }
     return NULL;
 }
 
@@ -341,7 +365,11 @@ void handle_event(event e)
     default:
         input_handle_event(e);
         if (e.type == KEY_PRESSED && e.data.key_pressed.key_code == GLFW_KEY_ESCAPE)
-            glfwSetWindowShouldClose(window, 69);
+        {
+            pthread_mutex_lock(&mutex_exit);
+            shouldExit = 69;
+            pthread_mutex_unlock(&mutex_exit);
+        }
         break;
     }
 }
@@ -668,7 +696,7 @@ void render(camera* cum, font* f)
     glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_SPECULAR));
 
     pthread_mutex_lock(&cm_mutex);
-    draw_kuba(cum, &projection);
+    chunkManager_drawTerrain(&cm, &geometryPassShader, &cum, &projection);
     pthread_mutex_unlock(&cm_mutex);
 
     //copy depth buffer
@@ -676,7 +704,7 @@ void render(camera* cum, font* f)
     glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rendor.endBuffer.id);
     glBlitFramebuffer(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, 0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-
+    
     //ssao pass ------------------------------------------------------------------------------------------
     // generate SSAO texture
     /*glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
@@ -793,7 +821,7 @@ void render(camera* cum, font* f)
         glUniform3fv(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, (float*)&(((light*)vector_get(lights, i))->colour.x));
         render_cube();
     }
-
+    
     //get lens flare data
     flare_queryQueryResult(&lensFlare);
     flare_query(&lensFlare, &pv, cum->position, sunTzu.position, 1.0f/window_getAspect());
@@ -880,18 +908,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     event_queue_push((event){ .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
 }
 
-void init_kuba()
-{
-    cm = chunkManager_create(69, 4);
-}
-
-void end_kuba() {
-    chunkManager_destroy(&cm);
-}
-
-void draw_kuba(camera* cum, mat4* projection) {
-    chunkManager_drawTerrain(&cm, &geometryPassShader, cum, projection);
-}
 
 void update_kuba(camera* cum)
 {

@@ -10,7 +10,7 @@
 
 #define CHUNK_NORMAL_MESH_VERTEX_SIZE 11
 
-typedef struct {
+struct chunk {
 
 	int chunkX, chunkY, chunkZ;
 
@@ -32,9 +32,12 @@ typedef struct {
 
 	mat4 model;
 
-} chunk;
+};
 
-chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ);//chunkX: the number of the chunk in the x axis (chunkX=3 means its the 3th (or 4th if we count 0) chunk in the positive x direction)
+typedef struct chunk chunk;
+
+chunk chunk_generate(struct chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshRaw* meshNormal, meshRaw* meshWalter);//chunkX: the number of the chunk in the x axis (chunkX=3 means its the 3th (or 4th if we count 0) chunk in the positive x direction)
+void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter);
 void chunk_destroy(chunk* chomk);
 
 
