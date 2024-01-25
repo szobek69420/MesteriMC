@@ -55,13 +55,17 @@ pthread_t mutex_exit;//mutex for glfwWindowShouldClose check
 int shouldPoll, shouldSwap, shouldExit;
 
 chunkManager cm;
-pthread_mutex_t cm_mutex;
+pthread_mutex_t mutex_cm;
 
 camera cum;
 pthread_mutex_t mutex_cum;
 
+playerMesh pm;
+pthread_mutex_t mutex_pm;
+
 renderer rendor;
-shader shadowShader;
+shader shadowChunkShader;
+shader shadowPlayerShader;
 shader geometryPassShader;
 shader ssaoShader;
 shader ssaoBlurShader;
@@ -92,8 +96,6 @@ sun szunce;
 
 flare lensFlare;
 
-playerMesh pm;
-
 //function prototypes
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
@@ -104,7 +106,6 @@ void* loop_physics(void* arg);
 
 void init_renderer();
 void end_renderer();
-void render(camera* cum, font* f);
 
 void update_kuba(camera* cum);
 
@@ -145,7 +146,8 @@ int main()
     shouldSwap = 0;
     shouldExit = 0;
 
-    pthread_mutex_init(&cm_mutex, NULL);
+    pthread_mutex_init(&mutex_cm, NULL);
+    pthread_mutex_init(&mutex_pm, NULL);
     pthread_mutex_init(&mutex_cum, NULL);
     pthread_mutex_init(&mutex_input, NULL);
     pthread_mutex_init(&mutex_swap, NULL);
@@ -177,11 +179,14 @@ int main()
     pthread_join(thread_generation, NULL);
     pthread_join(thread_render, NULL);
 
-    pthread_mutex_destroy(&cm_mutex);
+    pthread_mutex_destroy(&mutex_cm);
+    pthread_mutex_destroy(&mutex_pm);
     pthread_mutex_destroy(&mutex_cum);
     pthread_mutex_destroy(&mutex_input);
     pthread_mutex_destroy(&mutex_swap);
     pthread_mutex_destroy(&mutex_exit);
+
+    glfwMakeContextCurrent(window);
 
     chunkManager_destroy(&cm);
     textureHandler_destroyTextures();
@@ -222,16 +227,262 @@ void* loop_render(void* arg)
         pthread_mutex_unlock(&mutex_cum);
 
         //update chunk mesh data in gpu
-        pthread_mutex_lock(&cm_mutex);
+        pthread_mutex_lock(&mutex_cm);
         chunkManager_updateMesh(&cm);
         chunkManager_updateMesh(&cm);
         chunkManager_updateMesh(&cm);
         chunkManager_updateMesh(&cm);
         chunkManager_updateMesh(&cm);
-        pthread_mutex_unlock(&cm_mutex);
+        pthread_mutex_unlock(&mutex_cm);
 
-        //render
-        render(&cum_render, &f);
+        //render------------------------------------------
+        //matrices
+        mat4 view = camera_getViewMatrix(&cum_render);
+        mat4 projection = mat4_perspective(cum_render.fov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
+        mat4 pv = mat4_multiply(projection, view);
+        mat4 projectionInverse = mat4_inverse(projection);
+        mat3 viewNormal = mat3_createFromMat(view);
+
+        mat4 shadowViewProjection = mat4_multiply(
+            mat4_ortho(-80, 80, -80, 80, 1, 200),
+            mat4_lookAt(
+                vec3_sum(cum_render.position, vec3_create2(szunce.direction.x * 100, szunce.direction.y * 100, szunce.direction.z * 100)),
+                vec3_create2(-1 * szunce.direction.x, -1 * szunce.direction.y, -1 * szunce.direction.z),
+                vec3_create2(0, 1, 0)
+            )
+        );
+        mat4 shadowLightMatrix = mat4_multiply(shadowViewProjection, mat4_inverse(view));//from the camera's view space to the suns projection space
+
+        //shadow
+        glViewport(0, 0, RENDERER_SHADOW_RESOLUTION, RENDERER_SHADOW_RESOLUTION);
+        glBindFramebuffer(GL_FRAMEBUFFER, rendor.shadowBuffer.id);
+
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
+        glDepthMask(GL_TRUE);
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        glDisable(GL_CULL_FACE);
+        //glFrontFace(GL_CW);
+
+        glUseProgram(shadowChunkShader.id);
+        pthread_mutex_lock(&mutex_cm);
+        chunkManager_drawShadow(&cm, &shadowChunkShader, &shadowViewProjection);
+        pthread_mutex_unlock(&mutex_cm);
+
+        glUseProgram(shadowPlayerShader.id);
+        glUniformMatrix4fv(glGetUniformLocation(shadowPlayerShader.id, "lightMatrix"), 1, GL_FALSE, shadowViewProjection.data);
+        playerMesh_render(&pm, &shadowPlayerShader);
+
+        glEnable(GL_CULL_FACE);
+        glFrontFace(GL_CCW);
+
+
+        //prepare gbuffer fbo
+        glViewport(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, rendor.gBuffer.id);
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        //geometry pass ------------------------------------------------------------------------------------------
+        glUseProgram(geometryPassShader.id);
+
+        glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "view"), 1, GL_FALSE, view.data);
+        glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "projection"), 1, GL_FALSE, projection.data);
+        glUniformMatrix3fv(glGetUniformLocation(geometryPassShader.id, "view_normal"), 1, GL_FALSE, viewNormal.data);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_ALBEDO));
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_NORMAL));
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_SPECULAR));
+
+        pthread_mutex_lock(&mutex_cm);
+        chunkManager_drawTerrain(&cm, &geometryPassShader, &cum, &projection);
+        pthread_mutex_unlock(&mutex_cm);
+
+        //copy depth buffer
+        glEnable(GL_DEPTH_TEST);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rendor.endBuffer.id);
+        glBlitFramebuffer(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, 0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
+        //ssao pass ------------------------------------------------------------------------------------------
+        // generate SSAO texture
+        /*glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glUseProgram(ssaoShader.id);
+        // Send kernel + rotation
+        for (unsigned int i = 0; i <64; ++i)
+        {
+            static char buffer[20];
+            sprintf(buffer, "samples[%d]", i);
+            glUniform3f(glGetUniformLocation(ssaoShader.id, buffer), 1, ssaoKernel[i].x, ssaoKernel[i].y, ssaoKernel[i].z);
+        }
+        glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection"), 1, GL_FALSE, projection.data);
+        glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
+        glUniformMatrix3fv(glGetUniformLocation(ssaoShader.id, "viewForDirectional"), 1, GL_FALSE, viewNormal.data);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, noiseTexture);
+        glBindVertexArray(rectangleVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // blur SSAO texture to remove noise
+        glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idBlur);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glUseProgram(ssaoBlurShader.id);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBuffer);
+        glBindVertexArray(rectangleVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);*/
+
+        //lighting pass ------------------------------------------------------------------------------------------
+        glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
+        //glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
+        glClearColor(0, 0, 0, 0);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_FALSE);
+        glDepthFunc(GL_GREATER);
+        glFrontFace(GL_CW);
+
+        glEnable(GL_BLEND);
+        glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ONE, GL_ZERO);//az alpha azert GL_ONE/GL_ZERO, hogy felulirja a korabbi erteket az uj ertek (ugyis ugyanaz, de igy nem latszik a korvonala a gomboknek a distance fog-ban)
+        glBlendEquation(GL_FUNC_ADD);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.albedoSpec);
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, rendor.shadowBuffer.depthBuffer);
+
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
+
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBufferBlur);
+
+        glUseProgram(lightingPassShader.id);
+        glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "view"), 1, GL_FALSE, view.data);
+        glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection"), 1, GL_FALSE, projection.data);
+        glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
+
+        //point lights
+        //light_setPosition((light*)vector_get(lights, 0), cum->position);
+        float* bufferData = (float*)malloc(lights->size * LIGHT_SIZE_IN_VBO);
+        light* tempLight;
+        for (unsigned int i = 0; i < lights->size; i++)
+        {
+            tempLight = (light*)vector_get(lights, i);
+            memcpy(bufferData + i * LIGHT_FLOATS_IN_VBO, &(tempLight->position.x), LIGHT_SIZE_IN_VBO);
+        }
+
+        glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
+
+        light_fillRenderer(&lightRenderer, bufferData, lights->size);
+        light_render(&lightRenderer, 69);
+        free(bufferData);
+
+        //directional (sun)
+        glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
+        glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
+
+        bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
+        memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
+        light_fillRenderer(&lightRenderer, bufferData, 1);
+        light_render(&lightRenderer, 0);
+        free(bufferData);
+
+        glDepthMask(GL_TRUE);
+        glDepthFunc(GL_LESS);
+        glFrontFace(GL_CCW);
+
+        glDisable(GL_BLEND);
+
+
+        //render forward scene --------------------------------------------------------------------------------
+
+        //light kuba
+        glUseProgram(forwardPassShader.id);
+        glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "projection"), 1, GL_FALSE, projection.data);
+        glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "view"), 1, GL_FALSE, view.data);
+        for (unsigned int i = 0; i < lights->size; i++)
+        {
+            mat4 model = mat4_create(1.0f);
+            model = mat4_translate(model, ((light*)vector_get(lights, i))->position);
+            model = mat4_scale(model, vec3_create(0.125f));
+            glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "model"), 1, GL_FALSE, model.data);
+            glUniform3fv(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, (float*)&(((light*)vector_get(lights, i))->colour.x));
+            render_cube();
+        }
+
+        //get lens flare data
+        flare_queryQueryResult(&lensFlare);
+        flare_query(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / window_getAspect());
+        //switch to screen fbo ------------------------------------------------------------------------
+        glBindFramebuffer(GL_FRAMEBUFFER, rendor.screenBuffer.id);
+
+        //skybox
+        glDisable(GL_DEPTH_TEST);
+        glFrontFace(GL_CW);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT));
+
+        glUseProgram(skyboxShader.id);
+        glUniformMatrix4fv(glGetUniformLocation(skyboxShader.id, "pvm"), 1, GL_FALSE, mat4_multiply(pv, mat4_create2((float[]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, cum_render.position.x, cum_render.position.y, cum_render.position.z, 1 })).data);
+        glBindVertexArray(skyboxMesh.vao);
+        glDrawElements(GL_TRIANGLES, skyboxMesh.indexCount, GL_UNSIGNED_INT, 0);
+
+        glFrontFace(GL_CCW);
+
+        // draw the content of endfbo to screenfbo -----------------------------------------------------------------------------
+        glDisable(GL_DEPTH_TEST);
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glBlendEquation(GL_FUNC_ADD);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
+
+        glUseProgram(finalPassShader.id);
+        glBindVertexArray(rectangleVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glDisable(GL_BLEND);
+
+        //lens flare
+        flare_render(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / window_getAspect());
+
+        //switch to default fbo ------------------------------------------------------------------------
+        glViewport(0, 0, window_getWidth(), window_getHeight());
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
+
+        //fxaa
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, rendor.screenBuffer.colorBuffer);
+
+        glUseProgram(fxaaShader.id);
+        glBindVertexArray(rectangleVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        //render 2d stuff (only text yet)
+        //everything is inside render_text like use shader bing VAO etc. (inefficient but good enough for now)
+        render_text(&f, "amogus", 10, 10, 1);
+
+
         static char buffer[50];
         sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
         render_text(&f, buffer, 15, window_getHeight() - 34, 0.5);
@@ -250,6 +501,8 @@ void* loop_render(void* arg)
         if (shouldExit2)
             break;
     }
+
+    glfwMakeContextCurrent(NULL);
 
     return NULL;
 }
@@ -292,13 +545,13 @@ void* loop_generation(void* arg)
         pm.rotX = cum.pitch;
         pm.rotY = cum.yaw;
         pm.rotHeadX = cum.pitch;
-        playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) { previousCumPosition.x - cum.position.x, 0, previousCumPosition.z - cum.position.z }) > deltaTime) ? PLAYER_MESH_ANIMATION_WALK : PLAYER_MESH_ANIMATION_IDLE, deltaTime);
+        playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) { previousCumPosition.x - cum.position.x, 0, previousCumPosition.z - cum.position.z }) > 0.00001f) ? PLAYER_MESH_ANIMATION_WALK : PLAYER_MESH_ANIMATION_IDLE, deltaTime);
         playerMesh_calculateOuterModelMatrix(&pm);
         playerMesh_calculateInnerModelMatrices(&pm);
 
-        pthread_mutex_lock(&cm_mutex);
+        pthread_mutex_lock(&mutex_cm);
         update_kuba(&cum);
-        pthread_mutex_unlock(&cm_mutex);
+        pthread_mutex_unlock(&mutex_cm);
 
         pthread_mutex_lock(&mutex_input);
         shouldPoll = 69;
@@ -396,11 +649,16 @@ void handle_event(event e)
 void init_renderer()
 {
     //rendor = renderer_create(window_getWidth(), window_getHeight());
-    rendor = renderer_create(1920,1080);
+    rendor = renderer_create(RENDERER_WIDTH, RENDERER_HEIGHT);
 
     //shaders
-    shadowShader = shader_import(
-        "../assets/shaders/renderer/shadow/shader_shadow.vag",
+    shadowChunkShader = shader_import(
+        "../assets/shaders/renderer/shadow/shader_shadow_chunk.vag",
+        "../assets/shaders/renderer/shadow/shader_shadow.fag",
+        NULL);
+
+    shadowPlayerShader = shader_import(
+        "../assets/shaders/renderer/shadow/shader_shadow_player.vag",
         "../assets/shaders/renderer/shadow/shader_shadow.fag",
         NULL);
 
@@ -620,7 +878,8 @@ void end_renderer()
 {
     renderer_destroy(rendor);
 
-    shader_delete(&shadowShader);
+    shader_delete(&shadowChunkShader);
+    shader_delete(&shadowPlayerShader);
     shader_delete(&geometryPassShader);
     shader_delete(&lightingPassShader);
 
@@ -648,253 +907,6 @@ void end_renderer()
     playerMesh_destroy(&pm);
 }
 
-void render(camera* cum, font* f)
-{
-    //matrices
-    mat4 view = camera_getViewMatrix(cum);
-    mat4 projection = mat4_perspective(cum->fov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
-    mat4 pv = mat4_multiply(projection, view);
-    mat4 projectionInverse = mat4_inverse(projection);
-    mat3 viewNormal = mat3_createFromMat(view);
-
-    mat4 shadowViewProjection = mat4_multiply(
-        mat4_ortho(-80,80,-80,80,1,200),
-        mat4_lookAt(
-            vec3_sum(cum->position, vec3_create2(szunce.direction.x*100, szunce.direction.y * 100, szunce.direction.z * 100)),
-            vec3_create2(-1* szunce.direction.x, -1* szunce.direction.y, -1* szunce.direction.z),
-            vec3_create2(0,1,0)
-        )
-    );
-    mat4 shadowLightMatrix = mat4_multiply(shadowViewProjection, mat4_inverse(view));//from the camera's view space to the suns projection space
-
-    //shadow
-    glViewport(0, 0, RENDERER_SHADOW_RESOLUTION, RENDERER_SHADOW_RESOLUTION);
-    glBindFramebuffer(GL_FRAMEBUFFER, rendor.shadowBuffer.id);
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glDepthMask(GL_TRUE);
-    glClear(GL_DEPTH_BUFFER_BIT);
-
-    glDisable(GL_CULL_FACE);
-    //glFrontFace(GL_CW);
-
-    glUseProgram(shadowShader.id);
-
-    pthread_mutex_lock(&cm_mutex);
-    chunkManager_drawShadow(&cm, &shadowShader, &shadowViewProjection);
-    pthread_mutex_unlock(&cm_mutex);
-
-    //playerMesh_render(&pm, &shadowShader);
-
-    glEnable(GL_CULL_FACE);
-    glFrontFace(GL_CCW);
-
-
-    //prepare gbuffer fbo
-    glViewport(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT);
-    glBindFramebuffer(GL_FRAMEBUFFER, rendor.gBuffer.id);
-    glClearColor(0, 0, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    //geometry pass ------------------------------------------------------------------------------------------
-    glUseProgram(geometryPassShader.id);
-
-    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "view"), 1, GL_FALSE, view.data);
-    glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "projection"), 1, GL_FALSE, projection.data);
-    glUniformMatrix3fv(glGetUniformLocation(geometryPassShader.id, "view_normal"), 1, GL_FALSE, viewNormal.data);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_ALBEDO));
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_NORMAL));
-
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_SPECULAR));
-
-    pthread_mutex_lock(&cm_mutex);
-    chunkManager_drawTerrain(&cm, &geometryPassShader, &cum, &projection);
-    pthread_mutex_unlock(&cm_mutex);
-
-    //copy depth buffer
-    glEnable(GL_DEPTH_TEST);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rendor.endBuffer.id);
-    glBlitFramebuffer(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, 0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-    
-    //ssao pass ------------------------------------------------------------------------------------------
-    // generate SSAO texture
-    /*glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glUseProgram(ssaoShader.id);
-    // Send kernel + rotation
-    for (unsigned int i = 0; i <64; ++i)
-    {
-        static char buffer[20];
-        sprintf(buffer, "samples[%d]", i);
-        glUniform3f(glGetUniformLocation(ssaoShader.id, buffer), 1, ssaoKernel[i].x, ssaoKernel[i].y, ssaoKernel[i].z);
-    }
-    glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection"), 1, GL_FALSE, projection.data);
-    glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
-    glUniformMatrix3fv(glGetUniformLocation(ssaoShader.id, "viewForDirectional"), 1, GL_FALSE, viewNormal.data);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, noiseTexture);
-    glBindVertexArray(rectangleVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    // blur SSAO texture to remove noise
-    glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idBlur);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glUseProgram(ssaoBlurShader.id);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBuffer);
-    glBindVertexArray(rectangleVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);*/
-   
-    //lighting pass ------------------------------------------------------------------------------------------
-    glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
-    //glClearColor(0.0666f, 0.843f, 1.0f, 1.0f);
-    glClearColor(0, 0, 0, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-    glDepthFunc(GL_GREATER);
-    glFrontFace(GL_CW);
-
-    glEnable(GL_BLEND);
-    glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ONE, GL_ZERO);//az alpha azert GL_ONE/GL_ZERO, hogy felulirja a korabbi erteket az uj ertek (ugyis ugyanaz, de igy nem latszik a korvonala a gomboknek a distance fog-ban)
-    glBlendEquation(GL_FUNC_ADD);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.albedoSpec);
-
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, rendor.shadowBuffer.depthBuffer);
-
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
-
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBufferBlur);
-
-    glUseProgram(lightingPassShader.id);
-    glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "view"), 1, GL_FALSE, view.data);
-    glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection"), 1, GL_FALSE, projection.data);
-    glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
-
-    //point lights
-    //light_setPosition((light*)vector_get(lights, 0), cum->position);
-    float* bufferData = (float*)malloc(lights->size * LIGHT_SIZE_IN_VBO);
-    light* tempLight;
-    for (unsigned int i = 0; i < lights->size; i++)
-    {
-        tempLight = (light*)vector_get(lights, i);
-        memcpy(bufferData + i * LIGHT_FLOATS_IN_VBO, &(tempLight->position.x), LIGHT_SIZE_IN_VBO);
-    }
-
-    glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
-
-    light_fillRenderer(&lightRenderer, bufferData, lights->size);
-    light_render(&lightRenderer, 69);
-    free(bufferData);
-
-    //directional (sun)
-    glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
-    glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
-
-    bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
-    memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
-    light_fillRenderer(&lightRenderer, bufferData, 1);
-    light_render(&lightRenderer, 0);
-    free(bufferData);
-
-    glDepthMask(GL_TRUE);
-    glDepthFunc(GL_LESS);
-    glFrontFace(GL_CCW);
-
-    glDisable(GL_BLEND);
-
-
-    //render forward scene --------------------------------------------------------------------------------
-
-    //light kuba
-    glUseProgram(forwardPassShader.id);
-    glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "projection"), 1, GL_FALSE, projection.data);
-    glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "view"), 1, GL_FALSE, view.data);
-    for (unsigned int i = 0; i < lights->size; i++)
-    {
-        mat4 model = mat4_create(1.0f);
-        model = mat4_translate(model, ((light*)vector_get(lights, i))->position);
-        model = mat4_scale(model, vec3_create(0.125f));
-        glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "model"), 1, GL_FALSE, model.data);
-        glUniform3fv(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, (float*)&(((light*)vector_get(lights, i))->colour.x));
-        render_cube();
-    }
-    
-    //get lens flare data
-    flare_queryQueryResult(&lensFlare);
-    flare_query(&lensFlare, &pv, cum->position, sunTzu.position, 1.0f/window_getAspect());
-    //switch to screen fbo ------------------------------------------------------------------------
-    glBindFramebuffer(GL_FRAMEBUFFER, rendor.screenBuffer.id);
-
-    //skybox
-    glDisable(GL_DEPTH_TEST);
-    glFrontFace(GL_CW);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT));
-
-    glUseProgram(skyboxShader.id);
-    glUniformMatrix4fv(glGetUniformLocation(skyboxShader.id, "pvm"), 1, GL_FALSE, mat4_multiply(pv, mat4_create2((float[]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, cum->position.x, cum->position.y, cum->position.z, 1 })).data);
-    glBindVertexArray(skyboxMesh.vao);
-    glDrawElements(GL_TRIANGLES, skyboxMesh.indexCount, GL_UNSIGNED_INT, 0);
-
-    glFrontFace(GL_CCW);
-
-    // draw the content of endfbo to screenfbo -----------------------------------------------------------------------------
-    glDisable(GL_DEPTH_TEST);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glBlendEquation(GL_FUNC_ADD);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
-
-    glUseProgram(finalPassShader.id);
-    glBindVertexArray(rectangleVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    glDisable(GL_BLEND);
-
-    //lens flare
-    flare_render(&lensFlare, &pv, cum->position, sunTzu.position, 1.0f / window_getAspect());
-
-    //switch to default fbo ------------------------------------------------------------------------
-    glViewport(0, 0, window_getWidth(), window_getHeight());
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
-
-    //fxaa
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, rendor.screenBuffer.colorBuffer);
-
-    glUseProgram(fxaaShader.id);
-    glBindVertexArray(rectangleVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    //render 2d stuff (only text yet)
-    //everything is inside render_text like use shader bing VAO etc. (inefficient but good enough for now)
-    render_text(f, "amogus", 10, 10, 1);
-}
 
 void window_size_callback(GLFWwindow* window, int width, int height)
 {

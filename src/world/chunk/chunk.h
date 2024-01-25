@@ -8,8 +8,6 @@
 #define CHUNK_WIDTH 32
 #define CHUNK_HEIGHT 32
 
-#define CHUNK_NORMAL_MESH_VERTEX_SIZE 11
-
 struct chunk {
 
 	int chunkX, chunkY, chunkZ;
@@ -17,11 +15,24 @@ struct chunk {
 	char*** blocks;//[y][x][z]
 
 	/*
-	* normal mesh layout:
+	* old normal mesh layout:
 	* vec3 pos
 	* vec2 uv(2)
 	* vec3 normal
 	* vec3 tangent
+	*/
+
+	/*
+	based normal mesh layout:
+	uint: [000xxxxxxyyyyyyzzzzzzuuuuvvvviii]
+	x: pos x [0...32] -> 6 bits
+	y: pos y [0...32] -> 6 bits
+	z: pos z [0...32] -> 6 bits
+	u: uv x [0...10] -> 4 bits
+	v: uv y [0...10] -> 4 bits
+	i: side id [0...5] -> 3 bits
+
+	//actual uv values: uv*0.1
 	*/
 	mesh normalMesh;
 	
@@ -31,7 +42,6 @@ struct chunk {
 	char isThereWaterMesh;
 
 	mat4 model;
-
 };
 
 typedef struct chunk chunk;

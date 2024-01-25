@@ -1,11 +1,16 @@
 #include "chunk.h"
 #include "chunkManager.h"
 #include "../blocks/blocks.h"
+
+#include "../../glm2/vec3.h"
+#include "../../glm2/mat4.h"
+#include "../../utils/seqtor.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <glad/glad.h>
-#include "../../glm2/vec3.h"
-#include "../../glm2/mat4.h"
+#include <string.h>
+#include <math.h>
 
 static blockModel model_oak_tree[67];
 
@@ -115,63 +120,12 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		}
 	}
 
-	//generating mesh
-	//egyelore csak chunkon belul keres megjelenitendo oldalakat
-	int sideCount = 0;
-	for (int i = 0; i < CHUNK_HEIGHT; i++)//y
-	{
-		for (int j = 0; j < CHUNK_WIDTH; j++)//x
-		{
-			for (int k = 0; k < CHUNK_WIDTH; k++)//z 
-			{
-				if (chomk.blocks[i][j][k] == BLOCK_AIR)
-					continue;
-
-				//pos z
-				if ((k == CHUNK_WIDTH - 1 && heightMap[j+1][CHUNK_WIDTH + 1]<i) || (k != CHUNK_WIDTH - 1 && chomk.blocks[i][j][k + 1] !=chomk.blocks[i][j][k]&&(chomk.blocks[i][j][k + 1] == BLOCK_AIR||  chomk.blocks[i][j][k + 1] >= BLOCK_TRANSPARENCY_START)))
-					sideCount++;
-
-				//pos x
-				if ((j == CHUNK_WIDTH - 1 && heightMap[CHUNK_WIDTH + 1][k+1]<i) || (j!=CHUNK_WIDTH-1 && chomk.blocks[i][j + 1][k] != chomk.blocks[i][j][k] &&(chomk.blocks[i][j+1][k] == BLOCK_AIR||  chomk.blocks[i][j + 1][k] >= BLOCK_TRANSPARENCY_START)))
-					sideCount++;
-
-				//neg z
-				if ((k == 0 && heightMap[j+1][0]<i) || (k!=0&& chomk.blocks[i][j][k - 1] != chomk.blocks[i][j][k] &&(chomk.blocks[i][j][k -1] == BLOCK_AIR|| chomk.blocks[i][j][k - 1] >= BLOCK_TRANSPARENCY_START)))
-					sideCount++;
-
-				//neg x
-				if ((j == 0 &&heightMap[0][k+1]<i) || (j!=0&& chomk.blocks[i][j - 1][k] != chomk.blocks[i][j][k] &&(chomk.blocks[i][j - 1][k] == BLOCK_AIR|| chomk.blocks[i][j - 1][k] >= BLOCK_TRANSPARENCY_START)))
-					sideCount++;
-
-				//pos y
-				if ((i == CHUNK_HEIGHT - 1 && heightMap[j+1][k+1] ==CHUNK_HEIGHT-1) || (i!=CHUNK_HEIGHT-1&& chomk.blocks[i + 1][j][k] != chomk.blocks[i][j][k] &&(chomk.blocks[i + 1][j][k] == BLOCK_AIR ||  chomk.blocks[i + 1][j][k] >= BLOCK_TRANSPARENCY_START)))
-					sideCount++;
-
-				//neg y
-				if ((i == 0 &&basedY==0) || (i!=0&& chomk.blocks[i - 1][j][k] != chomk.blocks[i][j][k] &&(chomk.blocks[i - 1][j][k] == BLOCK_AIR || i != 0 && chomk.blocks[i - 1][j][k] >= BLOCK_TRANSPARENCY_START)))
-					sideCount++;
-			}
-		}
-	}
-
-	if (sideCount == 0)
-	{
-		chomk.isThereNormalMesh = 0;
-		goto WalterGeneration;
-	}
-
-	meshNormal->sizeVertices = 4 * sideCount * CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float);
-	meshNormal->vertices = (float*)malloc(meshNormal->sizeVertices);
-
-	meshNormal->sizeIndices = 6 * sideCount * sizeof(unsigned int);
-	meshNormal->indices = (unsigned int*)malloc(meshNormal->sizeIndices);
-
-	meshNormal->indexCount = 6 * sideCount;
-
+	seqtor_of(unsigned long) verticesNormal;
+	seqtor_init(verticesNormal, 1);
+	seqtor_of(unsigned int) indicesNormal;
+	seqtor_init(indicesNormal, 1);
 
 	unsigned int currentVertex = 0;//melyik az oldal elso csucsa (kell az indexeleshez)
-	unsigned int vertexDataIndex = 0;//eppen hol tartunk a normalVertexData tombon belul
-	unsigned int vertexIndexIndex = 0;
 	float x, y, z;
 	for (int i = 0; i < CHUNK_HEIGHT; i++)//y
 	{
@@ -186,40 +140,28 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				if ((k == CHUNK_WIDTH - 1 && heightMap[j + 1][CHUNK_WIDTH + 1] < i) || (k != CHUNK_WIDTH - 1 && chomk.blocks[i][j][k + 1] != chomk.blocks[i][j][k] && (chomk.blocks[i][j][k + 1] == BLOCK_AIR || chomk.blocks[i][j][k + 1] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 1;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 3;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
+					seqtor_push_back(indicesNormal, currentVertex);
+					seqtor_push_back(indicesNormal, currentVertex+2);
+					seqtor_push_back(indicesNormal, currentVertex+1);
+					seqtor_push_back(indicesNormal, currentVertex+3);
+					seqtor_push_back(indicesNormal, currentVertex+2);
+					seqtor_push_back(indicesNormal, currentVertex);
 
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
+						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_POSITIVE_Z, l, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = j + x;
-						meshNormal->vertices[vertexDataIndex++] = i + y;
-						meshNormal->vertices[vertexDataIndex++] = k + z;
+						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_POSITIVE_Z, l, &x, &y);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						//meshNormal->vertices[vertexDataIndex++] = 0;//geometry
+						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
+						data |= lroundf(10 * y) & 0b1111u; data <<= 3;
+						data |= 0b0;
 
-						blocks_getVertexNormal(BLOCK_POSITIVE_Z, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						blocks_getVertexTangent(BLOCK_POSITIVE_Z, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						/*blocks_getVertexBitangent(BLOCK_POSITIVE_Z, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;*/
+						seqtor_push_back(verticesNormal, data);
 					}
 
 					currentVertex += 4;
@@ -229,40 +171,28 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				if ((j == CHUNK_WIDTH - 1 && heightMap[CHUNK_WIDTH + 1][k + 1] < i) || (j != CHUNK_WIDTH - 1 && chomk.blocks[i][j + 1][k] != chomk.blocks[i][j][k] && (chomk.blocks[i][j + 1][k] == BLOCK_AIR || chomk.blocks[i][j + 1][k] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 1;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 3;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
+					seqtor_push_back(indicesNormal, currentVertex);
+					seqtor_push_back(indicesNormal, currentVertex + 2);
+					seqtor_push_back(indicesNormal, currentVertex + 1);
+					seqtor_push_back(indicesNormal, currentVertex + 3);
+					seqtor_push_back(indicesNormal, currentVertex + 2);
+					seqtor_push_back(indicesNormal, currentVertex);
 
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
+						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_POSITIVE_X, l, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = j + x;
-						meshNormal->vertices[vertexDataIndex++] = i + y;
-						meshNormal->vertices[vertexDataIndex++] = k + z;
+						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_POSITIVE_X, l, &x, &y);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						//meshNormal->vertices[vertexDataIndex++] = 0;//geometry
+						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
+						data |= lroundf(10 * y) & 0b1111u; data <<= 3;
+						data |= 0b1u;
 
-						blocks_getVertexNormal(BLOCK_POSITIVE_X, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						blocks_getVertexTangent(BLOCK_POSITIVE_X, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						/*blocks_getVertexBitangent(BLOCK_POSITIVE_X, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;*/
+						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
 				}
@@ -271,40 +201,28 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				if ((k == 0 && heightMap[j + 1][0] < i) || (k != 0 && chomk.blocks[i][j][k - 1] != chomk.blocks[i][j][k] && (chomk.blocks[i][j][k - 1] == BLOCK_AIR || chomk.blocks[i][j][k - 1] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 1;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 3;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
+					seqtor_push_back(indicesNormal, currentVertex);
+					seqtor_push_back(indicesNormal, currentVertex + 2);
+					seqtor_push_back(indicesNormal, currentVertex + 1);
+					seqtor_push_back(indicesNormal, currentVertex + 3);
+					seqtor_push_back(indicesNormal, currentVertex + 2);
+					seqtor_push_back(indicesNormal, currentVertex);
 
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
+						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_NEGATIVE_Z, l, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = j + x;
-						meshNormal->vertices[vertexDataIndex++] = i + y;
-						meshNormal->vertices[vertexDataIndex++] = k + z;
+						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_Z, l, &x, &y);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						//meshNormal->vertices[vertexDataIndex++] = 0;//geometry
+						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
+						data |= lroundf(10 * y) & 0b1111u; data <<= 3;
+						data |= 0b10u;
 
-						blocks_getVertexNormal(BLOCK_NEGATIVE_Z, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						blocks_getVertexTangent(BLOCK_NEGATIVE_Z, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						/*blocks_getVertexBitangent(BLOCK_NEGATIVE_Z, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;*/
+						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
 				}
@@ -313,40 +231,28 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				if ((j == 0 && heightMap[0][k + 1] < i) || (j != 0 && chomk.blocks[i][j - 1][k] != chomk.blocks[i][j][k] && (chomk.blocks[i][j - 1][k] == BLOCK_AIR || chomk.blocks[i][j - 1][k] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 1;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 3;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
+					seqtor_push_back(indicesNormal, currentVertex);
+					seqtor_push_back(indicesNormal, currentVertex + 2);
+					seqtor_push_back(indicesNormal, currentVertex + 1);
+					seqtor_push_back(indicesNormal, currentVertex + 3);
+					seqtor_push_back(indicesNormal, currentVertex + 2);
+					seqtor_push_back(indicesNormal, currentVertex);
 
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
+						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_NEGATIVE_X, l, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = j + x;
-						meshNormal->vertices[vertexDataIndex++] = i + y;
-						meshNormal->vertices[vertexDataIndex++] = k + z;
+						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_X, l, &x, &y);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						//meshNormal->vertices[vertexDataIndex++] = 0;//geometry
+						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
+						data |= lroundf(10 * y) & 0b1111u; data <<= 3;
+						data |= 0b11u;
 
-						blocks_getVertexNormal(BLOCK_NEGATIVE_X, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						blocks_getVertexTangent(BLOCK_NEGATIVE_X, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						/*blocks_getVertexBitangent(BLOCK_NEGATIVE_X, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;*/
+						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
 				}
@@ -355,40 +261,28 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				if ((i == CHUNK_HEIGHT - 1 && heightMap[j + 1][k + 1] == CHUNK_HEIGHT - 1) || (i != CHUNK_HEIGHT - 1 && chomk.blocks[i + 1][j][k] != chomk.blocks[i][j][k] && (chomk.blocks[i + 1][j][k] == BLOCK_AIR || chomk.blocks[i + 1][j][k] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 1;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 3;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
+					seqtor_push_back(indicesNormal, currentVertex);
+					seqtor_push_back(indicesNormal, currentVertex + 2);
+					seqtor_push_back(indicesNormal, currentVertex + 1);
+					seqtor_push_back(indicesNormal, currentVertex + 3);
+					seqtor_push_back(indicesNormal, currentVertex + 2);
+					seqtor_push_back(indicesNormal, currentVertex);
 
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
+						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_POSITIVE_Y, l, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = j + x;
-						meshNormal->vertices[vertexDataIndex++] = i + y;
-						meshNormal->vertices[vertexDataIndex++] = k + z;
+						data|= (j + lroundf(x))& 0b111111u; data <<= 6;
+						data|= (i + lroundf(y))& 0b111111u; data <<= 6;
+						data|= (k + lroundf(z))& 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_POSITIVE_Y, l, &x, &y);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						//meshNormal->vertices[vertexDataIndex++] = 0;//geometry
+						data|= lroundf(10 * x)& 0b1111u; data <<= 4;
+						data|= lroundf(10 * y)& 0b1111u; data <<= 3;
+						data |= 0b100u;
 
-						blocks_getVertexNormal(BLOCK_POSITIVE_Y, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						blocks_getVertexTangent(BLOCK_POSITIVE_Y, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						/*blocks_getVertexBitangent(BLOCK_POSITIVE_Y, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;*/
+						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
 				}
@@ -397,40 +291,28 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				if ((i == 0 && basedY == 0) || (i != 0 && chomk.blocks[i - 1][j][k] != chomk.blocks[i][j][k] && (chomk.blocks[i - 1][j][k] == BLOCK_AIR || i != 0 && chomk.blocks[i - 1][j][k] >= BLOCK_TRANSPARENCY_START)))
 				{
 					//indices (6 per side (2 triangles))
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 1;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 3;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex + 2;
-					meshNormal->indices[vertexIndexIndex++] = currentVertex;
+					seqtor_push_back(indicesNormal, currentVertex);
+					seqtor_push_back(indicesNormal, currentVertex + 2);
+					seqtor_push_back(indicesNormal, currentVertex + 1);
+					seqtor_push_back(indicesNormal, currentVertex + 3);
+					seqtor_push_back(indicesNormal, currentVertex + 2);
+					seqtor_push_back(indicesNormal, currentVertex);
 
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
+						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_NEGATIVE_Y, l, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = j + x;
-						meshNormal->vertices[vertexDataIndex++] = i + y;
-						meshNormal->vertices[vertexDataIndex++] = k + z;
+						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_Y, l, &x, &y);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						//meshNormal->vertices[vertexDataIndex++] = 0;//geometry
+						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
+						data |= lroundf(10 * y) & 0b1111u; data <<= 3;
+						data |= 0b101u;
 
-						blocks_getVertexNormal(BLOCK_NEGATIVE_Y, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						blocks_getVertexTangent(BLOCK_NEGATIVE_Y, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;
-
-						/*blocks_getVertexBitangent(BLOCK_NEGATIVE_Y, &x, &y, &z);
-						meshNormal->vertices[vertexDataIndex++] = x;
-						meshNormal->vertices[vertexDataIndex++] = y;
-						meshNormal->vertices[vertexDataIndex++] = z;*/
+						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
 				}
@@ -438,7 +320,21 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		}
 	}
 
+	if (verticesNormal.size > 0)
+	{
+		meshNormal->sizeVertices = verticesNormal.size * sizeof(unsigned long);
+		meshNormal->vertices = (float*)malloc(meshNormal->sizeVertices);
+		memcpy(meshNormal->vertices, verticesNormal.data, meshNormal->sizeVertices);
 
+		meshNormal->sizeIndices = indicesNormal.size * sizeof(unsigned int);
+		meshNormal->indices = (unsigned int*)malloc(meshNormal->sizeIndices);
+		memcpy(meshNormal->indices, indicesNormal.data, meshNormal->sizeIndices);
+
+		meshNormal->indexCount = indicesNormal.size;
+	}
+
+	seqtor_clear(verticesNormal);
+	seqtor_clear(indicesNormal);
 	chomk.isThereNormalMesh = 0;
 
 WalterGeneration:
@@ -468,16 +364,16 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, chomk->normalMesh.ebo);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshNormal.sizeIndices, meshNormal.indices, GL_STATIC_DRAW);
 
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)0);
+		/*glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)0);
 		glEnableVertexAttribArray(0);//positions
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(3 * sizeof(float)));
 		glEnableVertexAttribArray(1);//uv and geom
 		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(5 * sizeof(float)));
 		glEnableVertexAttribArray(2);//normal
 		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(8 * sizeof(float)));
-		glEnableVertexAttribArray(3);//tangent
-		/*glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(12 * sizeof(float)));
-		glEnableVertexAttribArray(4);//bitangent*/
+		glEnableVertexAttribArray(3);//tangent*/
+		glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(unsigned long), (void*)0);
+		glEnableVertexAttribArray(0);
 
 		glBindVertexArray(0);
 
@@ -504,16 +400,7 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, chomk->waterMesh.ebo);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshWalter.sizeIndices, meshWalter.indices, GL_STATIC_DRAW);
 
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(0);//positions
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(3 * sizeof(float)));
-		glEnableVertexAttribArray(1);//uv and geom
-		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(5 * sizeof(float)));
-		glEnableVertexAttribArray(2);//normal
-		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(8 * sizeof(float)));
-		glEnableVertexAttribArray(3);//tangent
-		/*glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(12 * sizeof(float)));
-		glEnableVertexAttribArray(4);//bitangent*/
+		//vertex attributs
 
 		glBindVertexArray(0);
 
