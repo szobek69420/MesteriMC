@@ -427,7 +427,7 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 				if (isPointInFrustum)
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					//chunk_drawTerrain(chomk);
+					chunk_drawTerrain(chomk);
 					break;
 				}
 			}
@@ -439,7 +439,7 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					//chunk_drawTerrain(chomk);
+					chunk_drawTerrain(chomk);
 				}
 			}
 		}

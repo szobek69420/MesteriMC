@@ -48,6 +48,10 @@ playerMesh playerMesh_create()
 
 	pm.animationTime = 0;
 
+	pm.albedo = 0;
+	pm.normal = 0;
+	pm.specular = 0;
+
 	playerMesh_calculateOuterModelMatrix(&pm);
 	playerMesh_calculateInnerModelMatrices(&pm);
 
@@ -145,12 +149,14 @@ void playerMesh_render(playerMesh* pm, shader* shit)
 
 	unsigned int modelLocation = glGetUniformLocation(shit->id, "model");
 
+	
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, pm->albedo);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, pm->normal);
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, pm->specular);
+	
 
 	//torso
 	glUniformMatrix4fv(modelLocation, 1, GL_FALSE, mat4_multiply(pm->model, pm->modelTorso).data);

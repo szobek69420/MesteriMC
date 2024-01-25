@@ -1,0 +1,19 @@
+#version 330 core
+
+layout (location=0) in uint attributes;
+
+uniform mat4 model;
+uniform mat4 lightMatrix;
+
+void main()
+{
+	//unpack data
+	uint data=attributes>>11;
+	uint posx, posy, posz;
+	posz=data&63u;	data>>=6u;
+	posy=data&63u;	data>>=6u;
+	posx=data&63u;
+
+	vec3 position=vec3(posx, posy, posz);
+	gl_Position=lightMatrix*model*vec4(position,1);
+}
