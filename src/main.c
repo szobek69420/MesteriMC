@@ -41,6 +41,9 @@
 #define CLIP_NEAR 0.1f
 #define CLIP_FAR 200.0f
 
+#define PHYSICS_UPDATE 0.02f
+#define GENERATION_UPDATE 0.01f
+
 //global variable
 GLFWwindow* window;
 int windowShouldClose = 0;
@@ -107,8 +110,6 @@ void* loop_physics(void* arg);
 void init_renderer();
 void end_renderer();
 
-void update_kuba(camera* cum);
-
 void render_text(font* f, const char* text, float x, float y, float scale);
 void render_cube();
 
@@ -133,7 +134,7 @@ int main()
 
     cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
-    cm = chunkManager_create(69, 4);
+    cm = chunkManager_create(69, 5);
     init_renderer();
 
     textureHandler_importTextures();
@@ -153,6 +154,7 @@ int main()
     pthread_mutex_init(&mutex_swap, NULL);
     pthread_mutex_init(&mutex_exit, NULL);
 
+    pthread_create(&thread_physics, NULL, loop_physics, NULL);
     pthread_create(&thread_generation, NULL, loop_generation, NULL);
     pthread_create(&thread_render, NULL, loop_render, NULL);
 
@@ -178,6 +180,7 @@ int main()
 
     pthread_join(thread_generation, NULL);
     pthread_join(thread_render, NULL);
+    pthread_join(thread_physics, NULL);
 
     pthread_mutex_destroy(&mutex_cm);
     pthread_mutex_destroy(&mutex_pm);
@@ -244,7 +247,7 @@ void* loop_render(void* arg)
         mat3 viewNormal = mat3_createFromMat(view);
 
         mat4 shadowViewProjection = mat4_multiply(
-            mat4_ortho(-80, 80, -80, 80, 1, 200),
+            mat4_ortho(-70, 70, -70, 70, 1, 200),
             mat4_lookAt(
                 vec3_sum(cum_render.position, vec3_create2(szunce.direction.x * 100, szunce.direction.y * 100, szunce.direction.z * 100)),
                 vec3_create2(-1 * szunce.direction.x, -1 * szunce.direction.y, -1 * szunce.direction.z),
@@ -272,7 +275,9 @@ void* loop_render(void* arg)
 
         glUseProgram(shadowPlayerShader.id);
         glUniformMatrix4fv(glGetUniformLocation(shadowPlayerShader.id, "lightMatrix"), 1, GL_FALSE, shadowViewProjection.data);
+        pthread_mutex_lock(&mutex_pm);
         playerMesh_render(&pm, &shadowPlayerShader);
+        pthread_mutex_unlock(&mutex_pm);
 
         glEnable(GL_CULL_FACE);
         glFrontFace(GL_CCW);
@@ -511,23 +516,59 @@ void* loop_generation(void* arg)
 {
     float deltaTime;
     float lastFrame = glfwGetTime();
-    float lastSecond = 0;//az fps szamolashoz
-    int framesInLastSecond = 0;
-    vec3 previousCumPosition =cum.position;
+    float lastCameraUpdate = 0;
+    camera cum_generation;
 
     while (69)
     {
-        deltaTime = glfwGetTime() - lastFrame;
-        lastFrame = glfwGetTime();
-        lastSecond += deltaTime;
-        framesInLastSecond++;
-        if (lastSecond > 1)
+        float currentTime = glfwGetTime();
+        while (currentTime - lastFrame < GENERATION_UPDATE)
+            currentTime = glfwGetTime();
+        deltaTime = currentTime - lastFrame;
+        lastFrame = currentTime;
+
+        if (currentTime - lastCameraUpdate>0.5f)//dont refresh camera every frame because it slows the other threads down
         {
-            //printf("FPS: %d\n", framesInLastSecond);
-            //printf("Pos: %d %d %d\n\n", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
-            lastSecond = 0;
-            framesInLastSecond = 0;
+            pthread_mutex_lock(&mutex_cum);
+            cum_generation = cum;
+            lastCameraUpdate = currentTime;
+            pthread_mutex_unlock(&mutex_cum);
         }
+
+        int chunkX, chunkY, chunkZ;
+        chunk_getChunkFromPos(vec3_create2(cum_generation.position.x + CHUNK_WIDTH * 0.5f, cum_generation.position.y + CHUNK_HEIGHT * 0.5f, cum_generation.position.z + CHUNK_WIDTH * 0.5f), &chunkX, &chunkY, &chunkZ);
+        pthread_mutex_lock(&mutex_cm);
+        chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
+        chunkManager_update(&cm);
+        chunkManager_update(&cm);
+        pthread_mutex_unlock(&mutex_cm);
+
+        
+        //query shouldExit
+        int shouldExit2 = 0;
+        pthread_mutex_lock(&mutex_exit);
+        shouldExit2 = shouldExit;
+        pthread_mutex_unlock(&mutex_exit);
+        if (shouldExit2)
+            break;
+    }
+    return NULL;
+}
+
+void* loop_physics(void* arg)
+{
+
+    float deltaTime;
+    float lastFrame = glfwGetTime();
+    vec3 previousCumPosition = cum.position;
+
+    while (69)
+    {
+        float currentTime = glfwGetTime();
+        while (currentTime - lastFrame < PHYSICS_UPDATE)
+            currentTime = glfwGetTime();
+        deltaTime = currentTime - lastFrame;
+        lastFrame = currentTime;
 
         //update
         input_update();
@@ -541,6 +582,7 @@ void* loop_generation(void* arg)
         pthread_mutex_unlock(&mutex_cum);
 
         //player animation
+        pthread_mutex_lock(&mutex_pm);
         pm.position = (vec3){ cum.position.x, cum.position.y - 1.6f, cum.position.z };
         pm.rotX = cum.pitch;
         pm.rotY = cum.yaw;
@@ -548,15 +590,12 @@ void* loop_generation(void* arg)
         playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) { previousCumPosition.x - cum.position.x, 0, previousCumPosition.z - cum.position.z }) > 0.00001f) ? PLAYER_MESH_ANIMATION_WALK : PLAYER_MESH_ANIMATION_IDLE, deltaTime);
         playerMesh_calculateOuterModelMatrix(&pm);
         playerMesh_calculateInnerModelMatrices(&pm);
-
-        pthread_mutex_lock(&mutex_cm);
-        update_kuba(&cum);
-        pthread_mutex_unlock(&mutex_cm);
+        pthread_mutex_unlock(&mutex_pm);
+        
 
         pthread_mutex_lock(&mutex_input);
         shouldPoll = 69;
         pthread_mutex_unlock(&mutex_input);
-        
 
         int shouldExit2 = 0;
         int shouldPoll2 = 0;
@@ -578,11 +617,8 @@ void* loop_generation(void* arg)
         if (shouldExit2)
             break;
     }
-    return NULL;
-}
 
-void* loop_physics(void* arg)
-{
+
     return NULL;
 }
 
@@ -707,9 +743,12 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_ssao"), 4);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 100);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 120);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f/(120-100));
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 150);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 160);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f/(160-150));
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStart"), 60);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowEnd"), 70);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowHelper"), 1.0f / (70 - 60));
 
     forwardPassShader = shader_import(
         "../assets/shaders/renderer/forward/shader_forward.vag",
@@ -938,16 +977,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     event_queue_push((event){ .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
 }
 
-
-void update_kuba(camera* cum)
-{
-    int chunkX, chunkY, chunkZ;
-    chunk_getChunkFromPos(vec3_create2(cum->position.x+CHUNK_WIDTH*0.5f, cum->position.y + CHUNK_HEIGHT * 0.5f, cum->position.z + CHUNK_WIDTH * 0.5f), &chunkX, &chunkY, &chunkZ);
-
-    chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
-    chunkManager_update(&cm);
-    chunkManager_update(&cm);
-}
 
 void render_text(font* f, const char* text, float x, float y, float scale)
 {
