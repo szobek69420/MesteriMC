@@ -86,12 +86,27 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 			for (int k = 0; k < CHUNK_WIDTH; k++)//z 
 			{
 				int level = heightMap[j + 1][k + 1];
-				if (i >  level)
-					chomk.blocks[i][j][k] = BLOCK_AIR;
-				else if(i>level-1)
-					chomk.blocks[i][j][k] = BLOCK_GRASS;
-				else if (i > level - 8)
-					chomk.blocks[i][j][k] = BLOCK_DIRT;
+				if (i > level)
+				{
+					if(level<28-basedY&&i<28-basedY)
+						chomk.blocks[i][j][k] = BLOCK_WATER;
+					else
+						chomk.blocks[i][j][k] = BLOCK_AIR;
+				}
+				else if (i > level - 1)
+				{
+					if(level<30-basedY)
+						chomk.blocks[i][j][k] = BLOCK_SAND;
+					else
+						chomk.blocks[i][j][k] = BLOCK_GRASS;
+				}
+				else if (i > level - 5)
+				{
+					if (level < 30-basedY)
+						chomk.blocks[i][j][k] = BLOCK_SAND;
+					else
+						chomk.blocks[i][j][k] = BLOCK_DIRT;
+				}
 				else
 					chomk.blocks[i][j][k] = BLOCK_STONE;
 			}
@@ -113,13 +128,15 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					for (int k = 0; k < sizeof(model_oak_tree) / sizeof(blockModel); k++)
 					{
 						blockModel bm = model_oak_tree[k];
-						chomk.blocks[height + bm.y][i + bm.x][j + bm.z] = bm.type;
+						if(chomk.blocks[height + bm.y][i + bm.x][j + bm.z] ==BLOCK_AIR)
+							chomk.blocks[height + bm.y][i + bm.x][j + bm.z] = bm.type;
 					}
 				}
 			}
 		}
 	}
 
+	//normal mesh
 	seqtor_of(unsigned long) verticesNormal;
 	seqtor_init(verticesNormal, 1);
 	seqtor_of(unsigned int) indicesNormal;
@@ -133,7 +150,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		{
 			for (int k = 0; k < CHUNK_WIDTH; k++)//z 
 			{
-				if (chomk.blocks[i][j][k] == BLOCK_AIR)
+				if (chomk.blocks[i][j][k] == BLOCK_AIR||chomk.blocks[i][j][k]==BLOCK_WATER)
 					continue;
 
 				//pos z
@@ -337,8 +354,72 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	seqtor_clear(indicesNormal);
 	chomk.isThereNormalMesh = 0;
 
-WalterGeneration:
 
+	//normal mesh
+	seqtor_of(unsigned long) verticesWalter;
+	seqtor_init(verticesWalter, 1);
+	seqtor_of(unsigned int) indicesWalter;
+	seqtor_init(indicesWalter, 1);
+
+	currentVertex = 0;//melyik az oldal elso csucsa (kell az indexeleshez)
+	for (int i = 0; i < CHUNK_HEIGHT; i++)//y
+	{
+		for (int j = 0; j < CHUNK_WIDTH; j++)//x
+		{
+			for (int k = 0; k < CHUNK_WIDTH; k++)//z 
+			{
+				if (chomk.blocks[i][j][k] != BLOCK_WATER)
+					continue;
+
+
+				//pos y
+				if (i != CHUNK_HEIGHT - 1 && chomk.blocks[i + 1][j][k] != BLOCK_WATER)
+				{
+					//indices (6 per side (2 triangles))
+					seqtor_push_back(indicesWalter, currentVertex);
+					seqtor_push_back(indicesWalter, currentVertex + 2);
+					seqtor_push_back(indicesWalter, currentVertex + 1);
+					seqtor_push_back(indicesWalter, currentVertex + 3);
+					seqtor_push_back(indicesWalter, currentVertex + 2);
+					seqtor_push_back(indicesWalter, currentVertex);
+
+					//vertices (4 per side)
+					for (int l = 0; l < 4; l++)
+					{
+						unsigned long data = 0b0;
+						blocks_getVertexPosition(BLOCK_POSITIVE_Y, l, &x, &y, &z);
+						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
+
+						blocks_getUV(BLOCK_WATER, BLOCK_POSITIVE_Y, l, &x, &y);
+						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
+						data |= lroundf(10 * y) & 0b1111u; data <<= 3;
+						data |= 0b100u;
+
+						seqtor_push_back(verticesWalter, data);
+					}
+					currentVertex += 4;
+				}
+			}
+		}
+	}
+
+	if (verticesWalter.size > 0)
+	{
+		meshWalter->sizeVertices = verticesWalter.size * sizeof(unsigned long);
+		meshWalter->vertices = (float*)malloc(meshWalter->sizeVertices);
+		memcpy(meshWalter->vertices, verticesWalter.data, meshWalter->sizeVertices);
+
+		meshWalter->sizeIndices = indicesWalter.size * sizeof(unsigned int);
+		meshWalter->indices = (unsigned int*)malloc(meshWalter->sizeIndices);
+		memcpy(meshWalter->indices, indicesWalter.data, meshWalter->sizeIndices);
+
+		meshWalter->indexCount = indicesWalter.size;
+	}
+
+	seqtor_clear(verticesWalter);
+	seqtor_clear(indicesWalter);
 	chomk.isThereWaterMesh = 0;
 
 	return chomk;
@@ -400,7 +481,8 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, chomk->waterMesh.ebo);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshWalter.sizeIndices, meshWalter.indices, GL_STATIC_DRAW);
 
-		//vertex attributs
+		glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(unsigned long), (void*)0);
+		glEnableVertexAttribArray(0);
 
 		glBindVertexArray(0);
 

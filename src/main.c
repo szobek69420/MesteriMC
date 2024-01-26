@@ -42,7 +42,7 @@
 #define CLIP_FAR 200.0f
 
 #define PHYSICS_UPDATE 0.02f
-#define GENERATION_UPDATE 0.01f
+#define GENERATION_UPDATE 0.005f
 
 //global variable
 GLFWwindow* window;
@@ -73,6 +73,7 @@ shader geometryPassShader;
 shader ssaoShader;
 shader ssaoBlurShader;
 shader lightingPassShader;
+shader waterShader;
 shader forwardPassShader;
 shader finalPassShader;
 shader fxaaShader;
@@ -432,6 +433,19 @@ void* loop_render(void* arg)
             render_cube();
         }
 
+        //walter
+        glUseProgram(waterShader.id);
+
+        glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "view"), 1, GL_FALSE, view.data);
+        glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "projection"), 1, GL_FALSE, projection.data);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_ALBEDO));
+
+        pthread_mutex_lock(&mutex_cm);
+        chunkManager_drawWalter(&cm, &waterShader, &cum, &projection);
+        pthread_mutex_unlock(&mutex_cm);
+
         //get lens flare data
         flare_queryQueryResult(&lensFlare);
         flare_query(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / window_getAspect());
@@ -539,9 +553,9 @@ void* loop_generation(void* arg)
         chunk_getChunkFromPos(vec3_create2(cum_generation.position.x + CHUNK_WIDTH * 0.5f, cum_generation.position.y + CHUNK_HEIGHT * 0.5f, cum_generation.position.z + CHUNK_WIDTH * 0.5f), &chunkX, &chunkY, &chunkZ);
         pthread_mutex_lock(&mutex_cm);
         chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
-        chunkManager_update(&cm);
-        chunkManager_update(&cm);
         pthread_mutex_unlock(&mutex_cm);
+        chunkManager_update(&cm,&mutex_cm);
+        chunkManager_update(&cm,&mutex_cm);
 
         
         //query shouldExit
@@ -707,6 +721,14 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(geometryPassShader.id, "texture_albedo"), 0);
     glUniform1i(glGetUniformLocation(geometryPassShader.id, "texture_normal"), 1);
     glUniform1i(glGetUniformLocation(geometryPassShader.id, "texture_specular"), 2);
+
+    waterShader = shader_import(
+        "../assets/shaders/renderer/water/shader_forward_water.vag",
+        "../assets/shaders/renderer/water/shader_forward_water.fag",
+        NULL
+    );
+    glUseProgram(waterShader.id);
+    glUniform1i(glGetUniformLocation(waterShader.id, "texture_albedo"), 0);
 
     ssaoShader = shader_import(
         "../assets/shaders/renderer/ssao/shader_ssao.vag",
@@ -920,7 +942,14 @@ void end_renderer()
     shader_delete(&shadowChunkShader);
     shader_delete(&shadowPlayerShader);
     shader_delete(&geometryPassShader);
+    shader_delete(&ssaoShader);
+    shader_delete(&ssaoBlurShader);
     shader_delete(&lightingPassShader);
+    shader_delete(&waterShader);
+    shader_delete(&forwardPassShader);
+    shader_delete(&finalPassShader);
+    shader_delete(&fxaaShader);
+    shader_delete(&textShader);
 
     glDeleteVertexArrays(1, &rectangleVAO);
     glDeleteBuffers(1, &rectangleVBO);
