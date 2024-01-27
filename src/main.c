@@ -38,6 +38,7 @@
 #include "utils/vector.h"
 #include "utils/lista.h"
 
+
 #define CLIP_NEAR 0.1f
 #define CLIP_FAR 200.0f
 
@@ -204,6 +205,9 @@ int main()
 void* loop_render(void* arg)
 {
     glfwMakeContextCurrent(window);
+
+    const char * vendor = glGetString(GL_VENDOR);
+    const char * renderer = glGetString(GL_RENDERER);
 
     float deltaTime;
     float lastFrame = glfwGetTime();
@@ -436,6 +440,8 @@ void* loop_render(void* arg)
         //walter
         glUseProgram(waterShader.id);
 
+        glUniform1f(glGetUniformLocation(waterShader.id, "uvOffset"), 0.03f * glfwGetTime());
+
         glUniform3f(glGetUniformLocation(waterShader.id, "waterColourDeep"), 0, 0.0627f, 0.8f);
         glUniform3f(glGetUniformLocation(waterShader.id, "waterColourShallow"), 0, 0.8627f, 0.8941f);
 
@@ -518,7 +524,8 @@ void* loop_render(void* arg)
 
         //render 2d stuff (only text yet)
         //everything is inside render_text like use shader bing VAO etc. (inefficient but good enough for now)
-        render_text(&f, "amogus", 10, 10, 1);
+        render_text(&f, vendor, 10, 35, 0.5f);
+        render_text(&f, renderer, 10, 10, 0.5f);
 
 
         static char buffer[50];
@@ -932,7 +939,7 @@ void init_renderer()
 
     sunTzu = light_create(
         vec3_create2(1, 0.97, 0.4),
-        vec3_create2(0.6, 1, -0.8),
+        vec3_create2(0.6, 0.5, -0.8),
         vec3_create2(10, 0, 0)
     );
 

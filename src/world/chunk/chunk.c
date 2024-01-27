@@ -355,7 +355,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	chomk.isThereNormalMesh = 0;
 
 
-	//normal mesh
+	//walter mesh
 	seqtor_of(unsigned long) verticesWalter;
 	seqtor_init(verticesWalter, 1);
 	seqtor_of(unsigned int) indicesWalter;
@@ -390,14 +390,16 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 						blocks_getVertexPosition(BLOCK_POSITIVE_Y, l, &x, &y, &z);
 						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
 						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
-						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
+						data |= (k + lroundf(z)) & 0b111111u; data <<= 3;
 
-						blocks_getUV(BLOCK_WATER, BLOCK_POSITIVE_Y, l, &x, &y);
-						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
-						data |= lroundf(10 * y) & 0b1111u; data <<= 3;
 						data |= 0b100u;
 
 						seqtor_push_back(verticesWalter, data);
+
+						seqtor_push_back(verticesWalter, 69);
+						seqtor_push_back(verticesWalter, 69);
+						*((float*)verticesWalter.data + verticesWalter.size - 2) = (j+x)/CHUNK_WIDTH;
+						*((float*)verticesWalter.data + verticesWalter.size - 1) = (k+z)/CHUNK_WIDTH;
 					}
 					currentVertex += 4;
 				}
@@ -481,8 +483,10 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, chomk->waterMesh.ebo);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshWalter.sizeIndices, meshWalter.indices, GL_STATIC_DRAW);
 
-		glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(unsigned long), (void*)0);
+		glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(unsigned long)+2*sizeof(float), (void*)0);
 		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(unsigned long) + 2 * sizeof(float), (void*)(sizeof(unsigned long)));
+		glEnableVertexAttribArray(1);
 
 		glBindVertexArray(0);
 

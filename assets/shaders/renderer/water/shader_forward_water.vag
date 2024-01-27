@@ -1,6 +1,7 @@
 //this shader is now exclusive for chunk meshes
 #version 330 core
 layout (location=0) in uint attributes;
+layout (location=1) in vec2 uv;
 
 out VS_OUT{
     vec2 texCoords;
@@ -46,14 +47,12 @@ void main()
 	uint id, uvx, uvy, posx, posy, posz;
 
 	id=data&7u;		data>>=3u;
-	uvy=data&15u;	data>>=4u;
-	uvx=data&15u;	data>>=4u;
 	posz=data&63u;	data>>=6u;
 	posy=data&63u;	data>>=6u;
 	posx=data&63u;
 
 	//everything else
-	vs_out.texCoords=0.1*vec2(uvx, uvy);
+	vs_out.texCoords=uv;
 	
     vs_out.tbn=mat3(tangents[id], bitangents[id], normals[id]);
 
