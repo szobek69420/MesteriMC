@@ -435,16 +435,23 @@ void* loop_render(void* arg)
 
         //walter
         glUseProgram(waterShader.id);
-
+        glUniform3f(glGetUniformLocation(waterShader.id, "waterColourDeep"), 0, 0.0627f, 0.8f);
+        glUniform3f(glGetUniformLocation(waterShader.id, "waterColourShallow"), 0, 0.8627f, 0.8941f);
+        glUniform3f(glGetUniformLocation(waterShader.id, "cameraPos"), cum_render.position.x, cum_render.position.y, cum_render.position.z);
         glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "view"), 1, GL_FALSE, view.data);
         glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "projection"), 1, GL_FALSE, projection.data);
+        
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_ALBEDO));
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         pthread_mutex_lock(&mutex_cm);
         chunkManager_drawWalter(&cm, &waterShader, &cum, &projection);
         pthread_mutex_unlock(&mutex_cm);
+
+        glDisable(GL_BLEND);
 
         //get lens flare data
         flare_queryQueryResult(&lensFlare);
@@ -728,7 +735,17 @@ void init_renderer()
         NULL
     );
     glUseProgram(waterShader.id);
-    glUniform1i(glGetUniformLocation(waterShader.id, "texture_albedo"), 0);
+    glUniform1i(glGetUniformLocation(waterShader.id, "texture_normal"), 0);
+    glUniform1i(glGetUniformLocation(waterShader.id, "texture_dudv"), 1);
+    glUniform1i(glGetUniformLocation(waterShader.id, "texture_depth_geometry"), 2);
+    glUniform1i(glGetUniformLocation(waterShader.id, "texture_depth_shadow"), 3);
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogStart"), 150);
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), 160);
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogHelper"), 1.0f / (160 - 150));
+    glUniform1f(glGetUniformLocation(waterShader.id, "projectionNear"), CLIP_NEAR);
+    glUniform1f(glGetUniformLocation(waterShader.id, "projectionFar"), CLIP_FAR);
+    glUniform1f(glGetUniformLocation(waterShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
+    glUniform1f(glGetUniformLocation(waterShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
 
     ssaoShader = shader_import(
         "../assets/shaders/renderer/ssao/shader_ssao.vag",

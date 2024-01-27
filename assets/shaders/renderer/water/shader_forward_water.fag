@@ -1,16 +1,73 @@
 #version 330 core
 
 in VS_OUT{
-    vec2 TexCoords;
+    vec2 texCoords;
+    vec3 fragPos;
     mat3 tbn;
 }fs_in;
 
 out vec4 fragColour;
 
-uniform sampler2D texture_albedo;
+uniform vec3 cameraPos;
+
+//yeah
+uniform vec3 waterColourShallow;
+uniform vec3 waterColourDeep;
+const float shallowStart=10;
+const float shallowHelper=0.1;
+
+//textures
 uniform sampler2D texture_normal;
+uniform sampler2D texture_dudv;
+uniform sampler2D texture_depth_geometry;
+uniform sampler2D texture_depth_shadow;
+uniform float uvOffset;
+
+//depth things
+uniform float onePerScreenWidth;
+uniform float onePerScreenHeight;
+uniform float projectionFar;
+uniform float projectionNear;
+
+//lights
+struct light{
+    vec3 colour;
+    vec3 position;
+    vec3 attenuation;//x: intensity, y: linear, z: quadratic
+};
+
+light sun;
+uniform mat4 shadowPV;
+
+//fog
+uniform float fogStart;
+uniform float fogEnd;
+uniform float fogHelper;
+
+float linearizeDepth(float);
 
 void main()
 {
-    fragColour=vec4(texture(texture_albedo, fs_in.TexCoords).rgb, 1.0);
+    vec2 screenUV=vec2(gl_FragCoord.x*onePerScreenWidth, gl_FragCoord.y*onePerScreenHeight);
+    float distanceFromEye=length(fs_in.fragPos-cameraPos);
+
+    //getting water tint
+    float depth=linearizeDepth(texture(texture_depth_geometry, screenUV).r)-linearizeDepth(gl_FragCoord.z);
+    vec3 albedo = waterColourDeep;
+    if(depth<shallowStart)
+        albedo=mix(waterColourShallow, waterColourDeep, depth*shallowHelper);
+
+    float alpha=1.0;
+    if(distanceFromEye>fogStart)
+        alpha=(fogEnd-distanceFromEye)*fogHelper;
+    if(alpha<0)
+        alpha=0;
+
+    fragColour=vec4(albedo, alpha);
+}
+
+float linearizeDepth(float depth) 
+{
+    float z = depth * 2.0 - 1.0; // back to NDC 
+    return (2.0 * projectionNear * projectionFar) / (projectionFar + projectionNear - z * (projectionFar - projectionNear));
 }

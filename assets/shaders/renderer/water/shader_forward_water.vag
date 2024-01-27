@@ -3,7 +3,8 @@
 layout (location=0) in uint attributes;
 
 out VS_OUT{
-    vec2 TexCoords;
+    vec2 texCoords;
+	vec3 fragPos;
     mat3 tbn;
 }vs_out;
 
@@ -52,11 +53,11 @@ void main()
 	posx=data&63u;
 
 	//everything else
-	vs_out.TexCoords=0.1*vec2(uvx, uvy);
+	vs_out.texCoords=0.1*vec2(uvx, uvy);
 	
     vs_out.tbn=mat3(tangents[id], bitangents[id], normals[id]);
 
-    vec4 position=view*model*vec4(posx, posy, posz, 1);
-
-    gl_Position=projection*position;
+    vec4 position=model*vec4(posx, posy, posz, 1);
+	vs_out.fragPos=position.xyz;
+    gl_Position=projection*view*position;
 }
