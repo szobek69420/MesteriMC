@@ -13,8 +13,8 @@ uniform vec3 cameraPos;
 //yeah
 uniform vec3 waterColourShallow;
 uniform vec3 waterColourDeep;
-const float shallowStart=10;
-const float shallowHelper=0.1;
+const float shallowStart=20;
+const float shallowHelper=0.05;
 
 //textures
 uniform sampler2D texture_normal;
@@ -36,7 +36,8 @@ struct light{
     vec3 attenuation;//x: intensity, y: linear, z: quadratic
 };
 
-light sun;
+uniform light sun;
+
 uniform mat4 shadowPV;
 
 //fog
@@ -50,20 +51,51 @@ void main()
 {
     vec2 screenUV=vec2(gl_FragCoord.x*onePerScreenWidth, gl_FragCoord.y*onePerScreenHeight);
     float distanceFromEye=length(fs_in.fragPos-cameraPos);
+    vec3 viewDirection=normalize(cameraPos-fs_in.fragPos);
+
+    //get normal
+    vec3 normal=fs_in.tbn*(2*texture(texture_normal, fs_in.texCoords).rgb-1);
 
     //getting water tint
+    vec3 waterColour = waterColourDeep;
+    /*
     float depth=linearizeDepth(texture(texture_depth_geometry, screenUV).r)-linearizeDepth(gl_FragCoord.z);
-    vec3 albedo = waterColourDeep;
     if(depth<shallowStart)
-        albedo=mix(waterColourShallow, waterColourDeep, depth*shallowHelper);
+        waterColour=mix(waterColourShallow, waterColourDeep, depth*shallowHelper);
+    */
 
-    float alpha=1.0;
+    //lighting calculations
+    vec3 lighting_sum=vec3(0);
+    vec3 ambient, diffuse, specular;
+    vec3 halfway;
+
+    //sun ambient
+	ambient = 0.1*sun.attenuation.x*sun.colour*waterColour;
+	//diffuse
+	diffuse = max(dot(normal, sun.position), 0.0) * waterColour * sun.colour*sun.attenuation.x;
+
+	//sun specular
+	halfway = normalize(sun.position + viewDirection);  
+	specular = sun.attenuation.x*sun.colour *pow(max(dot(normal, halfway), 0.0), 512.0);
+
+    //add sun beleuchtung to the sum
+    lighting_sum+=ambient+diffuse+specular;
+
+    //point lights
+    //...
+
+    //fresnel
+    float fresnel=max(dot(normal, viewDirection),0);
+    vec3 endColour=mix(lighting_sum, waterColour,fresnel);
+
+    //fog
+    float alpha=1;
     if(distanceFromEye>fogStart)
-        alpha=(fogEnd-distanceFromEye)*fogHelper;
+        alpha*=(fogEnd-distanceFromEye)*fogHelper;
     if(alpha<0)
         alpha=0;
 
-    fragColour=vec4(albedo, alpha);
+    fragColour=vec4(endColour, alpha);
 }
 
 float linearizeDepth(float depth) 

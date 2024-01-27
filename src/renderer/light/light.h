@@ -15,7 +15,7 @@ typedef struct light {
 	vec3 position;
 	vec3 colour;
 	vec3 attenuation;//(intensity, linear, quadratic)  NOTE: constant=1
-	mat4 model;
+	mat4 model; //a deferred lighting eseten a gombot transzformalja
 	float radius;
 } light;//fontos a sorrend, mert a shader ebben a sorrendben várja õket
 
