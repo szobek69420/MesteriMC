@@ -10,6 +10,8 @@
 #include "../../mesh/mesh.h"
 #include "chunk.h"
 
+#include <pthread.h>
+
 /*
 chunk load :
 
@@ -56,7 +58,7 @@ void chunkManager_destroy(chunkManager* cm);
 
 void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ);//adds an Eintrag to the pendingUpdates if needed
 
-void chunkManager_update(chunkManager* cm);//erledigt an update from pendingUpdates
+void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex);//erledigt an update from pendingUpdates (azert kell a mutex, hogy a chunk generalas kozben ne legyen lezarva, csupan amikor hozzaadja a pendingMeshUpdates-hoz)
 void chunkManager_updateMesh(chunkManager* cm);
 
 void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection);//a shader csak átmenetileg van átadva

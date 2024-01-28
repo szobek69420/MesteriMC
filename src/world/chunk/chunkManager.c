@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <pthread.h>
 
 #include <glad/glad.h>
 
@@ -206,29 +207,34 @@ exit_unload:
 	return;
 }
 
-void chunkManager_update(chunkManager* cm)
+void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 {
 	listElement* iterator;
 	int index;
 	chunk* chomk;
 	chunkMeshUpdate* cmu = (chunkMeshUpdate*)malloc(sizeof(chunkMeshUpdate));
 
+	pthread_mutex_lock(pmutex);
 	chunkGenerationUpdate* ceu = (chunkGenerationUpdate*)list_get(&(cm->pendingUpdates), 0);
-	
+	list_remove_at(&(cm->pendingUpdates), 0);
+	pthread_mutex_unlock(pmutex);
+
 	if (ceu == NULL)
 		return;
 
-	list_remove_at(&(cm->pendingUpdates), 0);
 
 	switch (ceu->type)
 	{
 		case CHUNKMANAGER_LOAD_CHUNK:
 			cmu->chomk=chunk_generate(cm, ceu->chunkX, ceu->chunkY, ceu->chunkZ, &cmu->meshNormal, &cmu->meshWalter);
 			cmu->type = CHUNKMANAGER_LOAD_CHUNK;
+			pthread_mutex_lock(pmutex);
 			list_push_back(&cm->pendingMeshUpdates, cmu);
+			pthread_mutex_unlock(pmutex);
 			break;
 
 		case CHUNKMANAGER_UNLOAD_CHUNK:
+			pthread_mutex_lock(pmutex);
 			iterator = list_get_iterator(&(cm->loadedChunks));
 			index = 0;
 			while (iterator != NULL)
@@ -249,6 +255,7 @@ void chunkManager_update(chunkManager* cm)
 				iterator = list_next(iterator);
 				index++;
 			}
+			pthread_mutex_unlock(pmutex);
 			break;
 
 
@@ -377,6 +384,73 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
 					chunk_drawTerrain(chomk);
+				}
+			}
+		}
+		//it=it->next;
+		it = list_next(it);
+	}
+}
+
+void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
+{
+	chunk* chomk;
+	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
+	char isInFrustum;
+	float basedX, basedY, basedZ;
+	vec4 temp;
+	mat4 pv = mat4_multiply(*projection, camera_getViewMatrix(cum));
+
+	//shader_setMat4(shit->id, "view", camera_getViewMatrix(cum));
+	//shader_setMat4(shit->id, "projection", *projection);
+
+	char frustumX[3] = { 0,0,0 };//volt-e olyan bounding point, ami x<-1 vagy -1<=x<=1 vagy x>1
+	char frustumY[3] = { 0,0,0 };//volt-e olyan bounding point, ami y<-1 vagy -1<=y<=1 vagy y>1
+	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
+	char isPointInFrustum = 0;
+
+	listElement* it = list_get_iterator(&(cm->loadedChunks));
+	while (it != NULL)
+	{
+		chomk = ((chunk*)it->data);
+		if (chomk->isThereNormalMesh)
+		{
+			basedX = chomk->chunkX * CHUNK_WIDTH;
+			basedY = chomk->chunkY * CHUNK_HEIGHT;
+			basedZ = chomk->chunkZ * CHUNK_WIDTH;
+
+			frustumX[0] = 0;	frustumX[1] = 0;	frustumX[2] = 0;
+			frustumY[0] = 0;	frustumY[1] = 0;	frustumY[2] = 0;
+			frustumZ[0] = 0;	frustumZ[1] = 0;	frustumZ[2] = 0;
+
+			for (int i = 0; i < 24; )
+			{
+				temp.x = basedX + chunkBounds[i++];
+				temp.y = basedY + chunkBounds[i++];
+				temp.z = basedZ + chunkBounds[i++];
+				temp.w = 1;
+				temp = vec4_multiplyWithMatrix(pv, temp);
+				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
+
+				//frustum cull
+				isPointInFrustum = chunkManager_checkIfInFrustum(&temp, frustumX, frustumY, frustumZ);
+
+				if (isPointInFrustum)
+				{
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
+					chunk_drawWalter(chomk);
+					break;
+				}
+			}
+
+			if (!isPointInFrustum)//ha nincs pont benne a kamera frustumban
+			{
+				if (((frustumX[0] && frustumX[2]) || frustumX[1]) &&
+					((frustumY[0] && frustumY[2]) || frustumY[1]) &&
+					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
+				{
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
+					chunk_drawWalter(chomk);
 				}
 			}
 		}

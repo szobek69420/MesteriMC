@@ -1,0 +1,62 @@
+//this shader is now exclusive for chunk meshes
+#version 330 core
+layout (location=0) in uint attributes;
+layout (location=1) in vec2 uv;
+
+out VS_OUT{
+    vec2 texCoords;
+	vec3 fragPos;
+    mat3 tbn;
+}vs_out;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+const vec3 normals[6] = vec3[](
+	vec3(0,0,1),
+	vec3(1,0,0),
+	vec3(0,0,-1),
+	vec3(-1,0,0),
+	vec3(0,1,0),
+	vec3(0,-1,0)
+);
+
+const vec3 tangents[6] = vec3[](
+	vec3(1,0,0),
+	vec3(0,0,-1),
+	vec3(-1,0,0),
+	vec3(0,0,1),
+	vec3(1,0,0),
+	vec3(1,0,0)
+);
+
+const vec3 bitangents[6] = vec3[](
+	vec3(0,1,0),
+	vec3(0,1,0),
+	vec3(0,1,0),
+	vec3(0,1,0),
+	vec3(0,0,-1),
+	vec3(0,0,1)
+);
+
+void main()
+{    
+	//unpack data
+	uint data=attributes;
+	uint id, uvx, uvy, posx, posy, posz;
+
+	id=data&7u;		data>>=3u;
+	posz=data&63u;	data>>=6u;
+	posy=data&63u;	data>>=6u;
+	posx=data&63u;
+
+	//everything else
+	vs_out.texCoords=uv;
+	
+    vs_out.tbn=mat3(tangents[id], bitangents[id], normals[id]);
+
+    vec4 position=model*vec4(posx, posy, posz, 1);
+	vs_out.fragPos=position.xyz;
+    gl_Position=projection*view*position;
+}

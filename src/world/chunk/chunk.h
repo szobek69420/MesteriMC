@@ -36,6 +36,17 @@ struct chunk {
 	*/
 	mesh normalMesh;
 	
+
+	/*
+	based walter mesh layout:
+	uint: [00000000000xxxxxxyyyyyyzzzzzziii]
+	vec2 uv (32 block/1 uv)
+
+	x: pos x [0...32] -> 6 bits
+	y: pos y [0...32] -> 6 bits
+	z: pos z [0...32] -> 6 bits
+	i: side id [0...5] -> 3 bits
+	*/
 	mesh waterMesh;//walter
 
 	char isThereNormalMesh;
