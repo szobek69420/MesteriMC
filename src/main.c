@@ -27,7 +27,8 @@
 #include "mesh/kuba/kuba.h"
 #include "mesh/player_mesh/player_mesh.h"
 
-#include "font_handler/font_handler.h"
+#include "ui/font_handler/font_handler.h"
+#include "ui/text/text_renderer.h"
 
 #include "post_processing/lens_flare/flare.h"
 
@@ -82,6 +83,7 @@ shader fxaaShader;
 shader textShader;
 shader skyboxShader; mesh skyboxMesh;
 
+textRenderer tr;
 font f;
 
 unsigned int rectangleVAO;
@@ -133,7 +135,10 @@ int main()
 
     event_queue_init();
     input_init();
+
+    tr = textRenderer_create(window_getWidth(), window_getHeight());
     fontHandler_init();
+    f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
 
     cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
@@ -141,7 +146,6 @@ int main()
     init_renderer();
 
     textureHandler_importTextures();
-    f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
 
     glfwMakeContextCurrent(NULL);
 
@@ -195,6 +199,7 @@ int main()
     glfwMakeContextCurrent(window);
 
     chunkManager_destroy(&cm);
+    textRenderer_destroy(&tr);
     textureHandler_destroyTextures();
     fontHandler_close();
     end_renderer();
@@ -531,7 +536,8 @@ void* loop_render(void* arg)
 
         static char buffer[50];
         sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
-        render_text(&f, buffer, 15, window_getHeight() - 34, 0.5);
+        //render_text(&f, buffer, 15, window_getHeight() - 34, 0.5);
+        textRenderer_render(&tr, &f, buffer, 15, window_getHeight() - 34, 0.5);
         sprintf(buffer, "Pos: %d %d %d", (int)cum_render.position.x, (int)cum_render.position.y, (int)cum_render.position.z);
         render_text(&f, buffer, 15, window_getHeight() - 69, 0.5);
 
