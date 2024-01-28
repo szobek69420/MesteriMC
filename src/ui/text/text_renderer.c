@@ -17,10 +17,15 @@ textRenderer textRenderer_create(int width, int height)
 
 	glGenBuffers(1, &renderer.vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, renderer.vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, 4, NULL, GL_STATIC_DRAW);
+
+	unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };//0: bal also, 1: jobb also, 2: jobb felso, 3: bal felso
+	glGenBuffers(1, &renderer.ebo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer.ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+	glVertexAttribPointer(0, 1, GL_UNSIGNED_BYTE, GL_FALSE,1, 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	glBindVertexArray(0);
@@ -49,7 +54,8 @@ void textRenderer_destroy(textRenderer* renderer)
 void textRenderer_render(textRenderer* renderer, font* f, const char* text, float x, float y, float scale)
 {
 	glUseProgram(renderer->program.id);
-	
+	unsigned int dataLocation = glGetUniformLocation(renderer->program.id, "vertexData");
+
 	glActiveTexture(GL_TEXTURE0);
 	glBindVertexArray(renderer->vao);
 	// iterate through all characters
@@ -63,21 +69,16 @@ void textRenderer_render(textRenderer* renderer, font* f, const char* text, floa
 		float w = ch.width * scale;
 		float h = ch.height * scale;
 		// update VBO for each character
-		float vertices[6][4] = {
-			{ xpos,     ypos,       0.0f, 1.0f },
-			{ xpos,     ypos + h,   0.0f, 0.0f },
-			{ xpos + w, ypos,       1.0f, 1.0f },
-
-			{ xpos + w, ypos,       1.0f, 1.0f },
-			{ xpos,     ypos + h,   0.0f, 0.0f },
-			{ xpos + w, ypos + h,   1.0f, 0.0f }
+		float vertices[16] = {
+			xpos,     ypos,       0.0f, 1.0f,
+			xpos + w, ypos,       1.0f, 1.0f,
+			xpos + w, ypos + h,   1.0f, 0.0f,
+			xpos,     ypos + h,   0.0f, 0.0f
 		};
 		// render glyph texture over quad
 		glBindTexture(GL_TEXTURE_2D, ch.textureID);
-		// update content of VBO memory
-		glBindBuffer(GL_ARRAY_BUFFER, renderer->vbo);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // be sure to use glBufferSubData and not glBufferData
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		// update data
+		glUniformMatrix4fv(dataLocation, 1, GL_FALSE, vertices);
 		// render quad
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		// now advance cursors for next glyph (note that advance is number of 1/64 pixels)
