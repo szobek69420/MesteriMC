@@ -9,7 +9,6 @@
 
 #include <pthread.h>
 
-#include <cpuinfo/cpuinfo.h>
 
 #include "window/window.h"
 #include "camera/camera.h"
@@ -210,14 +209,6 @@ void* loop_render(void* arg)
 
     const char * vendor = glGetString(GL_VENDOR);
     const char * renderer = glGetString(GL_RENDERER);
-
-    char processor[100];
-    if (cpuinfo_initialize())
-    {
-        struct cpuinfo_processor* proc=cpuinfo_get_current_processor();
-  
-        cpuinfo_deinitialize();
-    }
 
     float deltaTime;
     float lastFrame = glfwGetTime();
