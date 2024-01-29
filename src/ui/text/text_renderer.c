@@ -102,7 +102,7 @@ void textRenderer_setSize(textRenderer* renderer, int width, int height)
 		glGetUniformLocation(renderer->program.id, "projection"), 
 		1, 
 		GL_FALSE, 
-		mat4_ortho(0, window_getWidth(), 0, window_getHeight(), -1, 1).data
+		mat4_ortho(0, width, 0, height, -1, 1).data
 	);
 	glUseProgram(0);
 }

@@ -60,6 +60,8 @@ pthread_t mutex_swap;//mutex for glfwSwapBuffers
 pthread_t mutex_exit;//mutex for glfwWindowShouldClose check
 int shouldPoll, shouldSwap, shouldExit;
 
+pthread_mutex_t mutex_window;//for window calls (like window_getHeight())
+
 chunkManager cm;
 pthread_mutex_t mutex_cm;
 
@@ -83,6 +85,7 @@ shader fxaaShader;
 shader skyboxShader; mesh skyboxMesh;
 
 textRenderer tr;
+pthread_mutex_t mutex_tr;
 font f;
 
 unsigned int rectangleVAO;//a deferred resz hasznalja a kepernyo atrajzolasahoz
@@ -149,12 +152,16 @@ int main()
     shouldSwap = 0;
     shouldExit = 0;
 
-    pthread_mutex_init(&mutex_cm, NULL);
-    pthread_mutex_init(&mutex_pm, NULL);
-    pthread_mutex_init(&mutex_cum, NULL);
     pthread_mutex_init(&mutex_input, NULL);
     pthread_mutex_init(&mutex_swap, NULL);
     pthread_mutex_init(&mutex_exit, NULL);
+
+    pthread_mutex_init(&mutex_window, NULL);
+    pthread_mutex_init(&mutex_cm, NULL);
+    pthread_mutex_init(&mutex_pm, NULL);
+    pthread_mutex_init(&mutex_cum, NULL);
+    pthread_mutex_init(&mutex_tr, NULL);
+
 
     pthread_create(&thread_physics, NULL, loop_physics, NULL);
     pthread_create(&thread_generation, NULL, loop_generation, NULL);
@@ -184,12 +191,17 @@ int main()
     pthread_join(thread_render, NULL);
     pthread_join(thread_physics, NULL);
 
-    pthread_mutex_destroy(&mutex_cm);
-    pthread_mutex_destroy(&mutex_pm);
-    pthread_mutex_destroy(&mutex_cum);
+    
     pthread_mutex_destroy(&mutex_input);
     pthread_mutex_destroy(&mutex_swap);
     pthread_mutex_destroy(&mutex_exit);
+
+    pthread_mutex_destroy(&mutex_window);
+    pthread_mutex_destroy(&mutex_cm);
+    pthread_mutex_destroy(&mutex_pm);
+    pthread_mutex_destroy(&mutex_cum);
+    pthread_mutex_destroy(&mutex_tr);
+
 
     glfwMakeContextCurrent(window);
 
@@ -206,6 +218,9 @@ int main()
 void* loop_render(void* arg)
 {
     glfwMakeContextCurrent(window);
+
+    int windowWidth, windowHeight, lastWindowWidth=window_getWidth(), lastWindowHeight=window_getHeight(), shouldChangeSize=0;
+    float windowAspectXY;
 
     const char * vendor = glGetString(GL_VENDOR);
     const char * renderer = glGetString(GL_RENDERER);
@@ -229,6 +244,18 @@ void* loop_render(void* arg)
             lastSecond = 0;
             framesInLastSecond = 0;
         }
+       
+        //get window info
+        pthread_mutex_lock(&mutex_window);
+        windowWidth = window_getWidth();
+        windowHeight = window_getHeight();
+        windowAspectXY = window_getAspect();
+        pthread_mutex_unlock(&mutex_window);
+
+        if (windowWidth != lastWindowWidth || windowHeight != lastWindowHeight)
+            shouldChangeSize = 69;
+        lastWindowWidth = windowWidth;
+        lastWindowHeight = windowHeight;
 
         //get cum info
         pthread_mutex_lock(&mutex_cum);
@@ -247,7 +274,7 @@ void* loop_render(void* arg)
         //render------------------------------------------
         //matrices
         mat4 view = camera_getViewMatrix(&cum_render);
-        mat4 projection = mat4_perspective(cum_render.fov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
+        mat4 projection = mat4_perspective(cum_render.fov, windowAspectXY, CLIP_NEAR, CLIP_FAR);
         mat4 pv = mat4_multiply(projection, view);
         mat4 projectionInverse = mat4_inverse(projection);
         mat3 viewNormal = mat3_createFromMat(view);
@@ -474,7 +501,7 @@ void* loop_render(void* arg)
 
         //get lens flare data
         flare_queryQueryResult(&lensFlare);
-        flare_query(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / window_getAspect());
+        flare_query(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
         //switch to screen fbo ------------------------------------------------------------------------
         glBindFramebuffer(GL_FRAMEBUFFER, rendor.screenBuffer.id);
 
@@ -509,10 +536,10 @@ void* loop_render(void* arg)
         glDisable(GL_BLEND);
 
         //lens flare
-        flare_render(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / window_getAspect());
+        flare_render(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
 
         //switch to default fbo ------------------------------------------------------------------------
-        glViewport(0, 0, window_getWidth(), window_getHeight());
+        glViewport(0, 0, windowWidth, windowHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
 
         //fxaa
@@ -524,16 +551,24 @@ void* loop_render(void* arg)
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         //render 2d stuff (only text yet)
+        pthread_mutex_lock(&mutex_tr);
+        
+        if (shouldChangeSize)
+        {
+            textRenderer_setSize(&tr, windowWidth, windowHeight);
+        }
+
         textRenderer_render(&tr, &f, vendor, 15, 35, 0.5);
         textRenderer_render(&tr, &f, renderer, 15, 10, 0.5);
 
 
         static char buffer[50];
         sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
-        textRenderer_render(&tr, &f, buffer, 15, window_getHeight() - 34, 0.5);
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 34, 0.5);
         sprintf(buffer, "Pos: %d %d %d", (int)cum_render.position.x, (int)cum_render.position.y, (int)cum_render.position.z);
-        textRenderer_render(&tr, &f, buffer, 15, window_getHeight() - 69, 0.5);
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 69, 0.5);
 
+        pthread_mutex_unlock(&mutex_tr);
 
         glfwSwapBuffers(window);
 
@@ -705,10 +740,11 @@ void handle_event(event e)
     switch (e.type)
     {
     case WINDOW_RESIZE:
+        pthread_mutex_lock(&mutex_window);
         window_setWidth(e.data.window_resize.width);
         window_setHeight(e.data.window_resize.height);
-        textRenderer_setSize(&tr, e.data.window_resize.width, e.data.window_resize.height);
-        glViewport(0, 0, e.data.window_resize.width, e.data.window_resize.height);
+        pthread_mutex_unlock(&mutex_window);
+        //azert nem itt allitom at a text_renderer meretet, mert ez nem az opengl szal
         break;
     default:
         input_handle_event(e);
