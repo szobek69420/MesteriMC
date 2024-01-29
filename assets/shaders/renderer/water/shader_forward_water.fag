@@ -1,3 +1,4 @@
+//a shader of extraordinary walteriness
 #version 330 core
 
 in VS_OUT{
@@ -16,6 +17,8 @@ uniform vec3 waterColourShallow;
 uniform vec3 waterColourDeep;
 const float shallowStart=20;
 const float shallowHelper=0.05;
+
+uniform mat4 projectionInverse;//to get the view space position of the walter floor
 
 //textures
 uniform sampler2D texture_normal;
@@ -60,7 +63,12 @@ void main()
     vec3 viewDirection=normalize(cameraPos-fs_in.fragPos);
 
     //getting water depth
-    float depth=linearizeDepth(texture(texture_depth_geometry, screenUV).r)-linearizeDepth(gl_FragCoord.z);
+    //float depth=linearizeDepth(texture(texture_depth_geometry, screenUV).r)-linearizeDepth(gl_FragCoord.z);
+
+	vec4 tempPos = projectionInverse * (vec4(screenUV, texture(texture_depth_geometry, screenUV).r, 1)* 2 - 1);
+	vec3 waterFloorViewSpace = tempPos.xyz / tempPos.w;
+
+    float depth=length(waterFloorViewSpace-fs_in.fragPosViewSpace);
     if(depth<shallowStart)
         depth*=shallowHelper;
     if(depth>1)
