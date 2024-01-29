@@ -350,8 +350,8 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		meshNormal->indexCount = indicesNormal.size;
 	}
 
-	seqtor_clear(verticesNormal);
-	seqtor_clear(indicesNormal);
+	seqtor_destroy(verticesNormal);
+	seqtor_destroy(indicesNormal);
 	chomk.isThereNormalMesh = 0;
 
 
@@ -420,8 +420,8 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		meshWalter->indexCount = indicesWalter.size;
 	}
 
-	seqtor_clear(verticesWalter);
-	seqtor_clear(indicesWalter);
+	seqtor_destroy(verticesWalter);
+	seqtor_destroy(indicesWalter);
 	chomk.isThereWaterMesh = 0;
 
 	return chomk;

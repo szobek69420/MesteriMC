@@ -9,6 +9,15 @@
 
 #include <pthread.h>
 
+//memory leaks
+#ifdef _MSC_VER
+#define _CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
+#define CRTDBG_ON 1
+#else
+#define CRTDBG_ON 0
+#endif
+
 
 #include "window/window.h"
 #include "camera/camera.h"
@@ -102,7 +111,6 @@ light_renderer lightRenderer;
 sun szunce;
 
 flare lensFlare;
-
 //function prototypes
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
@@ -127,6 +135,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 int main()
 {
+    //_CrtSetBreakAlloc(4910);
+
     window_setWidth(1300);
     window_setHeight(800);
     window = init_window("amogus", window_getWidth(), window_getHeight());
@@ -213,6 +223,9 @@ int main()
     end_renderer();
 
     glfwTerminate();
+
+    if (CRTDBG_ON)
+        _CrtDumpMemoryLeaks();
     return 69;
 }
 
@@ -600,7 +613,7 @@ void* loop_generation(void* arg)
 {
     float deltaTime;
     float lastFrame = glfwGetTime();
-    float lastCameraUpdate = 0;
+    float lastCameraUpdate = -1;
     camera cum_generation;
 
     while (69)
