@@ -473,6 +473,11 @@ void* loop_render(void* arg)
         glUniform3f(glGetUniformLocation(waterShader.id, "waterColourDeep"), 0, 0.0627f, 0.8f);
         glUniform3f(glGetUniformLocation(waterShader.id, "waterColourShallow"), 0, 0.8627f, 0.8941f);
 
+        glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "projectionInverse"), 1, GL_FALSE, projectionInverse.data);
+
+        glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
+        glUniform1i(glGetUniformLocation(waterShader.id, "shadowOn"), 69);
+
         glUniform3f(glGetUniformLocation(waterShader.id, "sun.position"), sunTzu.position.x, sunTzu.position.y, sunTzu.position.z);
         glUniform3f(glGetUniformLocation(waterShader.id, "sun.colour"), sunTzu.colour.x, sunTzu.colour.y, sunTzu.colour.z);
         glUniform3f(glGetUniformLocation(waterShader.id, "sun.attenuation"), sunTzu.attenuation.x, sunTzu.attenuation.y, sunTzu.attenuation.z);
@@ -489,6 +494,9 @@ void* loop_render(void* arg)
 
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
+
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, rendor.shadowBuffer.depthBuffer);
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -802,6 +810,9 @@ void init_renderer()
     glUniform1f(glGetUniformLocation(waterShader.id, "projectionFar"), CLIP_FAR);
     glUniform1f(glGetUniformLocation(waterShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(waterShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
+    glUniform1f(glGetUniformLocation(waterShader.id, "shadowStart"), 60);
+    glUniform1f(glGetUniformLocation(waterShader.id, "shadowEnd"), 70);
+    glUniform1f(glGetUniformLocation(waterShader.id, "shadowHelper"), 1.0f / (70 - 60));
 
     ssaoShader = shader_import(
         "../assets/shaders/renderer/ssao/shader_ssao.vag",
