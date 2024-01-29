@@ -17,15 +17,15 @@ textRenderer textRenderer_create(int width, int height)
 
 	glGenBuffers(1, &renderer.vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, renderer.vbo);
-	glBufferData(GL_ARRAY_BUFFER, 4, NULL, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, 4*sizeof(float), NULL, GL_STATIC_DRAW);
 
-	unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };//0: bal also, 1: jobb also, 2: jobb felso, 3: bal felso
+	unsigned int indices[] = { 0, 2, 1, 3, 2, 0 };//0: bal also, 1: jobb also, 2: jobb felso, 3: bal felso
 	glGenBuffers(1, &renderer.ebo);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer.ebo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 1, GL_UNSIGNED_BYTE, GL_FALSE,1, 0);
+	glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE,sizeof(float), (void*)0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	glBindVertexArray(0);
@@ -80,7 +80,7 @@ void textRenderer_render(textRenderer* renderer, font* f, const char* text, floa
 		// update data
 		glUniformMatrix4fv(dataLocation, 1, GL_FALSE, vertices);
 		// render quad
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
 		// now advance cursors for next glyph (note that advance is number of 1/64 pixels)
 		x += (ch.advance >> 6) * scale; // bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
 	}

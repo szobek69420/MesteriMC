@@ -80,17 +80,13 @@ shader waterShader;
 shader forwardPassShader;
 shader finalPassShader;
 shader fxaaShader;
-shader textShader;
 shader skyboxShader; mesh skyboxMesh;
 
 textRenderer tr;
 font f;
 
-unsigned int rectangleVAO;
+unsigned int rectangleVAO;//a deferred resz hasznalja a kepernyo atrajzolasahoz
 unsigned int rectangleVBO;
-
-unsigned int textVAO;
-unsigned int textVBO;
 
 vec3 ssaoKernel[64];
 unsigned int noiseTexture;
@@ -115,7 +111,6 @@ void* loop_physics(void* arg);
 void init_renderer();
 void end_renderer();
 
-void render_text(font* f, const char* text, float x, float y, float scale);
 void render_cube();
 
 double lerp(double a, double b, double f);
@@ -529,17 +524,15 @@ void* loop_render(void* arg)
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         //render 2d stuff (only text yet)
-        //everything is inside render_text like use shader bing VAO etc. (inefficient but good enough for now)
-        render_text(&f, vendor, 10, 35, 0.5f);
-        render_text(&f, renderer, 10, 10, 0.5f);
+        textRenderer_render(&tr, &f, vendor, 15, 35, 0.5);
+        textRenderer_render(&tr, &f, renderer, 15, 10, 0.5);
 
 
         static char buffer[50];
         sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
-        //render_text(&f, buffer, 15, window_getHeight() - 34, 0.5);
         textRenderer_render(&tr, &f, buffer, 15, window_getHeight() - 34, 0.5);
         sprintf(buffer, "Pos: %d %d %d", (int)cum_render.position.x, (int)cum_render.position.y, (int)cum_render.position.z);
-        render_text(&f, buffer, 15, window_getHeight() - 69, 0.5);
+        textRenderer_render(&tr, &f, buffer, 15, window_getHeight() - 69, 0.5);
 
 
         glfwSwapBuffers(window);
@@ -714,6 +707,7 @@ void handle_event(event e)
     case WINDOW_RESIZE:
         window_setWidth(e.data.window_resize.width);
         window_setHeight(e.data.window_resize.height);
+        textRenderer_setSize(&tr, e.data.window_resize.width, e.data.window_resize.height);
         glViewport(0, 0, e.data.window_resize.width, e.data.window_resize.height);
         break;
     default:
@@ -839,12 +833,6 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(fxaaShader.id, "tex"), 0);
     glUniform2f(glGetUniformLocation(fxaaShader.id, "onePerResolution"), 1.0f/RENDERER_WIDTH, 1.0f/RENDERER_HEIGHT);
 
-    textShader = shader_import(
-        "../assets/shaders/renderer2D/text/shader_text.vag",
-        "../assets/shaders/renderer2D/text/shader_text.fag",
-        NULL
-    );
-
     //rectangle VAO, VBO
     float vertices[] = {
         1,-1,0,     1,0,
@@ -868,23 +856,6 @@ void init_renderer()
     glEnableVertexAttribArray(1);
 
     glBindVertexArray(0);
-
-    //text VAO, VBO
-    glGenVertexArrays(1, &textVAO);
-    glBindVertexArray(textVAO);
-
-    glGenBuffers(1, &textVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    glBindVertexArray(0);
-
-    glEnable(GL_DEPTH_TEST);
-    glClearDepth(1);
 
     //cull front faces
     glEnable(GL_CULL_FACE);
@@ -992,7 +963,6 @@ void end_renderer()
     shader_delete(&forwardPassShader);
     shader_delete(&finalPassShader);
     shader_delete(&fxaaShader);
-    shader_delete(&textShader);
 
     glDeleteVertexArrays(1, &rectangleVAO);
     glDeleteBuffers(1, &rectangleVBO);
@@ -1047,50 +1017,6 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     event_queue_push((event){ .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
-}
-
-
-void render_text(font* f, const char* text, float x, float y, float scale)
-{
-    glUseProgram(textShader.id);
-    mat4 projection2D = mat4_ortho(0, window_getWidth(), 0, window_getHeight(), -1, 1);
-    glUniformMatrix4fv(glGetUniformLocation(textShader.id, "projection"), 1, GL_FALSE, projection2D.data);
-    glUniform3f(glGetUniformLocation(textShader.id, "textColor"), 1, 1, 1);
-    glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(textVAO);
-    // iterate through all characters
-    for (int i = 0; text[i] != '\0'; i++)
-    {
-        character ch = f->characters[text[i]];
-
-        float xpos = x + ch.bearingX * scale;
-        float ypos = y - (ch.height - ch.bearingY) * scale;
-
-        float w = ch.width * scale;
-        float h = ch.height * scale;
-        // update VBO for each character
-        float vertices[6][4] = {
-            { xpos,     ypos,       0.0f, 1.0f },
-            { xpos,     ypos + h,   0.0f, 0.0f },
-            { xpos + w, ypos,       1.0f, 1.0f },
-
-            { xpos + w, ypos,       1.0f, 1.0f },
-            { xpos,     ypos + h,   0.0f, 0.0f },
-            { xpos + w, ypos + h,   1.0f, 0.0f }
-        };
-        // render glyph texture over quad
-        glBindTexture(GL_TEXTURE_2D, ch.textureID);
-        // update content of VBO memory
-        glBindBuffer(GL_ARRAY_BUFFER, textVBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // be sure to use glBufferSubData and not glBufferData
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        // render quad
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        // now advance cursors for next glyph (note that advance is number of 1/64 pixels)
-        x += (ch.advance >> 6) * scale; // bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
-    }
-    glBindVertexArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 unsigned int cubeVAO = 0;
