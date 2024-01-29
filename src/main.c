@@ -27,7 +27,8 @@
 #include "mesh/kuba/kuba.h"
 #include "mesh/player_mesh/player_mesh.h"
 
-#include "font_handler/font_handler.h"
+#include "ui/font_handler/font_handler.h"
+#include "ui/text/text_renderer.h"
 
 #include "post_processing/lens_flare/flare.h"
 
@@ -59,6 +60,8 @@ pthread_t mutex_swap;//mutex for glfwSwapBuffers
 pthread_t mutex_exit;//mutex for glfwWindowShouldClose check
 int shouldPoll, shouldSwap, shouldExit;
 
+pthread_mutex_t mutex_window;//for window calls (like window_getHeight())
+
 chunkManager cm;
 pthread_mutex_t mutex_cm;
 
@@ -79,16 +82,14 @@ shader waterShader;
 shader forwardPassShader;
 shader finalPassShader;
 shader fxaaShader;
-shader textShader;
 shader skyboxShader; mesh skyboxMesh;
 
+textRenderer tr;
+pthread_mutex_t mutex_tr;
 font f;
 
-unsigned int rectangleVAO;
+unsigned int rectangleVAO;//a deferred resz hasznalja a kepernyo atrajzolasahoz
 unsigned int rectangleVBO;
-
-unsigned int textVAO;
-unsigned int textVBO;
 
 vec3 ssaoKernel[64];
 unsigned int noiseTexture;
@@ -113,7 +114,6 @@ void* loop_physics(void* arg);
 void init_renderer();
 void end_renderer();
 
-void render_text(font* f, const char* text, float x, float y, float scale);
 void render_cube();
 
 double lerp(double a, double b, double f);
@@ -133,7 +133,10 @@ int main()
 
     event_queue_init();
     input_init();
+
+    tr = textRenderer_create(window_getWidth(), window_getHeight());
     fontHandler_init();
+    f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
 
     cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
@@ -141,7 +144,6 @@ int main()
     init_renderer();
 
     textureHandler_importTextures();
-    f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
 
     glfwMakeContextCurrent(NULL);
 
@@ -150,12 +152,16 @@ int main()
     shouldSwap = 0;
     shouldExit = 0;
 
-    pthread_mutex_init(&mutex_cm, NULL);
-    pthread_mutex_init(&mutex_pm, NULL);
-    pthread_mutex_init(&mutex_cum, NULL);
     pthread_mutex_init(&mutex_input, NULL);
     pthread_mutex_init(&mutex_swap, NULL);
     pthread_mutex_init(&mutex_exit, NULL);
+
+    pthread_mutex_init(&mutex_window, NULL);
+    pthread_mutex_init(&mutex_cm, NULL);
+    pthread_mutex_init(&mutex_pm, NULL);
+    pthread_mutex_init(&mutex_cum, NULL);
+    pthread_mutex_init(&mutex_tr, NULL);
+
 
     pthread_create(&thread_physics, NULL, loop_physics, NULL);
     pthread_create(&thread_generation, NULL, loop_generation, NULL);
@@ -185,16 +191,22 @@ int main()
     pthread_join(thread_render, NULL);
     pthread_join(thread_physics, NULL);
 
-    pthread_mutex_destroy(&mutex_cm);
-    pthread_mutex_destroy(&mutex_pm);
-    pthread_mutex_destroy(&mutex_cum);
+    
     pthread_mutex_destroy(&mutex_input);
     pthread_mutex_destroy(&mutex_swap);
     pthread_mutex_destroy(&mutex_exit);
 
+    pthread_mutex_destroy(&mutex_window);
+    pthread_mutex_destroy(&mutex_cm);
+    pthread_mutex_destroy(&mutex_pm);
+    pthread_mutex_destroy(&mutex_cum);
+    pthread_mutex_destroy(&mutex_tr);
+
+
     glfwMakeContextCurrent(window);
 
     chunkManager_destroy(&cm);
+    textRenderer_destroy(&tr);
     textureHandler_destroyTextures();
     fontHandler_close();
     end_renderer();
@@ -206,6 +218,9 @@ int main()
 void* loop_render(void* arg)
 {
     glfwMakeContextCurrent(window);
+
+    int windowWidth, windowHeight, lastWindowWidth=window_getWidth(), lastWindowHeight=window_getHeight(), shouldChangeSize=0;
+    float windowAspectXY;
 
     const char * vendor = glGetString(GL_VENDOR);
     const char * renderer = glGetString(GL_RENDERER);
@@ -229,6 +244,18 @@ void* loop_render(void* arg)
             lastSecond = 0;
             framesInLastSecond = 0;
         }
+       
+        //get window info
+        pthread_mutex_lock(&mutex_window);
+        windowWidth = window_getWidth();
+        windowHeight = window_getHeight();
+        windowAspectXY = window_getAspect();
+        pthread_mutex_unlock(&mutex_window);
+
+        if (windowWidth != lastWindowWidth || windowHeight != lastWindowHeight)
+            shouldChangeSize = 69;
+        lastWindowWidth = windowWidth;
+        lastWindowHeight = windowHeight;
 
         //get cum info
         pthread_mutex_lock(&mutex_cum);
@@ -247,7 +274,7 @@ void* loop_render(void* arg)
         //render------------------------------------------
         //matrices
         mat4 view = camera_getViewMatrix(&cum_render);
-        mat4 projection = mat4_perspective(cum_render.fov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
+        mat4 projection = mat4_perspective(cum_render.fov, windowAspectXY, CLIP_NEAR, CLIP_FAR);
         mat4 pv = mat4_multiply(projection, view);
         mat4 projectionInverse = mat4_inverse(projection);
         mat3 viewNormal = mat3_createFromMat(view);
@@ -474,7 +501,7 @@ void* loop_render(void* arg)
 
         //get lens flare data
         flare_queryQueryResult(&lensFlare);
-        flare_query(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / window_getAspect());
+        flare_query(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
         //switch to screen fbo ------------------------------------------------------------------------
         glBindFramebuffer(GL_FRAMEBUFFER, rendor.screenBuffer.id);
 
@@ -509,10 +536,10 @@ void* loop_render(void* arg)
         glDisable(GL_BLEND);
 
         //lens flare
-        flare_render(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / window_getAspect());
+        flare_render(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
 
         //switch to default fbo ------------------------------------------------------------------------
-        glViewport(0, 0, window_getWidth(), window_getHeight());
+        glViewport(0, 0, windowWidth, windowHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
 
         //fxaa
@@ -524,17 +551,24 @@ void* loop_render(void* arg)
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         //render 2d stuff (only text yet)
-        //everything is inside render_text like use shader bing VAO etc. (inefficient but good enough for now)
-        render_text(&f, vendor, 10, 35, 0.5f);
-        render_text(&f, renderer, 10, 10, 0.5f);
+        pthread_mutex_lock(&mutex_tr);
+        
+        if (shouldChangeSize)
+        {
+            textRenderer_setSize(&tr, windowWidth, windowHeight);
+        }
+
+        textRenderer_render(&tr, &f, vendor, windowWidth-0.5f*fontHandler_calculateTextLength(&f, vendor) - 15, windowHeight-34, 0.5);
+        textRenderer_render(&tr, &f, renderer, windowWidth - 0.5f * fontHandler_calculateTextLength(&f, renderer) - 15, windowHeight - 69, 0.5);
 
 
         static char buffer[50];
         sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
-        render_text(&f, buffer, 15, window_getHeight() - 34, 0.5);
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 34, 0.5);
         sprintf(buffer, "Pos: %d %d %d", (int)cum_render.position.x, (int)cum_render.position.y, (int)cum_render.position.z);
-        render_text(&f, buffer, 15, window_getHeight() - 69, 0.5);
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 69, 0.5);
 
+        pthread_mutex_unlock(&mutex_tr);
 
         glfwSwapBuffers(window);
 
@@ -706,9 +740,11 @@ void handle_event(event e)
     switch (e.type)
     {
     case WINDOW_RESIZE:
+        pthread_mutex_lock(&mutex_window);
         window_setWidth(e.data.window_resize.width);
         window_setHeight(e.data.window_resize.height);
-        glViewport(0, 0, e.data.window_resize.width, e.data.window_resize.height);
+        pthread_mutex_unlock(&mutex_window);
+        //azert nem itt allitom at a text_renderer meretet, mert ez nem az opengl szal
         break;
     default:
         input_handle_event(e);
@@ -833,12 +869,6 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(fxaaShader.id, "tex"), 0);
     glUniform2f(glGetUniformLocation(fxaaShader.id, "onePerResolution"), 1.0f/RENDERER_WIDTH, 1.0f/RENDERER_HEIGHT);
 
-    textShader = shader_import(
-        "../assets/shaders/renderer2D/text/shader_text.vag",
-        "../assets/shaders/renderer2D/text/shader_text.fag",
-        NULL
-    );
-
     //rectangle VAO, VBO
     float vertices[] = {
         1,-1,0,     1,0,
@@ -862,23 +892,6 @@ void init_renderer()
     glEnableVertexAttribArray(1);
 
     glBindVertexArray(0);
-
-    //text VAO, VBO
-    glGenVertexArrays(1, &textVAO);
-    glBindVertexArray(textVAO);
-
-    glGenBuffers(1, &textVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    glBindVertexArray(0);
-
-    glEnable(GL_DEPTH_TEST);
-    glClearDepth(1);
 
     //cull front faces
     glEnable(GL_CULL_FACE);
@@ -986,7 +999,6 @@ void end_renderer()
     shader_delete(&forwardPassShader);
     shader_delete(&finalPassShader);
     shader_delete(&fxaaShader);
-    shader_delete(&textShader);
 
     glDeleteVertexArrays(1, &rectangleVAO);
     glDeleteBuffers(1, &rectangleVBO);
@@ -1041,50 +1053,6 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     event_queue_push((event){ .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
-}
-
-
-void render_text(font* f, const char* text, float x, float y, float scale)
-{
-    glUseProgram(textShader.id);
-    mat4 projection2D = mat4_ortho(0, window_getWidth(), 0, window_getHeight(), -1, 1);
-    glUniformMatrix4fv(glGetUniformLocation(textShader.id, "projection"), 1, GL_FALSE, projection2D.data);
-    glUniform3f(glGetUniformLocation(textShader.id, "textColor"), 1, 1, 1);
-    glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(textVAO);
-    // iterate through all characters
-    for (int i = 0; text[i] != '\0'; i++)
-    {
-        character ch = f->characters[text[i]];
-
-        float xpos = x + ch.bearingX * scale;
-        float ypos = y - (ch.height - ch.bearingY) * scale;
-
-        float w = ch.width * scale;
-        float h = ch.height * scale;
-        // update VBO for each character
-        float vertices[6][4] = {
-            { xpos,     ypos,       0.0f, 1.0f },
-            { xpos,     ypos + h,   0.0f, 0.0f },
-            { xpos + w, ypos,       1.0f, 1.0f },
-
-            { xpos + w, ypos,       1.0f, 1.0f },
-            { xpos,     ypos + h,   0.0f, 0.0f },
-            { xpos + w, ypos + h,   1.0f, 0.0f }
-        };
-        // render glyph texture over quad
-        glBindTexture(GL_TEXTURE_2D, ch.textureID);
-        // update content of VBO memory
-        glBindBuffer(GL_ARRAY_BUFFER, textVBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // be sure to use glBufferSubData and not glBufferData
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        // render quad
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        // now advance cursors for next glyph (note that advance is number of 1/64 pixels)
-        x += (ch.advance >> 6) * scale; // bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
-    }
-    glBindVertexArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 unsigned int cubeVAO = 0;
