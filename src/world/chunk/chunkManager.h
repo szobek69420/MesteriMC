@@ -2,6 +2,7 @@
 #define CHUNKMANAGER_H
 
 #include "../../utils/list.h"
+#include "../../utils/lista.h"
 #include "../terrain/FastNoiseLite.h"
 #include "../../camera/camera.h"
 #include "../../glm2/mat4.h"
@@ -46,7 +47,7 @@ typedef struct chunkManager {
 	int renderDistance;
 
 	list loadedChunks;//list of chunks
-	list pendingUpdates;//list of chunk updates
+	lista_of(chunkGenerationUpdate) pendingUpdates;//list of chunk updates
 	list pendingMeshUpdates;//list of chunk mesh updates
 
 	fnl_state noise, noise2;//terrain generation

@@ -35,7 +35,7 @@ chunkManager chunkManager_create(int seed, int renderDistance)
 	cm.noise2.frequency = 0.0083;
 	cm.noise2.seed = seed*seed+seed;
 
-	cm.pendingUpdates = list_create();
+	lista_init(&cm.pendingUpdates);
 	cm.pendingMeshUpdates = list_create();
 	cm.loadedChunks = list_create();
 
@@ -45,7 +45,7 @@ chunkManager chunkManager_create(int seed, int renderDistance)
 void chunkManager_destroy(chunkManager* cm)
 {
 	chunk* chomk;
-	chunkGenerationUpdate* chomkUp;
+	chunkGenerationUpdate chomkUp;
 	chunkMeshUpdate* chomkDown;
 
 	while (69)
@@ -60,16 +60,7 @@ void chunkManager_destroy(chunkManager* cm)
 		free(chomk);
 	}
 
-	while (69)
-	{
-		chomkUp = (chunkGenerationUpdate*)list_get(&(cm->pendingUpdates), 0);
-		if (chomkUp == NULL)
-			break;
-
-		list_remove_at(&(cm->pendingUpdates), 0);
-
-		free(chomkUp);
-	}
+	lista_clear(&cm->pendingUpdates);
 
 	while (69)
 	{
@@ -116,14 +107,15 @@ int chunkManager_isChunkLoaded(chunkManager* cm, int chunkX, int chunkY, int chu
 
 int chunkManager_isChunkPending(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 {
-	listElement* iterator = list_get_iterator(&(cm->pendingUpdates));
+	listElement* iterator;
+	lista_element_of(chunkGenerationUpdate)* iterator2 = cm->pendingUpdates.head;
 
-	while (iterator != NULL)
+	while (iterator2 != NULL)
 	{
-		if (((chunkGenerationUpdate*)(iterator->data))->chunkX == chunkX && ((chunkGenerationUpdate*)(iterator->data))->chunkY == chunkY && ((chunkGenerationUpdate*)(iterator->data))->chunkZ == chunkZ)
+		if (iterator2->data.chunkX == chunkX && iterator2->data.chunkY == chunkY && iterator2->data.chunkZ == chunkZ)
 			return 69;
 
-		iterator = list_next(iterator);
+		iterator2 = iterator2->next;
 	}
 
 	iterator = list_get_iterator(&(cm->pendingMeshUpdates));
@@ -158,13 +150,13 @@ void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playe
 						&&
 						chunkManager_isChunkPending(cm, playerChunkX + x, playerChunkY + y, playerChunkZ + z) == 0)
 					{
-						chunkGenerationUpdate* ceu = (chunkGenerationUpdate*)malloc(sizeof(chunkGenerationUpdate));
-						ceu->chunkX = playerChunkX + x;
-						ceu->chunkY = playerChunkY + y;
-						ceu->chunkZ = playerChunkZ + z;
-						ceu->type = CHUNKMANAGER_LOAD_CHUNK;
+						chunkGenerationUpdate ceu;
+						ceu.chunkX = playerChunkX + x;
+						ceu.chunkY = playerChunkY + y;
+						ceu.chunkZ = playerChunkZ + z;
+						ceu.type = CHUNKMANAGER_LOAD_CHUNK;
 
-						list_push_back(&(cm->pendingUpdates), (void*)ceu);
+						lista_push_back(&cm->pendingUpdates, ceu);
 						goto exit_load;
 					}
 				}
@@ -186,13 +178,13 @@ exit_load:
 		{
 			if (chunkManager_isChunkPending(cm, ((chunk*)iterator->data)->chunkX, ((chunk*)iterator->data)->chunkY, ((chunk*)iterator->data)->chunkZ)==0)
 			{
-				chunkGenerationUpdate* ceu = (chunkGenerationUpdate*)malloc(sizeof(chunkGenerationUpdate));
-				ceu->chunkX = ((chunk*)iterator->data)->chunkX;
-				ceu->chunkY = ((chunk*)iterator->data)->chunkY;
-				ceu->chunkZ = ((chunk*)iterator->data)->chunkZ;
-				ceu->type = CHUNKMANAGER_UNLOAD_CHUNK;
+				chunkGenerationUpdate ceu;
+				ceu.chunkX = ((chunk*)iterator->data)->chunkX;
+				ceu.chunkY = ((chunk*)iterator->data)->chunkY;
+				ceu.chunkZ = ((chunk*)iterator->data)->chunkZ;
+				ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
 
-				list_push_back(&(cm->pendingUpdates), (void*)ceu);
+				lista_push_back(&cm->pendingUpdates, ceu);
 
 				break;
 			}
@@ -215,18 +207,22 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 	chunkMeshUpdate* cmu = (chunkMeshUpdate*)malloc(sizeof(chunkMeshUpdate));
 
 	pthread_mutex_lock(pmutex);
-	chunkGenerationUpdate* ceu = (chunkGenerationUpdate*)list_get(&(cm->pendingUpdates), 0);
-	list_remove_at(&(cm->pendingUpdates), 0);
+	if (cm->pendingUpdates.size == 0)
+	{
+		pthread_mutex_unlock(pmutex);
+		return;
+	}
+	chunkGenerationUpdate ceu;
+	lista_at(&cm->pendingUpdates, 0, &ceu);
+	lista_remove_at(&cm->pendingUpdates, 0);
 	pthread_mutex_unlock(pmutex);
 
-	if (ceu == NULL)
-		return;
 
 
-	switch (ceu->type)
+	switch (ceu.type)
 	{
 		case CHUNKMANAGER_LOAD_CHUNK:
-			cmu->chomk=chunk_generate(cm, ceu->chunkX, ceu->chunkY, ceu->chunkZ, &cmu->meshNormal, &cmu->meshWalter);
+			cmu->chomk=chunk_generate(cm, ceu.chunkX, ceu.chunkY, ceu.chunkZ, &cmu->meshNormal, &cmu->meshWalter);
 			cmu->type = CHUNKMANAGER_LOAD_CHUNK;
 			pthread_mutex_lock(pmutex);
 			list_push_back(&cm->pendingMeshUpdates, cmu);
@@ -240,7 +236,7 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 			while (iterator != NULL)
 			{
 				chomk = (chunk*)iterator->data;
-				if (chomk->chunkX == ceu->chunkX && chomk->chunkY == ceu->chunkY && chomk->chunkZ == ceu->chunkZ)
+				if (chomk->chunkX == ceu.chunkX && chomk->chunkY == ceu.chunkY && chomk->chunkZ == ceu.chunkZ)
 				{
 					//list_remove_at(&(cm->loadedChunks), index);
 					cmu->chomk = *chomk;
@@ -263,8 +259,6 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 			//unload and load
 			break;
 	}
-
-	free(ceu);
 }
 
 void chunkManager_updateMesh(chunkManager* cm)

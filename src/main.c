@@ -135,6 +135,7 @@ int main()
     input_init();
 
     tr = textRenderer_create(window_getWidth(), window_getHeight());
+    textRenderer_setColour(&tr, 1, 0.85f, 0);
     fontHandler_init();
     f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
 
