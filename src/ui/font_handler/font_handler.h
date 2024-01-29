@@ -23,4 +23,6 @@ void fontHandler_close();
 
 font fontHandler_loadFont(const char* fontPath, unsigned int fontSize);
 
+float fontHandler_calculateTextLength(font* f, const char* text);
+
 #endif

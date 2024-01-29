@@ -558,8 +558,8 @@ void* loop_render(void* arg)
             textRenderer_setSize(&tr, windowWidth, windowHeight);
         }
 
-        textRenderer_render(&tr, &f, vendor, 15, 35, 0.5);
-        textRenderer_render(&tr, &f, renderer, 15, 10, 0.5);
+        textRenderer_render(&tr, &f, vendor, windowWidth-0.5f*fontHandler_calculateTextLength(&f, vendor) - 15, windowHeight-34, 0.5);
+        textRenderer_render(&tr, &f, renderer, windowWidth - 0.5f * fontHandler_calculateTextLength(&f, renderer) - 15, windowHeight - 69, 0.5);
 
 
         static char buffer[50];

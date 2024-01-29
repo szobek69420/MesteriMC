@@ -82,3 +82,17 @@ static void _fontHandler_loadGlyphs(font* f, FT_Face face)
     }
     glBindTexture(GL_TEXTURE_2D, 0);
 }
+
+float fontHandler_calculateTextLength(font* f, const char* text)
+{
+    float length = 0;
+    // iterate through all characters
+    for (int i = 0; text[i] != '\0'; i++)
+    {
+        character ch = f->characters[text[i]];
+        // now advance cursors for next glyph (note that advance is number of 1/64 pixels)
+        length += ch.advance >> 6; // bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
+    }
+
+    return length;
+}
