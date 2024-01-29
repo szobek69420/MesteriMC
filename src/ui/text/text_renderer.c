@@ -15,18 +15,18 @@ textRenderer textRenderer_create(int width, int height)
 	glGenVertexArrays(1, &renderer.vao);
 	glBindVertexArray(renderer.vao);
 
+	float vertices[] = { 0.0f,1.0f,	1.0f,1.0f,	1.0f,0.0f,	0.0f,0.0f };
 	glGenBuffers(1, &renderer.vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, renderer.vbo);
-	glBufferData(GL_ARRAY_BUFFER, 4*sizeof(float), NULL, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 	unsigned int indices[] = { 0, 2, 1, 3, 2, 0 };//0: bal also, 1: jobb also, 2: jobb felso, 3: bal felso
 	glGenBuffers(1, &renderer.ebo);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderer.ebo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2*sizeof(float), (void*)0);//uv
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE,sizeof(float), (void*)0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	glBindVertexArray(0);
 
@@ -53,6 +53,12 @@ void textRenderer_destroy(textRenderer* renderer)
 
 void textRenderer_render(textRenderer* renderer, font* f, const char* text, float x, float y, float scale)
 {
+	/*
+	egy betuhoz 4 csucs tartozik, csucsonkent 2 float a pozicio (xy) es 2 float a uv
+	
+	a pozicio uniformkent van elkuldve float vertexData[8], ahol az i. csucshoz tartozo xy-ertek vertexData[2*i] es vertexData[2*i+1]
+	a uv benne van a vbo-ban
+	*/
 	glUseProgram(renderer->program.id);
 	unsigned int dataLocation = glGetUniformLocation(renderer->program.id, "vertexData");
 
@@ -69,16 +75,16 @@ void textRenderer_render(textRenderer* renderer, font* f, const char* text, floa
 		float w = ch.width * scale;
 		float h = ch.height * scale;
 		// update VBO for each character
-		float vertices[16] = {
-			xpos,     ypos,       0.0f, 1.0f,
-			xpos + w, ypos,       1.0f, 1.0f,
-			xpos + w, ypos + h,   1.0f, 0.0f,
-			xpos,     ypos + h,   0.0f, 0.0f
+		float vertices[8] = {
+			xpos,     ypos,       
+			xpos + w, ypos,       
+			xpos + w, ypos + h,   
+			xpos,     ypos + h
 		};
 		// render glyph texture over quad
 		glBindTexture(GL_TEXTURE_2D, ch.textureID);
 		// update data
-		glUniformMatrix4fv(dataLocation, 1, GL_FALSE, vertices);
+		glUniform1fv(dataLocation, 8, vertices);
 		// render quad
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
 		// now advance cursors for next glyph (note that advance is number of 1/64 pixels)

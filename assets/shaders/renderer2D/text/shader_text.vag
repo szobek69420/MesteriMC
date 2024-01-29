@@ -1,13 +1,12 @@
 #version 330 core
-layout (location = 0) in float vertex; // ingore it
+layout (location = 0) in vec2 uv;
 out vec2 TexCoords;
 
-uniform mat4 vertexData;
+uniform float vertexData[8];
 uniform mat4 projection;
 
 void main()
 {
-    vec4 vec=vertexData[gl_VertexID].xyzw;
-    gl_Position = projection * vec4(vec.xy, 0.0, 1.0);
-    TexCoords = vec.zw;
+    gl_Position = projection * vec4(vertexData[2*gl_VertexID], vertexData[2*gl_VertexID+1], 0.0, 1.0);
+    TexCoords = uv;
 }  
