@@ -53,7 +53,7 @@ struct chunkManager {
 	int seed;
 	int renderDistance;
 
-	list loadedChunks;//list of chunks
+	lista_of(chunk) loadedChunks;//list of chunks
 	lista_of(chunkGenerationUpdate) pendingUpdates;//list of chunk updates
 	lista_of(chunkMeshUpdate) pendingMeshUpdates;//list of chunk mesh updates
 
