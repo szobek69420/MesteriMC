@@ -15,110 +15,110 @@
     size_t size; \
 }
 
-#define lista_init(LIST_P) do{\
-	(LIST_P)->head=NULL;\
-	(LIST_P)->size = 0;\
+#define lista_init(LIST) do{\
+	(LIST).head=NULL;\
+	(LIST).size = 0;\
 } while(0)
 
-#define lista_clear(LIST_P) do{\
-	(LIST_P)->op1=(LIST_P)->head;\
-	while((LIST_P)->op1!=NULL)\
+#define lista_clear(LIST) do{\
+	(LIST).op1=(LIST).head;\
+	while((LIST).op1!=NULL)\
 	{\
-		(LIST_P)->op2=(LIST_P)->op1;\
-		(LIST_P)->op1=(LIST_P)->op1->next;\
-		free((LIST_P)->op2);\
+		(LIST).op2=(LIST).op1;\
+		(LIST).op1=(LIST).op1->next;\
+		free((LIST).op2);\
 	}\
-	(LIST_P)->head = NULL;\
-	(LIST_P)->size = 0;\
+	(LIST).head = NULL;\
+	(LIST).size = 0;\
 } while(0)
 
 //nem ellenorzi, hogy ervenyes-e az index
-#define lista_push(LIST_P, INDEX, VALUE) do{\
-	if ((LIST_P)->size == 0)\
+#define lista_push(LIST, INDEX, VALUE) do{\
+	if ((LIST).size == 0)\
 	{\
-		(LIST_P)->op2 = malloc(sizeof(*(LIST_P)->head));\
-		(LIST_P)->op2->data = (VALUE);\
-		(LIST_P)->op2->next = NULL;\
-		(LIST_P)->head = (LIST_P)->op2;\
-		(LIST_P)->size = 1;\
+		(LIST).op2 = malloc(sizeof(*(LIST).head));\
+		(LIST).op2->data = (VALUE);\
+		(LIST).op2->next = NULL;\
+		(LIST).head = (LIST).op2;\
+		(LIST).size = 1;\
 	}\
 	else if ((INDEX) == 0)\
 	{\
-		(LIST_P)->op2 = malloc(sizeof(*(LIST_P)->head));\
-		(LIST_P)->op2->data = (VALUE);\
-		(LIST_P)->op2->next = (LIST_P)->head;\
-		(LIST_P)->head = (LIST_P)->op2;\
-		(LIST_P)->size++;\
+		(LIST).op2 = malloc(sizeof(*(LIST).head));\
+		(LIST).op2->data = (VALUE);\
+		(LIST).op2->next = (LIST).head;\
+		(LIST).head = (LIST).op2;\
+		(LIST).size++;\
 	}\
 	else\
 	{\
-		(LIST_P)->op1 = (LIST_P)->head;\
+		(LIST).op1 = (LIST).head;\
 		for (int __i = 1; __i < (INDEX); __i++)\
-			(LIST_P)->op1 = (LIST_P)->op1->next;\
-		(LIST_P)->op2 = malloc(sizeof(*(LIST_P)->head)); \
-		(LIST_P)->op2->data = (VALUE);\
-		(LIST_P)->op2->next = (LIST_P)->op1->next;\
-		(LIST_P)->op1->next = (LIST_P)->op2;\
-		(LIST_P)->size++;\
+			(LIST).op1 = (LIST).op1->next;\
+		(LIST).op2 = malloc(sizeof(*(LIST).head)); \
+		(LIST).op2->data = (VALUE);\
+		(LIST).op2->next = (LIST).op1->next;\
+		(LIST).op1->next = (LIST).op2;\
+		(LIST).size++;\
 	}\
 } while(0)
 
-#define lista_push_back(LIST_P, VALUE) lista_push((LIST_P), (LIST_P)->size, (VALUE))
+#define lista_push_back(LIST, VALUE) lista_push((LIST), (LIST).size, (VALUE))
 
-#define lista_remove(LIST_P, VALUE) do{\
-	(LIST_P)->op1=NULL;\
-	(LIST_P)->op2 = (LIST_P)->head;\
-	while((LIST_P)->op2!=NULL)\
+#define lista_remove(LIST, VALUE) do{\
+	(LIST).op1=NULL;\
+	(LIST).op2 = (LIST).head;\
+	while((LIST).op2!=NULL)\
 	{\
-		if ((LIST_P)->op2->data == (VALUE))\
+		if ((LIST).op2->data == (VALUE))\
 		{\
-			if((LIST_P)->op1==NULL)\
-				(LIST_P)->head = (LIST_P)->op2->next;\
+			if((LIST).op1==NULL)\
+				(LIST).head = (LIST).op2->next;\
 			else\
-				(LIST_P)->op1->next = (LIST_P)->op2->next;\
-			free((LIST_P)->op2);\
-			(LIST_P)->size--;\
+				(LIST).op1->next = (LIST).op2->next;\
+			free((LIST).op2);\
+			(LIST).size--;\
 			break;\
 		}\
-		(LIST_P)->op1=(LIST_P)->op2;\
-		(LIST_P)->op2=(LIST_P)->op2->next;\
+		(LIST).op1=(LIST).op2;\
+		(LIST).op2=(LIST).op2->next;\
 	}\
 } while(0)
 
 //nem ellenorzi, hogy ervenyes-e az index
-#define lista_remove_at(LIST_P, INDEX) do{\
-	(LIST_P)->op2 = (LIST_P)->head;\
-	(LIST_P)->op1 = NULL;\
+#define lista_remove_at(LIST, INDEX) do{\
+	(LIST).op2 = (LIST).head;\
+	(LIST).op1 = NULL;\
 	for (int ___i = 0; ___i < (INDEX); ___i++)\
 	{\
-		(LIST_P)->op1 = (LIST_P)->op2;\
-		(LIST_P)->op2 = (LIST_P)->op2->next;\
+		(LIST).op1 = (LIST).op2;\
+		(LIST).op2 = (LIST).op2->next;\
 	}\
-	if ((INDEX) == 0 && (LIST_P)->size == 1)\
-		(LIST_P)->head = NULL;\
-	else if ((LIST_P)->op1 == NULL)\
-		(LIST_P)->head = (LIST_P)->op2->next;\
+	if ((INDEX) == 0 && (LIST).size == 1)\
+		(LIST).head = NULL;\
+	else if ((LIST).op1 == NULL)\
+		(LIST).head = (LIST).op2->next;\
 	else\
-		(LIST_P)->op1->next = (LIST_P)->op2->next;\
-	free((LIST_P)->op2);\
-	(LIST_P)->size--;\
+		(LIST).op1->next = (LIST).op2->next;\
+	free((LIST).op2);\
+	(LIST).size--;\
 } while(0)
 
 //a buffer egy TYPE pointer, amibe beleirja az INDEX-edik elem tartalmat (next nelkul)
 //nem ellenorzi, hogy ervenyes-e az index
-#define lista_at(LIST_P, INDEX, BUFFER_P) do{\
-	(LIST_P)->op1 = (LIST_P)->head;\
+#define lista_at(LIST, INDEX, BUFFER_P) do{\
+	(LIST).op1 = (LIST).head;\
 	for(int ___i=0;___i<(INDEX);___i++)\
-		(LIST_P)->op1 = (LIST_P)->op1->next;\
-	*(BUFFER_P)=(LIST_P)->op1->data;\
+		(LIST).op1 = (LIST).op1->next;\
+	*(BUFFER_P)=(LIST).op1->data;\
 } while(0)
 
 //nem ellenorzi, hogy ervenyes-e az index
-#define lista_set(LIST_P, INDEX, VALUE) do{\
-	(LIST_P)->op1=(LIST_P)->head;\
+#define lista_set(LIST, INDEX, VALUE) do{\
+	(LIST).op1=(LIST).head;\
 	for (int ___i = 0; ___i < (INDEX); ___i++)\
-		(LIST_P)->op1 = (LIST_P)->op1->next;\
-	(LIST_P)->op1->data=(VALUE)\
+		(LIST).op1 = (LIST).op1->next;\
+	(LIST).op1->data=(VALUE);\
 } while(0)
 
 #endif

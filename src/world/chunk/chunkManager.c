@@ -30,9 +30,9 @@ chunkManager chunkManager_create(int seed, int renderDistance)
 	cm.noise2.frequency = 0.0083;
 	cm.noise2.seed = seed*seed+seed;
 
-	lista_init(&cm.pendingUpdates);
-	lista_init(&cm.pendingMeshUpdates);
-	lista_init(&cm.loadedChunks);
+	lista_init(cm.pendingUpdates);
+	lista_init(cm.pendingMeshUpdates);
+	lista_init(cm.loadedChunks);
 
 	return cm;
 }
@@ -45,20 +45,20 @@ void chunkManager_destroy(chunkManager* cm)
 
 	while (cm->loadedChunks.size>0)
 	{
-		lista_at(&(cm->loadedChunks), 0, &chomk);
+		lista_at(cm->loadedChunks, 0, &chomk);
 
-		lista_remove_at(&(cm->loadedChunks), 0);
+		lista_remove_at(cm->loadedChunks, 0);
 
 		chunk_destroy(&chomk);
 	}
 
-	lista_clear(&cm->pendingUpdates);
+	lista_clear(cm->pendingUpdates);
 
 	while (cm->pendingMeshUpdates.size>0)
 	{
-		lista_at(&cm->pendingMeshUpdates, 0, &chomkDown);
+		lista_at(cm->pendingMeshUpdates, 0, &chomkDown);
 
-		lista_remove_at(&cm->pendingMeshUpdates, 0);
+		lista_remove_at(cm->pendingMeshUpdates, 0);
 
 		switch (chomkDown.type)
 		{
@@ -144,7 +144,7 @@ void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playe
 						ceu.chunkZ = playerChunkZ + z;
 						ceu.type = CHUNKMANAGER_LOAD_CHUNK;
 
-						lista_push_back(&cm->pendingUpdates, ceu);
+						lista_push_back(cm->pendingUpdates, ceu);
 						goto exit_load;
 					}
 				}
@@ -172,7 +172,7 @@ exit_load:
 				ceu.chunkZ = iterator->data.chunkZ;
 				ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
 
-				lista_push_back(&cm->pendingUpdates, ceu);
+				lista_push_back(cm->pendingUpdates, ceu);
 
 				break;
 			}
@@ -201,8 +201,8 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 		return;
 	}
 	chunkGenerationUpdate ceu;
-	lista_at(&cm->pendingUpdates, 0, &ceu);
-	lista_remove_at(&cm->pendingUpdates, 0);
+	lista_at(cm->pendingUpdates, 0, &ceu);
+	lista_remove_at(cm->pendingUpdates, 0);
 	pthread_mutex_unlock(pmutex);
 
 
@@ -213,7 +213,7 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 			cmu.chomk=chunk_generate(cm, ceu.chunkX, ceu.chunkY, ceu.chunkZ, &cmu.meshNormal, &cmu.meshWalter);
 			cmu.type = CHUNKMANAGER_LOAD_CHUNK;
 			pthread_mutex_lock(pmutex);
-			lista_push_back(&cm->pendingMeshUpdates, cmu);
+			lista_push_back(cm->pendingMeshUpdates, cmu);
 			pthread_mutex_unlock(pmutex);
 			break;
 
@@ -228,9 +228,9 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 				{
 					cmu.chomk = chomk;
 					cmu.type = CHUNKMANAGER_UNLOAD_CHUNK;
-					lista_push_back(&cm->pendingMeshUpdates, cmu);
+					lista_push_back(cm->pendingMeshUpdates, cmu);
 
-					lista_remove_at(&(cm->loadedChunks), index);
+					lista_remove_at(cm->loadedChunks, index);
 					break;
 				}
 
@@ -257,15 +257,15 @@ void chunkManager_updateMesh(chunkManager* cm)
 
 	chunkMeshUpdate cmu;
 
-	lista_at(&(cm->pendingMeshUpdates), 0, &cmu);
+	lista_at(cm->pendingMeshUpdates, 0, &cmu);
 
-	lista_remove_at(&(cm->pendingMeshUpdates), 0);
+	lista_remove_at(cm->pendingMeshUpdates, 0);
 
 	switch (cmu.type)
 	{
 	case CHUNKMANAGER_LOAD_CHUNK:
 		chunk_loadMeshInGPU(&cmu.chomk, cmu.meshNormal, cmu.meshWalter);
-		lista_push_back(&cm->loadedChunks, cmu.chomk);
+		lista_push_back(cm->loadedChunks, cmu.chomk);
 
 		if (cmu.meshNormal.indexCount != 0)
 		{
