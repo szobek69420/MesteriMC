@@ -67,17 +67,14 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	//getting neighbouring chunk data
 	seqtor_of(blockModel)* current=NULL, *plusZ=NULL, *plusX = NULL, *minusZ = NULL, *minusX = NULL, *plusY = NULL, *minusY = NULL;
 
-	if (firstLoad)//szoval hozza kell adni egy uj bejegyzest a cm->changedBlocks-hoz
+
+	//ha a firstLoad!=0, akkor nem letezik a chunkhoz tartozo bejegyzes a changedBlocksban.
+	//ekkor letrehoz egy vektort a currenthez, amelyhez hozzaadja a hozzaadando blokkokat a chunk generalasa kozben
+	//amennyiben a generalas vegen a vektor nem ures, azt hozzaadja a changedBlocks-hoz
+	if (firstLoad)
 	{
-		changedBlocksInChunk cbic;
-		cbic.chunkX = chunkX;
-		cbic.chunkY = chunkY;
-		cbic.chunkZ = chunkZ;
-		seqtor_init(cbic.blocks, 1);
-
-		seqtor_push_back(cm->changedBlocks, cbic);
-
-		current = &seqtor_back(cm->changedBlocks);
+		current = malloc(sizeof(seqtor_of(blockModel)));
+		seqtor_init(*current, 1);
 	}
 	else
 	{
@@ -410,6 +407,31 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		}
 	}
 
+	//check for changedBlocks
+	if (firstLoad)
+	{
+		if (current->size != 0)
+		{
+			changedBlocksInChunk cbic;
+			cbic.chunkX = chunkX;
+			cbic.chunkY = chunkY;
+			cbic.chunkZ = chunkZ;
+			cbic.blocks.data = current->data;
+			cbic.blocks.capacity = current->capacity;
+			cbic.blocks.size = current->size;
+
+			seqtor_push_back(cm->changedBlocks, cbic);
+
+			free(current);
+		}
+		else
+		{
+			seqtor_destroy(*current);
+			free(current);
+		}
+	}
+
+	//normal mesh
 	if (verticesNormal.size > 0)
 	{
 		meshNormal->sizeVertices = verticesNormal.size * sizeof(unsigned long);

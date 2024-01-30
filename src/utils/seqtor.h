@@ -13,6 +13,7 @@
     size_t capacity; \
 }
 
+//initializes the vector. without this, the vector won't be initialized
 //a capacity ne legyen 0 mert az nemtom mit baszhat el
 #define seqtor_init(VEC, CAPACITY) do { \
     (VEC).data = malloc((CAPACITY) * sizeof(*(VEC).data)); \
@@ -31,6 +32,7 @@
 
 #define seqtor_isEmpty(VEC) ((VEC).size == 0)
 
+//adds VAL to the end of the vector
 #define seqtor_push_back(VEC, VAL) do { \
     if ((VEC).size + 1 > (VEC).capacity) \
     { \
@@ -48,6 +50,8 @@
     (VEC).size ++; \
 } while (0)
 
+//removes the last element of the vector
+//doesn't return anything
 #define seqtor_pop_back(VEC) do{ \
     if((VEC).size>0) (VEC).size--;\
     if((VEC).size<=(VEC).capacity/2&&(VEC).size!=0) \
@@ -63,6 +67,7 @@
     }\
 } while(0)
 
+//inserts VALUE into the vector. the index of the inserted element will be INDEX
 //nem ellenorzi, hogy helyes-e az index
 #define seqtor_insert(VEC, INDEX, VALUE) do{ \
     if((VEC).size==(VEC).capacity) \
@@ -82,6 +87,7 @@
     (VEC).size++; \
 } while(0)
 
+//removes the element with the index of INDEX from the vector
 //nem ellenorzi, hogy helyes-e az index
 #define seqtor_remove_at(VEC, INDEX) do{ \
     for (size_t _i = (INDEX); _i < (VEC).size - 1; _i++) \
@@ -100,6 +106,7 @@
     }\
 } while(0)
 
+//removes the first element with value from the vector
 #define seqtor_remove(VEC, VALUE) do{\
     for(size_t _i2=0;_i2<(VEC).size;_i2++) \
     { \
