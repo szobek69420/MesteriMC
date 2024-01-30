@@ -33,7 +33,7 @@ chunkManager chunkManager_create(int seed, int renderDistance)
 	lista_init(cm.pendingUpdates);
 	lista_init(cm.pendingMeshUpdates);
 	lista_init(cm.loadedChunks);
-
+	
 	return cm;
 }
 
@@ -443,7 +443,7 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 	char frustumY[3] = { 0,0,0 };//volt-e olyan bounding point, ami y<-1 vagy -1<=y<=1 vagy y>1
 	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
 	char isPointInFrustum = 0;
-
+	
 	lista_element_of(chunk)* it = cm->loadedChunks.head;
 	while (it != NULL)
 	{
