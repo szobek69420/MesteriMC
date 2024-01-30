@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 // letrehoz egy TYPE tipusu vektort (nincs inicializalva, azt a seqtor_init vegzi)
 #define seqtor_of(TYPE) struct { \
@@ -15,8 +16,9 @@
 //a capacity ne legyen 0 mert az nemtom mit baszhat el
 #define seqtor_init(VEC, CAPACITY) do { \
     (VEC).data = malloc((CAPACITY) * sizeof(*(VEC).data)); \
-    if (!(VEC).data) { \
-        fputs("malloc failed!\n", stderr); \
+    if (!(VEC).data) \
+    { \
+        fputs("seqtor_init failed!\n", stderr); \
         abort(); \
     } \
     (VEC).size = 0; \
@@ -30,11 +32,13 @@
 #define seqtor_isEmpty(VEC) ((VEC).size == 0)
 
 #define seqtor_push_back(VEC, VAL) do { \
-    if ((VEC).size + 1 > (VEC).capacity) { \
+    if ((VEC).size + 1 > (VEC).capacity) \
+    { \
         size_t _n = (VEC).capacity * 2; \
         void *_p = realloc((VEC).data, _n * sizeof(*(VEC).data)); \
-        if (!_p) { \
-            fputs("realloc failed!\n", stderr); \
+        if (!_p) \
+        { \
+            fputs("seqtor_push_back failed!\n", stderr); \
             abort(); \
         } \
         (VEC).data = _p; \
@@ -46,11 +50,13 @@
 
 #define seqtor_pop_back(VEC) do{ \
     if((VEC).size>0) (VEC).size--;\
-    if((VEC).size<=(VEC).capacity/2&&(VEC).size!=0) { \
+    if((VEC).size<=(VEC).capacity/2&&(VEC).size!=0) \
+    { \
         (VEC).capacity/=2;\
         void *_p = realloc((VEC).data, (VEC).capacity * sizeof(*(VEC).data)); \
-        if (!_p) { \
-            fputs("realloc failed!\n", stderr); \
+        if (!_p) \
+        { \
+            fputs("seqtor_pop_back failed!\n", stderr); \
             abort(); \
         } \
         (VEC).data = _p; \
@@ -63,8 +69,9 @@
     { \
         (VEC).capacity*=2; \
         void *_p = realloc((VEC).data, (VEC).capacity * sizeof(*(VEC).data)); \
-        if (!_p) { \
-            fputs("realloc failed!\n", stderr); \
+        if (!_p) \
+        { \
+            fputs("sextor_insert failed!\n", stderr); \
             abort(); \
         } \
         (VEC).data = _p; \
@@ -80,11 +87,13 @@
     for (size_t _i = (INDEX); _i < (VEC).size - 1; _i++) \
         (VEC).data[_i] = (VEC).data[_i + 1]; \
     (VEC).size--; \
-    if((VEC).size<=(VEC).capacity/2&&(VEC).size!=0) { \
+    if((VEC).size<=(VEC).capacity/2&&(VEC).size!=0) \
+    { \
         (VEC).capacity/=2;\
         void *_p = realloc((VEC).data, (VEC).capacity * sizeof(*(VEC).data)); \
-        if (!_p) { \
-            fputs("realloc failed!\n", stderr); \
+        if (!_p) \
+        { \
+            fputs("seqtor_remove_at failed!\n", stderr); \
             abort(); \
         } \
         (VEC).data = _p; \
@@ -102,6 +111,23 @@
     } \
 } while(0)
 
+//copies content of SRC into DST
+//deletes the content of DST if necessary
+#define seqtor_copy(DST, SRC) do { \
+    if ((DST).capacity != 0) \
+        free((DST).data); \
+    (DST).size = (SRC).size; \
+    (DST).capacity = (SRC).capacity; \
+    (DST).data = malloc((DST).capacity * sizeof(*(DST).data)); \
+    if ((DST).data == NULL) \
+    { \
+        fputs("seqtor_copy failed!\n", stderr); \
+        abort(); \
+    } \
+    memcpy((DST).data, (SRC).data, (DST).capacity * sizeof(*(DST).data)); \
+} while(0)
+
+
 #define seqtor_at(VEC, INDEX) (VEC).data[INDEX]
 
 #define seqtor_front(VEC) (VEC).data[0]
@@ -112,13 +138,19 @@
 #define seqtor_clear(VEC) do { \
     (VEC).size = 0; \
     (VEC).capacity = 1; \
-    realloc((VEC).data, sizeof(*(VEC).data)); \
+    void* __p=realloc((VEC).data, sizeof(*(VEC).data)); \
+    if(__p==NULL) \
+    { \
+        fputs("seqtor_clear failed!\n", stderr); \
+            abort(); \
+    } \
 } while(0)
 
 //ha nem hasznalod tobbe a vektort, akkor hivd meg ezt (csak akkor)
 //mig a seqtor_clear 1 kapacitasura uriti a vektort, ez mindentol megszabadul
 #define seqtor_destroy(VEC) do{ \
     free((VEC).data);\
+    (VEC).data=NULL;\
     (VEC).size = 0; \
     (VEC).capacity = 0; \
 }while(0)
