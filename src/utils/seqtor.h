@@ -108,14 +108,19 @@
 
 #define seqtor_back(VEC) (VEC).data[seqtor_size(VEC) - 1]
 
+//kiuriti a vektort, es az elso elem kivetelevel mindent felszabadit (capacity=1)
 #define seqtor_clear(VEC) do { \
     (VEC).size = 0; \
     (VEC).capacity = 1; \
     realloc((VEC).data, sizeof(*(VEC).data)); \
 } while(0)
 
+//ha nem hasznalod tobbe a vektort, akkor hivd meg ezt (csak akkor)
+//mig a seqtor_clear 1 kapacitasura uriti a vektort, ez mindentol megszabadul
 #define seqtor_destroy(VEC) do{ \
     free((VEC).data);\
+    (VEC).size = 0; \
+    (VEC).capacity = 0; \
 }while(0)
 
 #endif 

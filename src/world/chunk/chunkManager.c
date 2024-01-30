@@ -13,6 +13,7 @@
 
 
 char chunkManager_checkIfInFrustum(vec4* vec, char* frustumX, char* frustumY, char* frustumZ);
+int chunkManager_isChunkRegistered(chunkManager* cm, int chunkX, int chunkY, int chunkZ);//elso generalaskor a chunknak foglalni kell helyet a changedBlocks vektorban
 
 chunkManager chunkManager_create(int seed, int renderDistance)
 {
@@ -33,6 +34,8 @@ chunkManager chunkManager_create(int seed, int renderDistance)
 	lista_init(cm.pendingUpdates);
 	lista_init(cm.pendingMeshUpdates);
 	lista_init(cm.loadedChunks);
+
+	seqtor_init(cm.changedBlocks, 1);
 	
 	return cm;
 }
@@ -77,6 +80,11 @@ void chunkManager_destroy(chunkManager* cm)
 			break;
 		}
 	}
+
+	for (int i = 0; i < cm->changedBlocks.size; i++)//chunkonkenti vektorok kiuritese
+		seqtor_destroy(seqtor_at(cm->changedBlocks, i).blocks);
+	seqtor_destroy(cm->changedBlocks);//a kulso vektor kiuritese
+
 }
 
 int chunkManager_isChunkLoaded(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
@@ -116,6 +124,25 @@ int chunkManager_isChunkPending(chunkManager* cm, int chunkX, int chunkY, int ch
 	}
 
 	return 0;
+}
+
+int chunkManager_isChunkRegistered(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
+{
+	int isChunkRegistered = 0;
+	for (int i = 0; i < cm->changedBlocks.size; i++)
+	{
+		if (seqtor_at(cm->changedBlocks, i).chunkX != chunkX)
+			continue;
+		if (seqtor_at(cm->changedBlocks, i).chunkY != chunkY)
+			continue;
+		if (seqtor_at(cm->changedBlocks, i).chunkZ != chunkZ)
+			continue;
+
+		isChunkRegistered = 69;
+		break;
+	}
+
+	return isChunkRegistered;
 }
 
 void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ)
@@ -205,12 +232,13 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 	lista_remove_at(cm->pendingUpdates, 0);
 	pthread_mutex_unlock(pmutex);
 
-
+	int firstLoad;
 
 	switch (ceu.type)
 	{
 		case CHUNKMANAGER_LOAD_CHUNK:
-			cmu.chomk=chunk_generate(cm, ceu.chunkX, ceu.chunkY, ceu.chunkZ, &cmu.meshNormal, &cmu.meshWalter);
+			firstLoad = chunkManager_isChunkRegistered(cm, ceu.chunkX, ceu.chunkY, ceu.chunkZ) == 0 ? 69 : 0;
+			cmu.chomk=chunk_generate(cm, ceu.chunkX, ceu.chunkY, ceu.chunkZ, &cmu.meshNormal, &cmu.meshWalter, firstLoad);
 			cmu.type = CHUNKMANAGER_LOAD_CHUNK;
 			pthread_mutex_lock(pmutex);
 			lista_push_back(cm->pendingMeshUpdates, cmu);

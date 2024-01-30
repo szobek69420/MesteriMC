@@ -35,7 +35,7 @@ void chunk_drawWalter(chunk* chomk)
 }
 
 
-chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshRaw* meshNormal, meshRaw* meshWalter)
+chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshRaw* meshNormal, meshRaw* meshWalter, int firstLoad)
 {
 	meshNormal->vertices = NULL; meshNormal->sizeVertices = 0;
 	meshNormal->indices = NULL; meshNormal->sizeIndices = 0;
@@ -64,6 +64,78 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 			chomk.blocks[i][j] = (char*)malloc(CHUNK_WIDTH * sizeof(char));
 	}
 
+	//getting neighbouring chunk data
+	seqtor_of(blockModel)* current=NULL, *plusZ=NULL, *plusX = NULL, *minusZ = NULL, *minusX = NULL, *plusY = NULL, *minusY = NULL;
+
+	if (firstLoad)//szoval hozza kell adni egy uj bejegyzest a cm->changedBlocks-hoz
+	{
+		changedBlocksInChunk cbic;
+		cbic.chunkX = chunkX;
+		cbic.chunkY = chunkY;
+		cbic.chunkZ = chunkZ;
+		seqtor_init(cbic.blocks, 1);
+
+		seqtor_push_back(cm->changedBlocks, cbic);
+
+		current = &seqtor_back(cm->changedBlocks);
+	}
+	else
+	{
+		for (int i = 0; i < seqtor_size(cm->changedBlocks); i++)
+		{
+			if (seqtor_at(cm->changedBlocks, i).chunkX != chunkX)
+				continue;
+			if (seqtor_at(cm->changedBlocks, i).chunkY != chunkY)
+				continue;
+			if (seqtor_at(cm->changedBlocks, i).chunkZ != chunkZ)
+				continue;
+
+			current = &seqtor_at(cm->changedBlocks, i).blocks;
+			break;
+		}
+	}
+
+	int tempX, tempY, tempZ, zeroCount;
+	for (int i = 0; i < cm->changedBlocks.size; i++)
+	{
+		zeroCount = 0;
+		tempX = seqtor_at(cm->changedBlocks, i).chunkX - chunkX;
+		tempY = seqtor_at(cm->changedBlocks, i).chunkY - chunkY;
+		tempZ = seqtor_at(cm->changedBlocks, i).chunkZ - chunkZ;
+
+		if (tempX < -1 || tempX>1)
+			continue;
+		if (tempY < -1 || tempY>1)
+			continue;
+		if (tempZ < -1 || tempY>1)
+			continue;
+
+		if (tempX == 0)
+			zeroCount++;
+		if (tempY == 0)
+			zeroCount++;
+		if (tempZ == 0)
+			zeroCount++;
+
+		if (zeroCount != 2)
+			continue;
+
+		if (tempX == 1)
+			plusX = &seqtor_at(cm->changedBlocks, i).blocks;
+		if (tempX == -1)
+			minusX = &seqtor_at(cm->changedBlocks, i).blocks;
+		if (tempY == 1)
+			plusY = &seqtor_at(cm->changedBlocks, i).blocks;
+		if (tempY == -1)
+			minusY = &seqtor_at(cm->changedBlocks, i).blocks;
+		if (tempZ == 1)
+			plusZ = &seqtor_at(cm->changedBlocks, i).blocks;
+		if (tempZ == -1)
+			minusZ = &seqtor_at(cm->changedBlocks, i).blocks;
+	}
+
+
+	//generating terrain
 	int heightMap[CHUNK_WIDTH + 2][CHUNK_WIDTH + 2];//[x][z], a +2 az�rt van, hogy a sz�leken is ismerje a magass�got
 	float heightHelper;
 	for (int i = 0; i < CHUNK_WIDTH + 2; i++)
