@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define lista_element_of(TYPE) struct xXx_RobuxHaver_xXx{\
+#define lista_element_of(TYPE) struct xXx_RobuxHaver_xXx_##TYPE{\
 	TYPE data;\
-	struct xXx_RobuxHaver_xXx* next;\
+	struct xXx_RobuxHaver_xXx_##TYPE * next;\
 }
 
 //az op1 es op2 nem tarolnak informaciot, csak a kesobbi muveletekhez kellenek

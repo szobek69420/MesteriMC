@@ -3,7 +3,9 @@
 
 #include "../../utils/list.h"
 #include "../../utils/lista.h"
+
 #include "../terrain/FastNoiseLite.h"
+
 #include "../../camera/camera.h"
 #include "../../glm2/mat4.h"
 #include "../../shader/shader.h"
@@ -33,25 +35,31 @@ chunk unload :
 #define CHUNKMANAGER_UNLOAD_CHUNK 2
 #define CHUNKMANAGER_RELOAD_CHUNK 3
 
-typedef struct {
+struct chunkGenerationUpdate{
 	int chunkX, chunkY, chunkZ;
 	int type;
-} chunkGenerationUpdate;
+};
+typedef struct chunkGenerationUpdate chunkGenerationUpdate;
 
-struct chunkMeshUpdate;
+struct chunkMeshUpdate {
+	struct chunk chomk;
+	meshRaw meshNormal;
+	meshRaw meshWalter;
+	int type;// load/unload/reload
+};
 typedef struct chunkMeshUpdate chunkMeshUpdate;
 
-
-typedef struct chunkManager {
+struct chunkManager {
 	int seed;
 	int renderDistance;
 
 	list loadedChunks;//list of chunks
 	lista_of(chunkGenerationUpdate) pendingUpdates;//list of chunk updates
-	list pendingMeshUpdates;//list of chunk mesh updates
+	lista_of(chunkMeshUpdate) pendingMeshUpdates;//list of chunk mesh updates
 
 	fnl_state noise, noise2;//terrain generation
-} chunkManager;
+};
+typedef struct chunkManager chunkManager;
 
 
 chunkManager chunkManager_create(int seed, int renderDistance);

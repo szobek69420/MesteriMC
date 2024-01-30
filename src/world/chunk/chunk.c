@@ -1,6 +1,7 @@
 #include "chunk.h"
 #include "chunkManager.h"
 #include "../blocks/blocks.h"
+#include "../terrain/FastNoiseLite.h"
 
 #include "../../glm2/vec3.h"
 #include "../../glm2/mat4.h"

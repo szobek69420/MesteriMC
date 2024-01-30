@@ -10,12 +10,12 @@
 #include <pthread.h>
 
 //memory leaks
+#define CRTDBG_ON 0
 #ifdef _MSC_VER
 #define _CRTDBG_MAP_ALLOC
 #include <crtdbg.h>
+#undef CRTDBG_ON
 #define CRTDBG_ON 1
-#else
-#define CRTDBG_ON 0
 #endif
 
 
@@ -136,7 +136,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 int main()
 {
     //_CrtSetBreakAlloc(4910);
-
     window_setWidth(1300);
     window_setHeight(800);
     window = init_window("amogus", window_getWidth(), window_getHeight());
