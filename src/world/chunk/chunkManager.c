@@ -1,7 +1,8 @@
-#include "../terrain/FastNoiseLite.h"
 #include "chunkManager.h"
 #include "chunk.h"
+#include "../terrain/FastNoiseLite.h"
 #include "../../utils/list.h"
+#include "../../utils/lista.h"
 #include "../../shader/shader.h"
 
 #include <stdlib.h>
@@ -10,12 +11,6 @@
 
 #include <glad/glad.h>
 
-struct chunkMeshUpdate{
-	struct chunk chomk;
-	meshRaw meshNormal;
-	meshRaw meshWalter;
-	int type;// load/unload/reload
-};
 
 char chunkManager_checkIfInFrustum(vec4* vec, char* frustumX, char* frustumY, char* frustumZ);
 
@@ -35,80 +30,65 @@ chunkManager chunkManager_create(int seed, int renderDistance)
 	cm.noise2.frequency = 0.0083;
 	cm.noise2.seed = seed*seed+seed;
 
-	cm.pendingUpdates = list_create();
-	cm.pendingMeshUpdates = list_create();
-	cm.loadedChunks = list_create();
-
+	lista_init(cm.pendingUpdates);
+	lista_init(cm.pendingMeshUpdates);
+	lista_init(cm.loadedChunks);
+	
 	return cm;
 }
 
 void chunkManager_destroy(chunkManager* cm)
 {
-	chunk* chomk;
-	chunkGenerationUpdate* chomkUp;
-	chunkMeshUpdate* chomkDown;
+	chunk chomk;
+	chunkGenerationUpdate chomkUp;
+	chunkMeshUpdate chomkDown;
 
-	while (69)
+	while (cm->loadedChunks.size>0)
 	{
-		chomk = (chunk*)list_get(&(cm->loadedChunks), 0);
-		if (chomk == NULL)
-			break;
+		lista_at(cm->loadedChunks, 0, &chomk);
 
-		list_remove_at(&(cm->loadedChunks), 0);
+		lista_remove_at(cm->loadedChunks, 0);
 
-		chunk_destroy(chomk);
-		free(chomk);
+		chunk_destroy(&chomk);
 	}
 
-	while (69)
+	lista_clear(cm->pendingUpdates);
+
+	while (cm->pendingMeshUpdates.size>0)
 	{
-		chomkUp = (chunkGenerationUpdate*)list_get(&(cm->pendingUpdates), 0);
-		if (chomkUp == NULL)
-			break;
+		lista_at(cm->pendingMeshUpdates, 0, &chomkDown);
 
-		list_remove_at(&(cm->pendingUpdates), 0);
+		lista_remove_at(cm->pendingMeshUpdates, 0);
 
-		free(chomkUp);
-	}
-
-	while (69)
-	{
-		chomkDown = (chunkMeshUpdate*)list_get(&(cm->pendingMeshUpdates), 0);
-		if (chomkDown == NULL)
-			break;
-
-		list_remove_at(&(cm->pendingMeshUpdates), 0);
-
-		switch (chomkDown->type)
+		switch (chomkDown.type)
 		{
 		case CHUNKMANAGER_LOAD_CHUNK:
-			if (chomkDown->meshNormal.indexCount != 0)
+			if (chomkDown.meshNormal.indexCount != 0)
 			{
-				free(chomkDown->meshNormal.vertices);
-				free(chomkDown->meshNormal.indices);
+				free(chomkDown.meshNormal.vertices);
+				free(chomkDown.meshNormal.indices);
 			}
-			if (chomkDown->meshWalter.indexCount != 0)
+			if (chomkDown.meshWalter.indexCount != 0)
 			{
-				free(chomkDown->meshWalter.vertices);
-				free(chomkDown->meshWalter.indices);
+				free(chomkDown.meshWalter.vertices);
+				free(chomkDown.meshWalter.indices);
 			}
-			chunk_destroy(&chomkDown->chomk);
+			chunk_destroy(&chomkDown.chomk);
 			break;
 		}
-		free(chomkDown);
 	}
 }
 
 int chunkManager_isChunkLoaded(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 {
-	listElement* iterator = list_get_iterator(&(cm->loadedChunks));
+	lista_element_of(chunk)* iterator = cm->loadedChunks.head;
 
 	while (iterator!=NULL)
 	{
-		if (((chunk*)(iterator->data))->chunkX == chunkX && ((chunk*)(iterator->data))->chunkY ==chunkY && ((chunk*)(iterator->data))->chunkZ == chunkZ)
+		if (iterator->data.chunkX == chunkX && iterator->data.chunkY ==chunkY && iterator->data.chunkZ == chunkZ)
 			return 69;
 
-		iterator=list_next(iterator);
+		iterator=iterator->next;
 	}
 
 	return 0;
@@ -116,23 +96,23 @@ int chunkManager_isChunkLoaded(chunkManager* cm, int chunkX, int chunkY, int chu
 
 int chunkManager_isChunkPending(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 {
-	listElement* iterator = list_get_iterator(&(cm->pendingUpdates));
+	lista_element_of(chunkMeshUpdate)* iterator=cm->pendingMeshUpdates.head;
+	lista_element_of(chunkGenerationUpdate)* iterator2 = cm->pendingUpdates.head;
 
-	while (iterator != NULL)
+	while (iterator2 != NULL)
 	{
-		if (((chunkGenerationUpdate*)(iterator->data))->chunkX == chunkX && ((chunkGenerationUpdate*)(iterator->data))->chunkY == chunkY && ((chunkGenerationUpdate*)(iterator->data))->chunkZ == chunkZ)
+		if (iterator2->data.chunkX == chunkX && iterator2->data.chunkY == chunkY && iterator2->data.chunkZ == chunkZ)
 			return 69;
 
-		iterator = list_next(iterator);
+		iterator2 = iterator2->next;
 	}
 
-	iterator = list_get_iterator(&(cm->pendingMeshUpdates));
 	while (iterator != NULL)
 	{
-		if (((chunkMeshUpdate*)(iterator->data))->chomk.chunkX == chunkX && ((chunkMeshUpdate*)(iterator->data))->chomk.chunkY == chunkY && ((chunkMeshUpdate*)(iterator->data))->chomk.chunkZ == chunkZ)
+		if (iterator->data.chomk.chunkX == chunkX && iterator->data.chomk.chunkY == chunkY && iterator->data.chomk.chunkZ == chunkZ)
 			return 69;
 
-		iterator = list_next(iterator);
+		iterator = iterator->next;
 	}
 
 	return 0;
@@ -140,7 +120,7 @@ int chunkManager_isChunkPending(chunkManager* cm, int chunkX, int chunkY, int ch
 
 void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ)
 {
-	listElement* iterator;
+	lista_element_of(chunk)* iterator;
 
 	//load
 	for (int i = 1; i <= cm->renderDistance; i++)
@@ -158,13 +138,13 @@ void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playe
 						&&
 						chunkManager_isChunkPending(cm, playerChunkX + x, playerChunkY + y, playerChunkZ + z) == 0)
 					{
-						chunkGenerationUpdate* ceu = (chunkGenerationUpdate*)malloc(sizeof(chunkGenerationUpdate));
-						ceu->chunkX = playerChunkX + x;
-						ceu->chunkY = playerChunkY + y;
-						ceu->chunkZ = playerChunkZ + z;
-						ceu->type = CHUNKMANAGER_LOAD_CHUNK;
+						chunkGenerationUpdate ceu;
+						ceu.chunkX = playerChunkX + x;
+						ceu.chunkY = playerChunkY + y;
+						ceu.chunkZ = playerChunkZ + z;
+						ceu.type = CHUNKMANAGER_LOAD_CHUNK;
 
-						list_push_back(&(cm->pendingUpdates), (void*)ceu);
+						lista_push_back(cm->pendingUpdates, ceu);
 						goto exit_load;
 					}
 				}
@@ -175,30 +155,30 @@ void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playe
 exit_load:
 
 	//unload
-	iterator = list_get_iterator(&(cm->loadedChunks));
+	iterator = cm->loadedChunks.head;
 	while (iterator != NULL)
 	{
-		if (abs(((chunk*)iterator->data)->chunkX - playerChunkX) > cm->renderDistance
+		if (abs(iterator->data.chunkX - playerChunkX) > cm->renderDistance
 			||
-			abs(((chunk*)iterator->data)->chunkY - playerChunkY) > cm->renderDistance
+			abs(iterator->data.chunkY - playerChunkY) > cm->renderDistance
 			||
-			abs(((chunk*)iterator->data)->chunkZ - playerChunkZ) > cm->renderDistance)
+			abs(iterator->data.chunkZ - playerChunkZ) > cm->renderDistance)
 		{
-			if (chunkManager_isChunkPending(cm, ((chunk*)iterator->data)->chunkX, ((chunk*)iterator->data)->chunkY, ((chunk*)iterator->data)->chunkZ)==0)
+			if (chunkManager_isChunkPending(cm, iterator->data.chunkX, iterator->data.chunkY, iterator->data.chunkZ)==0)
 			{
-				chunkGenerationUpdate* ceu = (chunkGenerationUpdate*)malloc(sizeof(chunkGenerationUpdate));
-				ceu->chunkX = ((chunk*)iterator->data)->chunkX;
-				ceu->chunkY = ((chunk*)iterator->data)->chunkY;
-				ceu->chunkZ = ((chunk*)iterator->data)->chunkZ;
-				ceu->type = CHUNKMANAGER_UNLOAD_CHUNK;
+				chunkGenerationUpdate ceu;
+				ceu.chunkX = iterator->data.chunkX;
+				ceu.chunkY = iterator->data.chunkY;
+				ceu.chunkZ = iterator->data.chunkZ;
+				ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
 
-				list_push_back(&(cm->pendingUpdates), (void*)ceu);
+				lista_push_back(cm->pendingUpdates, ceu);
 
 				break;
 			}
 		}
 
-		iterator = list_next(iterator);
+		iterator = iterator->next;
 	}
 
 
@@ -209,50 +189,52 @@ exit_unload:
 
 void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 {
-	listElement* iterator;
+	lista_element_of(chunk)* iterator;
 	int index;
-	chunk* chomk;
-	chunkMeshUpdate* cmu = (chunkMeshUpdate*)malloc(sizeof(chunkMeshUpdate));
+	chunk chomk;
+	chunkMeshUpdate cmu;
 
 	pthread_mutex_lock(pmutex);
-	chunkGenerationUpdate* ceu = (chunkGenerationUpdate*)list_get(&(cm->pendingUpdates), 0);
-	list_remove_at(&(cm->pendingUpdates), 0);
+	if (cm->pendingUpdates.size == 0)
+	{
+		pthread_mutex_unlock(pmutex);
+		return;
+	}
+	chunkGenerationUpdate ceu;
+	lista_at(cm->pendingUpdates, 0, &ceu);
+	lista_remove_at(cm->pendingUpdates, 0);
 	pthread_mutex_unlock(pmutex);
 
-	if (ceu == NULL)
-		return;
 
 
-	switch (ceu->type)
+	switch (ceu.type)
 	{
 		case CHUNKMANAGER_LOAD_CHUNK:
-			cmu->chomk=chunk_generate(cm, ceu->chunkX, ceu->chunkY, ceu->chunkZ, &cmu->meshNormal, &cmu->meshWalter);
-			cmu->type = CHUNKMANAGER_LOAD_CHUNK;
+			cmu.chomk=chunk_generate(cm, ceu.chunkX, ceu.chunkY, ceu.chunkZ, &cmu.meshNormal, &cmu.meshWalter);
+			cmu.type = CHUNKMANAGER_LOAD_CHUNK;
 			pthread_mutex_lock(pmutex);
-			list_push_back(&cm->pendingMeshUpdates, cmu);
+			lista_push_back(cm->pendingMeshUpdates, cmu);
 			pthread_mutex_unlock(pmutex);
 			break;
 
 		case CHUNKMANAGER_UNLOAD_CHUNK:
 			pthread_mutex_lock(pmutex);
-			iterator = list_get_iterator(&(cm->loadedChunks));
+			iterator = cm->loadedChunks.head;
 			index = 0;
 			while (iterator != NULL)
 			{
-				chomk = (chunk*)iterator->data;
-				if (chomk->chunkX == ceu->chunkX && chomk->chunkY == ceu->chunkY && chomk->chunkZ == ceu->chunkZ)
+				chomk = iterator->data;
+				if (chomk.chunkX == ceu.chunkX && chomk.chunkY == ceu.chunkY && chomk.chunkZ == ceu.chunkZ)
 				{
-					//list_remove_at(&(cm->loadedChunks), index);
-					cmu->chomk = *chomk;
-					cmu->type = CHUNKMANAGER_UNLOAD_CHUNK;
-					list_push_back(&cm->pendingMeshUpdates, cmu);
+					cmu.chomk = chomk;
+					cmu.type = CHUNKMANAGER_UNLOAD_CHUNK;
+					lista_push_back(cm->pendingMeshUpdates, cmu);
 
-					list_remove_at(&(cm->loadedChunks), index);
-					free(chomk);
+					lista_remove_at(cm->loadedChunks, index);
 					break;
 				}
 
-				iterator = list_next(iterator);
+				iterator = iterator->next;
 				index++;
 			}
 			pthread_mutex_unlock(pmutex);
@@ -263,55 +245,48 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 			//unload and load
 			break;
 	}
-
-	free(ceu);
 }
 
 void chunkManager_updateMesh(chunkManager* cm)
 {
-	listElement* iterator;
+	if (cm->pendingMeshUpdates.size == 0)
+		return;
+
+	lista_element_of(chunkMeshUpdate)* iterator;
 	int index;
 
-	chunk* chomk;
-	chunkMeshUpdate* cmu = (chunkMeshUpdate*)list_get(&(cm->pendingMeshUpdates), 0);
+	chunkMeshUpdate cmu;
 
-	if (cmu == NULL)
-	{
-		return;
-	}
+	lista_at(cm->pendingMeshUpdates, 0, &cmu);
 
-	list_remove_at(&(cm->pendingMeshUpdates), 0);
+	lista_remove_at(cm->pendingMeshUpdates, 0);
 
-	switch (cmu->type)
+	switch (cmu.type)
 	{
 	case CHUNKMANAGER_LOAD_CHUNK:
-		chunk_loadMeshInGPU(&cmu->chomk, cmu->meshNormal, cmu->meshWalter);
-		chomk = (chunk*)malloc(sizeof(chunk));
-		*chomk = cmu->chomk;
-		list_push_back(&cm->loadedChunks, (void*)chomk);
+		chunk_loadMeshInGPU(&cmu.chomk, cmu.meshNormal, cmu.meshWalter);
+		lista_push_back(cm->loadedChunks, cmu.chomk);
 
-		if (cmu->meshNormal.indexCount != 0)
+		if (cmu.meshNormal.indexCount != 0)
 		{
-			free(cmu->meshNormal.vertices);
-			free(cmu->meshNormal.indices);
+			free(cmu.meshNormal.vertices);
+			free(cmu.meshNormal.indices);
 		}
-		if (cmu->meshWalter.indexCount != 0)
+		if (cmu.meshWalter.indexCount != 0)
 		{
-			free(cmu->meshWalter.vertices);
-			free(cmu->meshWalter.indices);
+			free(cmu.meshWalter.vertices);
+			free(cmu.meshWalter.indices);
 		}
 		break;
 
 	case CHUNKMANAGER_UNLOAD_CHUNK:
-		chunk_destroy(&cmu->chomk);
+		chunk_destroy(&cmu.chomk);
 		break;
 
 
 	case CHUNKMANAGER_RELOAD_CHUNK:
 		break;
 	}
-
-	free(cmu);
 }
 
 static float chunkBounds[24] = {
@@ -327,7 +302,6 @@ static float chunkBounds[24] = {
 
 void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
 {
-	chunk* chomk;
 	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
 	char isInFrustum;
 	float basedX, basedY, basedZ;
@@ -342,15 +316,14 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
 	char isPointInFrustum = 0;
 
-	listElement* it = list_get_iterator(&(cm->loadedChunks));
+	lista_element_of(chunk)* it = cm->loadedChunks.head;
 	while (it != NULL)
 	{
-		chomk = ((chunk*)it->data);
-		if (chomk->isThereNormalMesh)
+		if (it->data.isThereNormalMesh)
 		{
-			basedX = chomk->chunkX * CHUNK_WIDTH;
-			basedY = chomk->chunkY * CHUNK_HEIGHT;
-			basedZ = chomk->chunkZ * CHUNK_WIDTH;
+			basedX = it->data.chunkX * CHUNK_WIDTH;
+			basedY = it->data.chunkY * CHUNK_HEIGHT;
+			basedZ = it->data.chunkZ * CHUNK_WIDTH;
 
 			frustumX[0] = 0;	frustumX[1] = 0;	frustumX[2] = 0;
 			frustumY[0] = 0;	frustumY[1] = 0;	frustumY[2] = 0;
@@ -370,8 +343,8 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 
 				if (isPointInFrustum)
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					chunk_drawTerrain(chomk);
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
+					chunk_drawTerrain(&it->data);
 					break;
 				}
 			}
@@ -382,19 +355,17 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 					((frustumY[0] && frustumY[2]) || frustumY[1]) &&
 					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					chunk_drawTerrain(chomk);
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
+					chunk_drawTerrain(&it->data);
 				}
 			}
 		}
-		//it=it->next;
-		it = list_next(it);
+		it=it->next;
 	}
 }
 
 void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
 {
-	chunk* chomk;
 	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
 	char isInFrustum;
 	float basedX, basedY, basedZ;
@@ -409,15 +380,14 @@ void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* 
 	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
 	char isPointInFrustum = 0;
 
-	listElement* it = list_get_iterator(&(cm->loadedChunks));
+	lista_element_of(chunk) * it = cm->loadedChunks.head;
 	while (it != NULL)
 	{
-		chomk = ((chunk*)it->data);
-		if (chomk->isThereNormalMesh)
+		if (it->data.isThereNormalMesh)
 		{
-			basedX = chomk->chunkX * CHUNK_WIDTH;
-			basedY = chomk->chunkY * CHUNK_HEIGHT;
-			basedZ = chomk->chunkZ * CHUNK_WIDTH;
+			basedX = it->data.chunkX * CHUNK_WIDTH;
+			basedY = it->data.chunkY * CHUNK_HEIGHT;
+			basedZ = it->data.chunkZ * CHUNK_WIDTH;
 
 			frustumX[0] = 0;	frustumX[1] = 0;	frustumX[2] = 0;
 			frustumY[0] = 0;	frustumY[1] = 0;	frustumY[2] = 0;
@@ -437,8 +407,8 @@ void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* 
 
 				if (isPointInFrustum)
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					chunk_drawWalter(chomk);
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
+					chunk_drawWalter(&it->data);
 					break;
 				}
 			}
@@ -449,19 +419,17 @@ void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* 
 					((frustumY[0] && frustumY[2]) || frustumY[1]) &&
 					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					chunk_drawWalter(chomk);
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
+					chunk_drawWalter(&it->data);
 				}
 			}
 		}
-		//it=it->next;
-		it = list_next(it);
+		it=it->next;
 	}
 }
 
 void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjection)
 {
-	chunk* chomk;
 	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
 	char isInFrustum;
 	float basedX, basedY, basedZ;
@@ -475,16 +443,15 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 	char frustumY[3] = { 0,0,0 };//volt-e olyan bounding point, ami y<-1 vagy -1<=y<=1 vagy y>1
 	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
 	char isPointInFrustum = 0;
-
-	listElement* it = list_get_iterator(&(cm->loadedChunks));
+	
+	lista_element_of(chunk)* it = cm->loadedChunks.head;
 	while (it != NULL)
 	{
-		chomk = ((chunk*)it->data);
-		if (chomk->isThereNormalMesh)
+		if (it->data.isThereNormalMesh)
 		{
-			basedX = chomk->chunkX * CHUNK_WIDTH;
-			basedY = chomk->chunkY * CHUNK_HEIGHT;
-			basedZ = chomk->chunkZ * CHUNK_WIDTH;
+			basedX = it->data.chunkX * CHUNK_WIDTH;
+			basedY = it->data.chunkY * CHUNK_HEIGHT;
+			basedZ = it->data.chunkZ * CHUNK_WIDTH;
 
 			for (int i = 0; i < 24; )
 			{
@@ -500,8 +467,8 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 
 				if (isPointInFrustum)
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					chunk_drawTerrain(chomk);
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
+					chunk_drawTerrain(&it->data);
 					break;
 				}
 			}
@@ -512,13 +479,12 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 					((frustumY[0] && frustumY[2]) || frustumY[1]) &&
 					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, chomk->model.data);
-					chunk_drawTerrain(chomk);
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
+					chunk_drawTerrain(&it->data);
 				}
 			}
 		}
-		//it=it->next;
-		it = list_next(it);
+		it=it->next;
 	}
 }
 

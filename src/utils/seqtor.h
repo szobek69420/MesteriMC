@@ -114,4 +114,8 @@
     realloc((VEC).data, sizeof(*(VEC).data)); \
 } while(0)
 
+#define seqtor_destroy(VEC) do{ \
+    free((VEC).data);\
+}while(0)
+
 #endif 
