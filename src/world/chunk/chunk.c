@@ -183,26 +183,89 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		}
 	}
 
-	//adding trees
-	srand(1000000 * chunkX + 1000 * chunkY + chunkZ);
-	for (int i = 4; i < CHUNK_WIDTH-1; i++)
+	//things that should be generated only once and then stored in the changedBlocks (for example trees)
+	if (firstLoad)
 	{
-		for (int j = 4; j < CHUNK_WIDTH-1;j++)
+		//adding trees
+		srand(1000000 * chunkX + 1000 * chunkY + chunkZ);
+		for (int i = 4; i < CHUNK_WIDTH - 1; i++)
 		{
-			int height = heightMap[i + 1][j + 1];
-			if (height >= 1 && height < CHUNK_HEIGHT-5)
+			for (int j = 4; j < CHUNK_WIDTH - 1; j++)
 			{
-				float szam = (float)rand() / RAND_MAX;
-				if (chomk.blocks[height][i][j] == BLOCK_GRASS&&szam>0.995f)
+				int height = heightMap[i + 1][j + 1];
+				if (height >= 1 && height < CHUNK_HEIGHT - 5)
 				{
-					for (int k = 0; k < sizeof(model_oak_tree) / sizeof(blockModel); k++)
+					float szam = (float)rand() / RAND_MAX;
+					if (chomk.blocks[height][i][j] == BLOCK_GRASS && szam > 0.995f)
 					{
-						blockModel bm = model_oak_tree[k];
-						if(chomk.blocks[height + bm.y][i + bm.x][j + bm.z] ==BLOCK_AIR)
-							chomk.blocks[height + bm.y][i + bm.x][j + bm.z] = bm.type;
+						for (int k = 0; k < sizeof(model_oak_tree) / sizeof(blockModel); k++)
+						{
+							blockModel bm = model_oak_tree[k];
+							if (chomk.blocks[height + bm.y][i + bm.x][j + bm.z] == BLOCK_AIR)
+							{
+								//a blokkok indexe a vektorban chunkhoz relativ, azaz 0 es CHUNK_WIDTH-1 kozott van
+								//ehhez hozza kell adni egyet, hogy megkapjuk a chomk.blocks-beli indexet
+								chomk.blocks[height + bm.y][i + bm.x][j + bm.z] = bm.type;
+								blockModel pushed = (blockModel){ i-1 + bm.x, height-1 + bm.y, j-1 + bm.z };
+								seqtor_push_back(*current, pushed);
+							}
+						}
 					}
 				}
 			}
+		}
+	}
+
+	//adding the contents of the current and neightbouring chunks
+	for (int i = 0; i < current->size; i++)
+		chomk.blocks[seqtor_at(*current, i).y+1][seqtor_at(*current, i).x+1][seqtor_at(*current, i).z+1] = seqtor_at(*current, i).type;
+
+	if (plusZ != NULL)
+	{
+		for (int i = 0; i < plusZ->size; i++)
+		{
+			if(seqtor_at(*plusZ, i).z==0)
+				chomk.blocks[seqtor_at(*plusZ, i).y+1][seqtor_at(*plusZ, i).x+1][CHUNK_WIDTH+1] = seqtor_at(*plusZ, i).type;
+		}
+	}
+	if (plusX != NULL)
+	{
+		for (int i = 0; i < plusX->size; i++)
+		{
+			if (seqtor_at(*plusX, i).x == 0)
+				chomk.blocks[seqtor_at(*plusX, i).y+1][CHUNK_WIDTH+1][seqtor_at(*plusX, i).z+1] = seqtor_at(*plusX, i).type;
+		}
+	}
+	if (minusZ != NULL)
+	{
+		for (int i = 0; i < minusZ->size; i++)
+		{
+			if(seqtor_at(*minusZ,i).z==CHUNK_WIDTH-1)
+				chomk.blocks[seqtor_at(*minusZ, i).y+1][seqtor_at(*minusZ, i).x+1][0] = seqtor_at(*minusZ, i).type;
+		}
+	}
+	if (minusX != NULL)
+	{
+		for (int i = 0; i < minusX->size; i++)
+		{
+			if (seqtor_at(*minusX, i).x == CHUNK_WIDTH - 1)
+				chomk.blocks[seqtor_at(*minusX, i).y+1][0][seqtor_at(*minusX, i).z+1] = seqtor_at(*minusX, i).type;
+		}
+	}
+	if (plusY != NULL)
+	{
+		for (int i = 0; i < plusY->size; i++)
+		{
+			if (seqtor_at(*plusY, i).y == 0)
+				chomk.blocks[CHUNK_HEIGHT+1][seqtor_at(*plusY, i).z + 1][seqtor_at(*plusY, i).z + 1] = seqtor_at(*plusY, i).type;
+		}
+	}
+	if (minusY != NULL)
+	{
+		for (int i = 0; i < minusY->size; i++)
+		{
+			if (seqtor_at(*minusY, i).y == CHUNK_HEIGHT-1)
+				chomk.blocks[0][seqtor_at(*minusY, i).z + 1][seqtor_at(*minusY, i).z + 1] = seqtor_at(*minusY, i).type;
 		}
 	}
 
