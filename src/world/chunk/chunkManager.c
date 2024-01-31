@@ -13,6 +13,7 @@
 
 
 char chunkManager_checkIfInFrustum(vec4* vec, char* frustumX, char* frustumY, char* frustumZ);
+int chunkManager_isChunkRegistered(chunkManager* cm, int chunkX, int chunkY, int chunkZ);//elso generalaskor a chunknak foglalni kell helyet a changedBlocks vektorban
 
 chunkManager chunkManager_create(int seed, int renderDistance)
 {
@@ -33,6 +34,8 @@ chunkManager chunkManager_create(int seed, int renderDistance)
 	lista_init(cm.pendingUpdates);
 	lista_init(cm.pendingMeshUpdates);
 	lista_init(cm.loadedChunks);
+
+	seqtor_init(cm.changedBlocks, 1);
 	
 	return cm;
 }
@@ -77,6 +80,11 @@ void chunkManager_destroy(chunkManager* cm)
 			break;
 		}
 	}
+
+	for (int i = 0; i < cm->changedBlocks.size; i++)//chunkonkenti vektorok kiuritese
+		seqtor_destroy(seqtor_at(cm->changedBlocks, i).blocks);
+	seqtor_destroy(cm->changedBlocks);//a kulso vektor kiuritese
+
 }
 
 int chunkManager_isChunkLoaded(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
@@ -116,6 +124,24 @@ int chunkManager_isChunkPending(chunkManager* cm, int chunkX, int chunkY, int ch
 	}
 
 	return 0;
+}
+
+int chunkManager_isChunkRegistered(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
+{
+	int isChunkRegistered = 0;
+	for (int i = 0; i < cm->changedBlocks.size; i++)
+	{
+		if (seqtor_at(cm->changedBlocks, i).chunkX != chunkX)
+			continue;
+		if (seqtor_at(cm->changedBlocks, i).chunkY != chunkY)
+			continue;
+		if (seqtor_at(cm->changedBlocks, i).chunkZ != chunkZ)
+			continue;
+
+		return seqtor_at(cm->changedBlocks, i).isRegistered;
+	}
+
+	return isChunkRegistered;
 }
 
 void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ)
@@ -204,8 +230,6 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 	lista_at(cm->pendingUpdates, 0, &ceu);
 	lista_remove_at(cm->pendingUpdates, 0);
 	pthread_mutex_unlock(pmutex);
-
-
 
 	switch (ceu.type)
 	{
@@ -300,7 +324,7 @@ static float chunkBounds[24] = {
 	CHUNK_WIDTH,CHUNK_HEIGHT,CHUNK_WIDTH
 };
 
-void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
+int chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
 {
 	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
 	char isInFrustum;
@@ -316,6 +340,7 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
 	char isPointInFrustum = 0;
 
+	int drawn = 0;
 	lista_element_of(chunk)* it = cm->loadedChunks.head;
 	while (it != NULL)
 	{
@@ -345,6 +370,7 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
 					chunk_drawTerrain(&it->data);
+					drawn++;
 					break;
 				}
 			}
@@ -357,11 +383,14 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
 					chunk_drawTerrain(&it->data);
+					drawn++;
 				}
 			}
 		}
 		it=it->next;
 	}
+
+	return drawn;
 }
 
 void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* projection)

@@ -23,7 +23,8 @@ struct chunk {
 
 	/*
 	based normal mesh layout:
-	uint: [000xxxxxxyyyyyyzzzzzzuuuuvvvviii]
+	uint: [0aaxxxxxxyyyyyyzzzzzzuuuuvvvviii]
+	a: ambient occlusion [0...3] -> 2 bits
 	x: pos x [0...32] -> 6 bits
 	y: pos y [0...32] -> 6 bits
 	z: pos z [0...32] -> 6 bits

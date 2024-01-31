@@ -15,8 +15,8 @@ uniform vec3 cameraPos;
 //yeah
 uniform vec3 waterColourShallow;
 uniform vec3 waterColourDeep;
-const float shallowStart=20;
-const float shallowHelper=0.05;
+const float shallowStart=10;
+const float shallowHelper=0.1;
 
 uniform mat4 projectionInverse;//to get the view space position of the walter floor
 
@@ -90,7 +90,7 @@ void main()
     vec3 halfway;
 
     //sun ambient
-	ambient = 0.1*sun.attenuation.x*sun.colour*waterColour;
+	ambient = 0.3*sun.attenuation.x*sun.colour*waterColour;
 	//diffuse
 	diffuse = max(dot(normal, sun.position), 0.0) * waterColour * sun.colour*sun.attenuation.x;
 
@@ -134,8 +134,7 @@ void main()
     vec3 endColour=mix(lighting_sum, ambient,fresnel*(1-min(5*depth,1)));
 
     //fog
-    float alpha=(1-fresnel)*0.2+0.8;
-    alpha*=min(5*depth, 1);
+    float alpha=min(5*depth, 1);
     if(distanceFromEye>fogStart)
         alpha*=(fogEnd-distanceFromEye)*fogHelper;
     if(alpha<0)

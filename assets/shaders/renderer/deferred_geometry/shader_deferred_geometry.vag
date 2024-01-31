@@ -5,6 +5,7 @@ layout (location=0) in uint attributes;
 out VS_OUT{
     vec2 TexCoords;
     vec3 viewDir;//view direction in tangent space
+	float ao;
     mat3 tangentToView;
 }vs_out;
 
@@ -40,21 +41,25 @@ const vec3 bitangents[6] = vec3[](
 	vec3(0,0,1)
 );
 
+const float aoValues[4]=float[](0.1,0.25,0.5,1.0);
+
 void main()
 {    
 	//unpack data
 	uint data=attributes;
-	uint id, uvx, uvy, posx, posy, posz;
+	uint id, uvx, uvy, posx, posy, posz, ao;
 
 	id=data&7u;		data>>=3u;
 	uvy=data&15u;	data>>=4u;
 	uvx=data&15u;	data>>=4u;
 	posz=data&63u;	data>>=6u;
 	posy=data&63u;	data>>=6u;
-	posx=data&63u;
+	posx=data&63u;	data>>=6u;
+	ao=data&3u;
 
 	//everything else
 	vs_out.TexCoords=0.1*vec2(uvx, uvy);
+	vs_out.ao=aoValues[ao];
 	
     vs_out.tangentToView=view_normal*mat3(tangents[id], bitangents[id], normals[id]);
 

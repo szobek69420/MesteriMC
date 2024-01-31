@@ -6,7 +6,7 @@ in vec3 lightPosition;
 in vec3 lightColour;
 in vec3 lightAttenuation;
 
-uniform sampler2D texture_normal;
+uniform sampler2D texture_normal; //normal+ao
 uniform sampler2D texture_albedospec;
 uniform sampler2D texture_shadow;
 uniform sampler2D texture_depth;
@@ -65,11 +65,11 @@ void main()
 
 	float distanceFromEye=length(viewspace_position);
 	
-	vec3 normal = texture(texture_normal, uv).rgb * 2 - 1;
+	vec4 normalTemp=texture(texture_normal,uv);
+	vec3 normal = normalTemp.rgb * 2 - 1;
+	float ambientOcclusion=normalTemp.a;
 	vec3 albedo = texture(texture_albedospec, uv).rgb;
 	float specular = texture(texture_albedospec, uv).a;
-    //float ambientOcclusion = texture(texture_ssao, uv).r;
-	float ambientOcclusion=1;
 	
 	// attenuation
 	float distance = length(lightPosition - viewspace_position);
