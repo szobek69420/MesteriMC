@@ -115,6 +115,7 @@ static float vertexUV[] = {
 	0.2,0.7,0.1
 };
 
+//ha ez megvaltozik, akkor a define-oknak a chunk_ambient_occlusion.h-ban is meg kell valtozniuk
 static float vertexPosition[] = {
 	0,0,1,
 	1,0,1,

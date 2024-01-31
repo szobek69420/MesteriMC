@@ -13,6 +13,8 @@
 #include <string.h>
 #include <math.h>
 
+#include "chunk_ambient_occlusion.h"
+
 static blockModel model_oak_tree[67];
 
 
@@ -208,7 +210,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 								//a blokkok indexe a vektorban chunkhoz relativ, azaz 0 es CHUNK_WIDTH-1 kozott van
 								//ehhez hozza kell adni egyet, hogy megkapjuk a chomk.blocks-beli indexet
 								chomk.blocks[height + bm.y][i + bm.x][j + bm.z] = bm.type;
-								blockModel pushed = (blockModel){ i-1 + bm.x, height-1 + bm.y, j-1 + bm.z };
+								blockModel pushed = (blockModel){ i-1 + bm.x, height-1 + bm.y, j-1 + bm.z, bm.type };
 								seqtor_push_back(*current, pushed);
 							}
 						}
@@ -279,6 +281,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 	unsigned int currentVertex = 0;//melyik az oldal elso csucsa (kell az indexeleshez)
 	float x, y, z;
+	unsigned long ao;
 	for (int i = 1; i < CHUNK_HEIGHT+1; i++)//y
 	{
 		for (int j = 1; j < CHUNK_WIDTH+1; j++)//x
@@ -303,6 +306,9 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					for (int l = 0; l < 4; l++)
 					{
 						unsigned long data = 0b0;
+						chunk_ao_pos_z(chomk.blocks, j, i, k, l, ao);
+						data |= (ao & 0b11u); data <<= 6;
+
 						blocks_getVertexPosition(BLOCK_POSITIVE_Z, l, &x, &y, &z);
 						data |= (j-1 + lroundf(x)) & 0b111111u; data <<= 6;
 						data |= (i-1 + lroundf(y)) & 0b111111u; data <<= 6;
@@ -334,6 +340,10 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					for (int l = 0; l < 4; l++)
 					{
 						unsigned long data = 0b0;
+
+						chunk_ao_pos_x(chomk.blocks, j, i, k, l, ao);
+						data |= (ao & 0b11u); data <<= 6;
+
 						blocks_getVertexPosition(BLOCK_POSITIVE_X, l, &x, &y, &z);
 						data |= (j-1 + lroundf(x)) & 0b111111u; data <<= 6;
 						data |= (i-1 + lroundf(y)) & 0b111111u; data <<= 6;
@@ -364,6 +374,10 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					for (int l = 0; l < 4; l++)
 					{
 						unsigned long data = 0b0;
+
+						chunk_ao_neg_z(chomk.blocks, j, i, k, l, ao);
+						data |= (ao & 0b11u); data <<= 6;
+
 						blocks_getVertexPosition(BLOCK_NEGATIVE_Z, l, &x, &y, &z);
 						data |= (j-1 + lroundf(x)) & 0b111111u; data <<= 6;
 						data |= (i-1 + lroundf(y)) & 0b111111u; data <<= 6;
@@ -394,6 +408,10 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					for (int l = 0; l < 4; l++)
 					{
 						unsigned long data = 0b0;
+
+						chunk_ao_neg_x(chomk.blocks, j, i, k, l, ao);
+						data |= (ao & 0b11u); data <<= 6;
+
 						blocks_getVertexPosition(BLOCK_NEGATIVE_X, l, &x, &y, &z);
 						data |= (j-1 + lroundf(x)) & 0b111111u; data <<= 6;
 						data |= (i-1 + lroundf(y)) & 0b111111u; data <<= 6;
@@ -424,6 +442,10 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					for (int l = 0; l < 4; l++)
 					{
 						unsigned long data = 0b0;
+
+						chunk_ao_pos_y(chomk.blocks, j, i, k, l, ao);
+						data |= (ao & 0b11u); data <<= 6;
+
 						blocks_getVertexPosition(BLOCK_POSITIVE_Y, l, &x, &y, &z);
 						data|= (j -1 + lroundf(x))& 0b111111u; data <<= 6;
 						data|= (i -1 + lroundf(y))& 0b111111u; data <<= 6;
@@ -454,6 +476,10 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					for (int l = 0; l < 4; l++)
 					{
 						unsigned long data = 0b0;
+
+						chunk_ao_neg_y(chomk.blocks, j, i, k, l, ao);
+						data |= (ao & 0b11u); data <<= 6;
+
 						blocks_getVertexPosition(BLOCK_NEGATIVE_Y, l, &x, &y, &z);
 						data |= (j -1+ lroundf(x)) & 0b111111u; data <<= 6;
 						data |= (i -1+ lroundf(y)) & 0b111111u; data <<= 6;
@@ -477,7 +503,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	if (verticesNormal.size > 0)
 	{
 		meshNormal->sizeVertices = verticesNormal.size * sizeof(unsigned long);
-		meshNormal->vertices = (float*)malloc(meshNormal->sizeVertices);
+		meshNormal->vertices = malloc(meshNormal->sizeVertices);
 		memcpy(meshNormal->vertices, verticesNormal.data, meshNormal->sizeVertices);
 
 		meshNormal->sizeIndices = indicesNormal.size * sizeof(unsigned int);
