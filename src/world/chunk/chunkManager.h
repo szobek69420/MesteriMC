@@ -52,7 +52,7 @@ struct chunkMeshUpdate {
 typedef struct chunkMeshUpdate chunkMeshUpdate;
 
 struct changedBlocksInChunk {//egy chunkhoz tartozo valtozott blokkok
-	int chunkX, chunkY, chunkZ;
+	int chunkX, chunkY, chunkZ, isRegistered;//isRegistered: ha ez 0, akkor az azt jelenti, hogy az adott chunk listajat valamelyik kornyezo chunk toltotte be, azaz az o tartalma meg nincs benne (pl a fak hianyoznak)
 	seqtor_of(blockModel) blocks;
 };
 typedef struct changedBlocksInChunk changedBlocksInChunk;

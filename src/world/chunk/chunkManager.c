@@ -138,8 +138,7 @@ int chunkManager_isChunkRegistered(chunkManager* cm, int chunkX, int chunkY, int
 		if (seqtor_at(cm->changedBlocks, i).chunkZ != chunkZ)
 			continue;
 
-		isChunkRegistered = 69;
-		break;
+		return seqtor_at(cm->changedBlocks, i).isRegistered;
 	}
 
 	return isChunkRegistered;
@@ -232,13 +231,10 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 	lista_remove_at(cm->pendingUpdates, 0);
 	pthread_mutex_unlock(pmutex);
 
-	int firstLoad;
-
 	switch (ceu.type)
 	{
 		case CHUNKMANAGER_LOAD_CHUNK:
-			firstLoad = chunkManager_isChunkRegistered(cm, ceu.chunkX, ceu.chunkY, ceu.chunkZ) == 0 ? 69 : 0;
-			cmu.chomk=chunk_generate(cm, ceu.chunkX, ceu.chunkY, ceu.chunkZ, &cmu.meshNormal, &cmu.meshWalter, firstLoad);
+			cmu.chomk=chunk_generate(cm, ceu.chunkX, ceu.chunkY, ceu.chunkZ, &cmu.meshNormal, &cmu.meshWalter);
 			cmu.type = CHUNKMANAGER_LOAD_CHUNK;
 			pthread_mutex_lock(pmutex);
 			lista_push_back(cm->pendingMeshUpdates, cmu);

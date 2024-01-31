@@ -59,7 +59,7 @@ typedef struct chunk chunk;
 #include "chunkManager.h"//azert kell a struct chunk definicioja utan, mert kulonben osszeakad a chunkManager.h-val
 
 //a meshRaw*-ok feltoltodnek a chunkmesh adataival, amelyek egy kesobbi lepesben be lesznek toltve a video memoriaba
-chunk chunk_generate(struct chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshRaw* meshNormal, meshRaw* meshWalter, int firstLoad);//chunkX: the number of the chunk in the x axis (chunkX=3 means its the 3th (or 4th if we count 0) chunk in the positive x direction)
+chunk chunk_generate(struct chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshRaw* meshNormal, meshRaw* meshWalter);//chunkX: the number of the chunk in the x axis (chunkX=3 means its the 3th (or 4th if we count 0) chunk in the positive x direction)
 void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter);
 void chunk_destroy(chunk* chomk);
 

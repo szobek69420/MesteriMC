@@ -35,7 +35,7 @@ void chunk_drawWalter(chunk* chomk)
 }
 
 
-chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshRaw* meshNormal, meshRaw* meshWalter, int firstLoad)
+chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshRaw* meshNormal, meshRaw* meshWalter)
 {
 	meshNormal->vertices = NULL; meshNormal->sizeVertices = 0;
 	meshNormal->indices = NULL; meshNormal->sizeIndices = 0;
@@ -65,31 +65,33 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	}
 
 	//getting neighbouring chunk data
+	int isCurrentCreatedHere = 0;
+	int isCurrentFilledAlready = 69;//ha nem, az azt jelenti, hogy hozza kell adni ennek a chunknak a blokkjait (pl a fakat)
 	seqtor_of(blockModel)* current=NULL, *plusZ=NULL, *plusX = NULL, *minusZ = NULL, *minusX = NULL, *plusY = NULL, *minusY = NULL;
 
-
-	//ha a firstLoad!=0, akkor nem letezik a chunkhoz tartozo bejegyzes a changedBlocksban.
-	//ekkor letrehoz egy vektort a currenthez, amelyhez hozzaadja a hozzaadando blokkokat a chunk generalasa kozben
-	//amennyiben a generalas vegen a vektor nem ures, azt hozzaadja a changedBlocks-hoz
-	if (firstLoad)
+	for (int i = 0; i < seqtor_size(cm->changedBlocks); i++)
 	{
+		if (seqtor_at(cm->changedBlocks, i).chunkX != chunkX)
+			continue;
+		if (seqtor_at(cm->changedBlocks, i).chunkY != chunkY)
+			continue;
+		if (seqtor_at(cm->changedBlocks, i).chunkZ != chunkZ)
+			continue;
+
+		current = &seqtor_at(cm->changedBlocks, i).blocks;
+		isCurrentFilledAlready = seqtor_at(cm->changedBlocks, i).isRegistered;
+		seqtor_at(cm->changedBlocks, i).isRegistered = 69;
+		break;
+	}
+	if (current == NULL)
+	{
+		//ha a current=NULL, akkor nem letezik a chunkhoz tartozo bejegyzes a changedBlocksban.
+		//ekkor letrehoz egy vektort a currenthez, amelyhez hozzaadja a hozzaadando blokkokat a chunk generalasa kozben
+		//amennyiben a generalas vegen a vektor nem ures, azt hozzaadja a changedBlocks-hoz
 		current = malloc(sizeof(seqtor_of(blockModel)));
 		seqtor_init(*current, 1);
-	}
-	else
-	{
-		for (int i = 0; i < seqtor_size(cm->changedBlocks); i++)
-		{
-			if (seqtor_at(cm->changedBlocks, i).chunkX != chunkX)
-				continue;
-			if (seqtor_at(cm->changedBlocks, i).chunkY != chunkY)
-				continue;
-			if (seqtor_at(cm->changedBlocks, i).chunkZ != chunkZ)
-				continue;
-
-			current = &seqtor_at(cm->changedBlocks, i).blocks;
-			break;
-		}
+		isCurrentCreatedHere = 69;
+		isCurrentFilledAlready = 0;
 	}
 
 	int tempX, tempY, tempZ, zeroCount;
@@ -184,7 +186,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	}
 
 	//things that should be generated only once and then stored in the changedBlocks (for example trees)
-	if (firstLoad)
+	if (isCurrentFilledAlready==0)
 	{
 		//adding trees
 		srand(1000000 * chunkX + 1000 * chunkY + chunkZ);
@@ -560,7 +562,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	chomk.isThereWaterMesh = 0;
 
 	//check for changedBlocks
-	if (firstLoad)
+	if (isCurrentCreatedHere)
 	{
 		if (current->size != 0)
 		{
@@ -568,6 +570,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 			cbic.chunkX = chunkX;
 			cbic.chunkY = chunkY;
 			cbic.chunkZ = chunkZ;
+			cbic.isRegistered = 69;
 			cbic.blocks.data = current->data;
 			cbic.blocks.capacity = current->capacity;
 			cbic.blocks.size = current->size;
