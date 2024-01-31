@@ -45,6 +45,11 @@ void camera_update(camera* cam, float delta_time)
     dx *= cam->mouse_sensitivity;
     dy *= cam->mouse_sensitivity;
     cam->yaw -= dx;
+    if (cam->yaw > 180.0f)
+        cam->yaw -= 360.0f;
+    if (cam->yaw < -180.0f)
+        cam->yaw += 360.0f;
+
     cam->pitch -= dy;
     if (cam->pitch > 89.0f)
         cam->pitch = 89.0f;

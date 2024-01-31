@@ -324,7 +324,7 @@ static float chunkBounds[24] = {
 	CHUNK_WIDTH,CHUNK_HEIGHT,CHUNK_WIDTH
 };
 
-void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
+int chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
 {
 	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
 	char isInFrustum;
@@ -340,6 +340,7 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
 	char isPointInFrustum = 0;
 
+	int drawn = 0;
 	lista_element_of(chunk)* it = cm->loadedChunks.head;
 	while (it != NULL)
 	{
@@ -369,6 +370,7 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
 					chunk_drawTerrain(&it->data);
+					drawn++;
 					break;
 				}
 			}
@@ -381,11 +383,14 @@ void chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4*
 				{
 					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
 					chunk_drawTerrain(&it->data);
+					drawn++;
 				}
 			}
 		}
 		it=it->next;
 	}
+
+	return drawn;
 }
 
 void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* projection)

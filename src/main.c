@@ -55,6 +55,7 @@
 
 #define PHYSICS_UPDATE 0.02f
 #define GENERATION_UPDATE 0.005f
+#define CHUNK_UPDATES_PER_GENERATION_UPDATE 2
 
 //global variable
 GLFWwindow* window;
@@ -73,6 +74,7 @@ pthread_mutex_t mutex_window;//for window calls (like window_getHeight())
 
 chunkManager cm;
 pthread_mutex_t mutex_cm;
+int chunkUpdatesInLastSecond = 0;
 
 camera cum;
 pthread_mutex_t mutex_cum;
@@ -241,7 +243,10 @@ void* loop_render(void* arg)
     float deltaTime;
     float lastFrame = glfwGetTime();
     float lastSecond = 0;//az fps szamolashoz
-    int framesInLastSecond = 0;
+    int frameCounter = 0;
+    int framesInLastInterval = 0;
+
+    int loadedChunks = 0;
 
     camera cum_render;
     while (69)
@@ -249,13 +254,14 @@ void* loop_render(void* arg)
         deltaTime = glfwGetTime() - lastFrame;
         lastFrame = glfwGetTime();
         lastSecond += deltaTime;
-        framesInLastSecond++;
-        if (lastSecond > 1)
+        frameCounter++;
+        if (lastSecond > 0.2857f)
         {
             //printf("FPS: %d\n", framesInLastSecond);
             //printf("Pos: %d %d %d\n\n", (int)cum.position.x, (int)cum.position.y, (int)cum.position.z);
             lastSecond = 0;
-            framesInLastSecond = 0;
+            framesInLastInterval = frameCounter;
+            frameCounter = 0;
         }
        
         //get window info
@@ -282,6 +288,8 @@ void* loop_render(void* arg)
         chunkManager_updateMesh(&cm);
         chunkManager_updateMesh(&cm);
         chunkManager_updateMesh(&cm);
+
+        loadedChunks = cm.loadedChunks.size;
         pthread_mutex_unlock(&mutex_cm);
 
         //render------------------------------------------
@@ -293,7 +301,7 @@ void* loop_render(void* arg)
         mat3 viewNormal = mat3_createFromMat(view);
 
         mat4 shadowViewProjection = mat4_multiply(
-            mat4_ortho(-70, 70, -70, 70, 1, 200),
+            mat4_ortho(-150, 150, -150, 150, 1, 200),
             mat4_lookAt(
                 vec3_sum(cum_render.position, vec3_create2(szunce.direction.x * 100, szunce.direction.y * 100, szunce.direction.z * 100)),
                 vec3_create2(-1 * szunce.direction.x, -1 * szunce.direction.y, -1 * szunce.direction.z),
@@ -352,7 +360,7 @@ void* loop_render(void* arg)
         glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_ATLAS_SPECULAR));
 
         pthread_mutex_lock(&mutex_cm);
-        chunkManager_drawTerrain(&cm, &geometryPassShader, &cum, &projection);
+        int renderedChunks=chunkManager_drawTerrain(&cm, &geometryPassShader, &cum, &projection);
         pthread_mutex_unlock(&mutex_cm);
 
         //copy depth buffer
@@ -579,15 +587,26 @@ void* loop_render(void* arg)
             textRenderer_setSize(&tr, windowWidth, windowHeight);
         }
 
-        textRenderer_render(&tr, &f, vendor, windowWidth-0.5f*fontHandler_calculateTextLength(&f, vendor) - 15, windowHeight-34, 0.5);
-        textRenderer_render(&tr, &f, renderer, windowWidth - 0.5f * fontHandler_calculateTextLength(&f, renderer) - 15, windowHeight - 69, 0.5);
+        textRenderer_render(&tr, &f, vendor, windowWidth-0.5f*fontHandler_calculateTextLength(&f, vendor) - 15, windowHeight-30, 0.5);
+        textRenderer_render(&tr, &f, renderer, windowWidth - 0.5f * fontHandler_calculateTextLength(&f, renderer) - 15, windowHeight - 55, 0.5);
 
 
         static char buffer[50];
-        sprintf(buffer, "FPS: %.0f", 1.0 / deltaTime);
-        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 34, 0.5);
-        sprintf(buffer, "Pos: %d %d %d", (int)cum_render.position.x, (int)cum_render.position.y, (int)cum_render.position.z);
-        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 69, 0.5);
+        sprintf(buffer, "fps: %d", (int)(3.5f*framesInLastInterval));
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 30, 0.5);
+        sprintf(buffer, "position: %d %d %d", (int)cum_render.position.x, (int)cum_render.position.y, (int)cum_render.position.z);
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 55, 0.5);
+        sprintf(buffer, "rotation: %.f %.f", cum_render.pitch, cum_render.yaw);
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 80, 0.5);
+
+        sprintf(buffer, "render distance: %d", cm.renderDistance);
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 120, 0.5);
+        sprintf(buffer, "chunk updates: %d/s", chunkUpdatesInLastSecond);
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 145, 0.5);
+        sprintf(buffer, "loaded chunks: %d", loadedChunks);
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 170, 0.5);
+        sprintf(buffer, "rendered chunks: %d", renderedChunks);
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 195, 0.5);
 
         pthread_mutex_unlock(&mutex_tr);
 
@@ -613,6 +632,7 @@ void* loop_generation(void* arg)
     float deltaTime;
     float lastFrame = glfwGetTime();
     float lastCameraUpdate = -1;
+    float lastChunkUpdateUpdate = -1; int chunkUpdates = 0;
     camera cum_generation;
 
     while (69)
@@ -630,14 +650,27 @@ void* loop_generation(void* arg)
             lastCameraUpdate = currentTime;
             pthread_mutex_unlock(&mutex_cum);
         }
+        if (currentTime - lastChunkUpdateUpdate > 1)
+        {
+            lastChunkUpdateUpdate = currentTime;
+            chunkUpdatesInLastSecond = chunkUpdates;
+            chunkUpdates = 0;
+        }
 
         int chunkX, chunkY, chunkZ;
         chunk_getChunkFromPos(vec3_create2(cum_generation.position.x + CHUNK_WIDTH * 0.5f, cum_generation.position.y + CHUNK_HEIGHT * 0.5f, cum_generation.position.z + CHUNK_WIDTH * 0.5f), &chunkX, &chunkY, &chunkZ);
         pthread_mutex_lock(&mutex_cm);
         chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
         pthread_mutex_unlock(&mutex_cm);
-        chunkManager_update(&cm,&mutex_cm);
-        chunkManager_update(&cm,&mutex_cm);
+        
+        for (int i = 0; i < CHUNK_UPDATES_PER_GENERATION_UPDATE; i++)
+        {
+            if (cm.pendingUpdates.size > 0)
+            {
+                chunkManager_update(&cm, &mutex_cm);
+                chunkUpdates++;
+            }
+        }
 
         
         //query shouldExit
@@ -823,9 +856,9 @@ void init_renderer()
     glUniform1f(glGetUniformLocation(waterShader.id, "projectionFar"), CLIP_FAR);
     glUniform1f(glGetUniformLocation(waterShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(waterShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
-    glUniform1f(glGetUniformLocation(waterShader.id, "shadowStart"), 60);
-    glUniform1f(glGetUniformLocation(waterShader.id, "shadowEnd"), 70);
-    glUniform1f(glGetUniformLocation(waterShader.id, "shadowHelper"), 1.0f / (70 - 60));
+    glUniform1f(glGetUniformLocation(waterShader.id, "shadowStart"), 140);
+    glUniform1f(glGetUniformLocation(waterShader.id, "shadowEnd"), 150);
+    glUniform1f(glGetUniformLocation(waterShader.id, "shadowHelper"), 1.0f / (150 - 140));
 
     ssaoShader = shader_import(
         "../assets/shaders/renderer/ssao/shader_ssao.vag",
@@ -865,9 +898,9 @@ void init_renderer()
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 150);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 160);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f/(160-150));
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStart"), 60);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowEnd"), 70);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowHelper"), 1.0f / (70 - 60));
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStart"), 90);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowEnd"), 100);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowHelper"), 1.0f / (100 - 90));
 
     forwardPassShader = shader_import(
         "../assets/shaders/renderer/forward/shader_forward.vag",
