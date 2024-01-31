@@ -56,12 +56,12 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 	chomk.model = mat4_translate(mat4_create(1), vec3_create2(basedX, basedY, basedZ));
 
-	chomk.blocks = (char***)malloc(CHUNK_HEIGHT * sizeof(char**));
-	for (int i = 0; i < CHUNK_WIDTH; i++)
+	chomk.blocks = (char***)malloc((CHUNK_HEIGHT+2) * sizeof(char**));
+	for (int i = 0; i < CHUNK_WIDTH+2; i++)
 	{
-		chomk.blocks[i] = (char**)malloc(CHUNK_WIDTH * sizeof(char*));
-		for (int j = 0; j < CHUNK_WIDTH; j++)
-			chomk.blocks[i][j] = (char*)malloc(CHUNK_WIDTH * sizeof(char));
+		chomk.blocks[i] = (char**)malloc((CHUNK_WIDTH+2) * sizeof(char*));
+		for (int j = 0; j < CHUNK_WIDTH+2; j++)
+			chomk.blocks[i][j] = (char*)malloc((CHUNK_WIDTH+2) * sizeof(char));
 	}
 
 	//getting neighbouring chunk data
@@ -149,13 +149,13 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	
 
 	//filling chunk
-	for (int i = 0; i < CHUNK_HEIGHT; i++)//y
+	for (int i = 0; i < CHUNK_HEIGHT+2; i++)//y
 	{
-		for (int j = 0; j < CHUNK_WIDTH; j++)//x
+		for (int j = 0; j < CHUNK_WIDTH+2; j++)//x
 		{
-			for (int k = 0; k < CHUNK_WIDTH; k++)//z 
+			for (int k = 0; k < CHUNK_WIDTH+2; k++)//z 
 			{
-				int level = heightMap[j + 1][k + 1];
+				int level = heightMap[j][k];
 				if (i > level)
 				{
 					if(level<28-basedY&&i<28-basedY)
@@ -185,12 +185,12 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 	//adding trees
 	srand(1000000 * chunkX + 1000 * chunkY + chunkZ);
-	for (int i = 2; i < CHUNK_WIDTH-2; i++)
+	for (int i = 4; i < CHUNK_WIDTH-1; i++)
 	{
-		for (int j = 2; j < CHUNK_WIDTH-2;j++)
+		for (int j = 4; j < CHUNK_WIDTH-1;j++)
 		{
 			int height = heightMap[i + 1][j + 1];
-			if (height >= 0 && height < CHUNK_HEIGHT-6)
+			if (height >= 1 && height < CHUNK_HEIGHT-5)
 			{
 				float szam = (float)rand() / RAND_MAX;
 				if (chomk.blocks[height][i][j] == BLOCK_GRASS&&szam>0.995f)
@@ -214,17 +214,17 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 	unsigned int currentVertex = 0;//melyik az oldal elso csucsa (kell az indexeleshez)
 	float x, y, z;
-	for (int i = 0; i < CHUNK_HEIGHT; i++)//y
+	for (int i = 1; i < CHUNK_HEIGHT+1; i++)//y
 	{
-		for (int j = 0; j < CHUNK_WIDTH; j++)//x
+		for (int j = 1; j < CHUNK_WIDTH+1; j++)//x
 		{
-			for (int k = 0; k < CHUNK_WIDTH; k++)//z 
+			for (int k = 1; k < CHUNK_WIDTH+1; k++)//z 
 			{
 				if (chomk.blocks[i][j][k] == BLOCK_AIR||chomk.blocks[i][j][k]==BLOCK_WATER)
 					continue;
 
 				//pos z
-				if ((k == CHUNK_WIDTH - 1 && heightMap[j + 1][CHUNK_WIDTH + 1] < i) || (k != CHUNK_WIDTH - 1 && chomk.blocks[i][j][k + 1] != chomk.blocks[i][j][k] && (chomk.blocks[i][j][k + 1] == BLOCK_AIR || chomk.blocks[i][j][k + 1] >= BLOCK_TRANSPARENCY_START)))
+				if (chomk.blocks[i][j][k + 1] != chomk.blocks[i][j][k] && (chomk.blocks[i][j][k + 1] == BLOCK_AIR || chomk.blocks[i][j][k + 1] >= BLOCK_TRANSPARENCY_START))
 				{
 					//indices (6 per side (2 triangles))
 					seqtor_push_back(indicesNormal, currentVertex);
@@ -239,9 +239,9 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					{
 						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_POSITIVE_Z, l, &x, &y, &z);
-						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
-						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
-						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
+						data |= (j-1 + lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i-1 + lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k-1 + lroundf(z)) & 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_POSITIVE_Z, l, &x, &y);
 						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
@@ -255,7 +255,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				}
 
 				//pos x
-				if ((j == CHUNK_WIDTH - 1 && heightMap[CHUNK_WIDTH + 1][k + 1] < i) || (j != CHUNK_WIDTH - 1 && chomk.blocks[i][j + 1][k] != chomk.blocks[i][j][k] && (chomk.blocks[i][j + 1][k] == BLOCK_AIR || chomk.blocks[i][j + 1][k] >= BLOCK_TRANSPARENCY_START)))
+				if (chomk.blocks[i][j + 1][k] != chomk.blocks[i][j][k] && (chomk.blocks[i][j + 1][k] == BLOCK_AIR || chomk.blocks[i][j + 1][k] >= BLOCK_TRANSPARENCY_START))
 				{
 					//indices (6 per side (2 triangles))
 					seqtor_push_back(indicesNormal, currentVertex);
@@ -270,9 +270,9 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					{
 						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_POSITIVE_X, l, &x, &y, &z);
-						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
-						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
-						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
+						data |= (j-1 + lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i-1 + lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k-1 + lroundf(z)) & 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_POSITIVE_X, l, &x, &y);
 						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
@@ -285,7 +285,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				}
 
 				//neg z
-				if ((k == 0 && heightMap[j + 1][0] < i) || (k != 0 && chomk.blocks[i][j][k - 1] != chomk.blocks[i][j][k] && (chomk.blocks[i][j][k - 1] == BLOCK_AIR || chomk.blocks[i][j][k - 1] >= BLOCK_TRANSPARENCY_START)))
+				if (chomk.blocks[i][j][k - 1] != chomk.blocks[i][j][k] && (chomk.blocks[i][j][k - 1] == BLOCK_AIR || chomk.blocks[i][j][k - 1] >= BLOCK_TRANSPARENCY_START))
 				{
 					//indices (6 per side (2 triangles))
 					seqtor_push_back(indicesNormal, currentVertex);
@@ -300,9 +300,9 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					{
 						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_NEGATIVE_Z, l, &x, &y, &z);
-						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
-						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
-						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
+						data |= (j-1 + lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i-1 + lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k-1 + lroundf(z)) & 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_Z, l, &x, &y);
 						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
@@ -315,7 +315,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				}
 
 				//neg x
-				if ((j == 0 && heightMap[0][k + 1] < i) || (j != 0 && chomk.blocks[i][j - 1][k] != chomk.blocks[i][j][k] && (chomk.blocks[i][j - 1][k] == BLOCK_AIR || chomk.blocks[i][j - 1][k] >= BLOCK_TRANSPARENCY_START)))
+				if (chomk.blocks[i][j - 1][k] != chomk.blocks[i][j][k] && (chomk.blocks[i][j - 1][k] == BLOCK_AIR || chomk.blocks[i][j - 1][k] >= BLOCK_TRANSPARENCY_START))
 				{
 					//indices (6 per side (2 triangles))
 					seqtor_push_back(indicesNormal, currentVertex);
@@ -330,9 +330,9 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					{
 						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_NEGATIVE_X, l, &x, &y, &z);
-						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
-						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
-						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
+						data |= (j-1 + lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i-1 + lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k-1 + lroundf(z)) & 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_X, l, &x, &y);
 						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
@@ -345,7 +345,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				}
 
 				//pos y
-				if ((i == CHUNK_HEIGHT - 1 && heightMap[j + 1][k + 1] == CHUNK_HEIGHT - 1) || (i != CHUNK_HEIGHT - 1 && chomk.blocks[i + 1][j][k] != chomk.blocks[i][j][k] && (chomk.blocks[i + 1][j][k] == BLOCK_AIR || chomk.blocks[i + 1][j][k] >= BLOCK_TRANSPARENCY_START)))
+				if (chomk.blocks[i + 1][j][k] != chomk.blocks[i][j][k] && (chomk.blocks[i + 1][j][k] == BLOCK_AIR || chomk.blocks[i + 1][j][k] >= BLOCK_TRANSPARENCY_START))
 				{
 					//indices (6 per side (2 triangles))
 					seqtor_push_back(indicesNormal, currentVertex);
@@ -360,9 +360,9 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					{
 						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_POSITIVE_Y, l, &x, &y, &z);
-						data|= (j + lroundf(x))& 0b111111u; data <<= 6;
-						data|= (i + lroundf(y))& 0b111111u; data <<= 6;
-						data|= (k + lroundf(z))& 0b111111u; data <<= 4;
+						data|= (j -1 + lroundf(x))& 0b111111u; data <<= 6;
+						data|= (i -1 + lroundf(y))& 0b111111u; data <<= 6;
+						data|= (k -1 + lroundf(z))& 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_POSITIVE_Y, l, &x, &y);
 						data|= lroundf(10 * x)& 0b1111u; data <<= 4;
@@ -375,7 +375,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				}
 
 				//neg y
-				if ((i == 0 && basedY == 0) || (i != 0 && chomk.blocks[i - 1][j][k] != chomk.blocks[i][j][k] && (chomk.blocks[i - 1][j][k] == BLOCK_AIR || i != 0 && chomk.blocks[i - 1][j][k] >= BLOCK_TRANSPARENCY_START)))
+				if (chomk.blocks[i - 1][j][k] != chomk.blocks[i][j][k] && (chomk.blocks[i - 1][j][k] == BLOCK_AIR || i != 0 && chomk.blocks[i - 1][j][k] >= BLOCK_TRANSPARENCY_START))
 				{
 					//indices (6 per side (2 triangles))
 					seqtor_push_back(indicesNormal, currentVertex);
@@ -390,9 +390,9 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					{
 						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_NEGATIVE_Y, l, &x, &y, &z);
-						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
-						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
-						data |= (k + lroundf(z)) & 0b111111u; data <<= 4;
+						data |= (j -1+ lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i -1+ lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k -1+ lroundf(z)) & 0b111111u; data <<= 4;
 
 						blocks_getUV(chomk.blocks[i][j][k], BLOCK_NEGATIVE_Y, l, &x, &y);
 						data |= lroundf(10 * x) & 0b1111u; data <<= 4;
@@ -407,29 +407,6 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		}
 	}
 
-	//check for changedBlocks
-	if (firstLoad)
-	{
-		if (current->size != 0)
-		{
-			changedBlocksInChunk cbic;
-			cbic.chunkX = chunkX;
-			cbic.chunkY = chunkY;
-			cbic.chunkZ = chunkZ;
-			cbic.blocks.data = current->data;
-			cbic.blocks.capacity = current->capacity;
-			cbic.blocks.size = current->size;
-
-			seqtor_push_back(cm->changedBlocks, cbic);
-
-			free(current);
-		}
-		else
-		{
-			seqtor_destroy(*current);
-			free(current);
-		}
-	}
 
 	//normal mesh
 	if (verticesNormal.size > 0)
@@ -457,18 +434,18 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	seqtor_init(indicesWalter, 1);
 
 	currentVertex = 0;//melyik az oldal elso csucsa (kell az indexeleshez)
-	for (int i = 0; i < CHUNK_HEIGHT; i++)//y
+	for (int i = 1; i < CHUNK_HEIGHT+1; i++)//y
 	{
-		for (int j = 0; j < CHUNK_WIDTH; j++)//x
+		for (int j = 1; j < CHUNK_WIDTH+1; j++)//x
 		{
-			for (int k = 0; k < CHUNK_WIDTH; k++)//z 
+			for (int k = 1; k < CHUNK_WIDTH+1; k++)//z 
 			{
 				if (chomk.blocks[i][j][k] != BLOCK_WATER)
 					continue;
 
 
 				//pos y
-				if (i != CHUNK_HEIGHT - 1 && chomk.blocks[i + 1][j][k] != BLOCK_WATER)
+				if (chomk.blocks[i + 1][j][k] != BLOCK_WATER)
 				{
 					//indices (6 per side (2 triangles))
 					seqtor_push_back(indicesWalter, currentVertex);
@@ -483,9 +460,9 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					{
 						unsigned long data = 0b0;
 						blocks_getVertexPosition(BLOCK_POSITIVE_Y, l, &x, &y, &z);
-						data |= (j + lroundf(x)) & 0b111111u; data <<= 6;
-						data |= (i + lroundf(y)) & 0b111111u; data <<= 6;
-						data |= (k + lroundf(z)) & 0b111111u; data <<= 3;
+						data |= (j -1+ lroundf(x)) & 0b111111u; data <<= 6;
+						data |= (i -1+ lroundf(y)) & 0b111111u; data <<= 6;
+						data |= (k -1+ lroundf(z)) & 0b111111u; data <<= 3;
 
 						data |= 0b100u;
 
@@ -518,6 +495,30 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	seqtor_destroy(verticesWalter);
 	seqtor_destroy(indicesWalter);
 	chomk.isThereWaterMesh = 0;
+
+	//check for changedBlocks
+	if (firstLoad)
+	{
+		if (current->size != 0)
+		{
+			changedBlocksInChunk cbic;
+			cbic.chunkX = chunkX;
+			cbic.chunkY = chunkY;
+			cbic.chunkZ = chunkZ;
+			cbic.blocks.data = current->data;
+			cbic.blocks.capacity = current->capacity;
+			cbic.blocks.size = current->size;
+
+			seqtor_push_back(cm->changedBlocks, cbic);
+
+			free(current);
+		}
+		else
+		{
+			seqtor_destroy(*current);
+			free(current);
+		}
+	}
 
 	return chomk;
 }
