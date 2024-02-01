@@ -16,12 +16,16 @@ typedef struct {
 typedef struct {
     unsigned int fontSize;
     character characters[MAX_CHARACTERS];
+    unsigned int lineHeight;//max({characters[i].height})
 } font;
 
 int fontHandler_init();
 void fontHandler_close();
 
+int fontHandler_isInitialized();
+
 font fontHandler_loadFont(const char* fontPath, unsigned int fontSize);
+void fontHandler_destroyFont(font* f);
 
 float fontHandler_calculateTextLength(font* f, const char* text);
 
