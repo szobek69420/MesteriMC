@@ -1,0 +1,14 @@
+#version 330 core
+
+in vec2 uv;
+
+out vec4 fragColour;
+
+uniform vec4 buttonData;//width, height, borderWidth, borderRadius
+uniform vec4 borderColour;
+uniform vec4 fillColour;
+
+void main()
+{
+	vec2 bottomLeft=
+}

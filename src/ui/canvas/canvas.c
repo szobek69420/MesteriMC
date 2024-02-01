@@ -334,7 +334,7 @@ int canvas_addButton(canvas* c, int hAlign, int vAlign, int x, int y, float widt
 
 	cc.cb.ct.text = NULL;
 	cc.cb.clicked = NULL;
-	cc.cb.normalR = 1;	cc.cb.normalG = 1;	cc.cb.normalB = 1;
+	cc.cb.normalR = 1;		cc.cb.normalG = 1;		cc.cb.normalB = 1;
 	cc.cb.hoverR = 0.8f;	cc.cb.hoverG = 0.8f;	cc.cb.hoverB = 0.8f;
 	cc.cb.clickedR = 0.5f;	cc.cb.clickedG = 0.5f;	cc.cb.clickedB = 0.5f;
 
