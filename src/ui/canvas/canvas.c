@@ -12,15 +12,24 @@
 #define CANVAS_FONT_SIZE 48
 
 #define CANVAS_COMPONENT_TEXT 0
+#define CANVAS_COMPONENT_BUTTON 1
 
-static int componentIDCounter = 0;
+static int componentIDCounter = 0;//increases by one if a component has been added to the canvas
 
 struct canvasText {
 	char* text;
-	float r, g, b;
+	float r, g, b;//white is rgb(255,255,255)
 	float scale;//for the textRenderer
 };
 typedef struct canvasText canvasText;
+
+struct canvasButton {
+	canvasText ct;
+	float normalR, normalG, normalB;
+	float hoverR, hoverG, hoverB;
+	void (*clicked)(void*);
+};
+typedef struct canvasButton canvasButton;
 
 struct canvasComponent {
 	int id;
@@ -32,6 +41,7 @@ struct canvasComponent {
 
 	union componentData {
 		canvasText ct;
+		canvasButton cb;
 	};
 };
 typedef struct canvasComponent canvasComponent;
@@ -77,6 +87,21 @@ void canvas_destroy(canvas* c)
 	seqtor_destroy(c->components);
 
 	free(c);
+}
+
+canvasComponent* canvas_getComponent(canvas* c, int id)
+{
+	canvasComponent* cc = NULL;
+	for (int i = 0; i < c->components.size; i++)
+	{
+		if (id == seqtor_at(c->components, i).id)
+		{
+			cc = &seqtor_at(c->components, i).id;
+			break;
+		}
+	}
+
+	return cc;
 }
 
 void canvas_setSize(canvas* c, int width, int height)
@@ -196,15 +221,9 @@ void canvas_removeComponent(canvas* c, int id)
 
 void canvas_setTextText(canvas* c, int id, const char* text)
 {
-	canvasComponent* cc=NULL;
-	for (int i = 0; i < c->components.size; i++)
-	{
-		if (id == seqtor_at(c->components, i).id)
-		{
-			cc = &seqtor_at(c->components, i).id;
-			break;
-		}
-	}
+	canvasComponent* cc;
+
+	cc = canvas_getComponent(c, id);
 
 	if (cc == NULL)
 		return;
@@ -213,6 +232,32 @@ void canvas_setTextText(canvas* c, int id, const char* text)
 	cc->ct.text = malloc((strlen(text) + 1) * sizeof(char));
 	strcpy(cc->ct.text, text);
 
+	cc->width = cc->ct.scale * fontHandler_calculateTextLength(&c->f, cc->ct.text);
+
+	canvas_calculatePosition(c, cc);
+}
+
+void canvas_setTextColour(canvas* c, int id, float r, float g, float b)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL)
+		return;
+
+	cc->ct.r = r;
+	cc->ct.g = g;
+	cc->ct.b = b;
+}
+
+void canvas_setTextFontSize(canvas* c, int id, int fontSize)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL)
+		return;
+
+	cc->ct.scale = (float)fontSize / CANVAS_FONT_SIZE;
+	cc->height = cc->ct.scale * c->f.lineHeight;
 	cc->width = cc->ct.scale * fontHandler_calculateTextLength(&c->f, cc->ct.text);
 
 	canvas_calculatePosition(c, cc);

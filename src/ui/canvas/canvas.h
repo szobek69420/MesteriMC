@@ -12,6 +12,7 @@
 #define CANVAS_ALIGN_RIGHT 2
 
 
+
 struct canvas;
 typedef struct canvas canvas;
 
@@ -29,5 +30,7 @@ int canvas_addText(canvas* c, const char* text, int hAlign, int vAlign, int x, i
 void canvas_removeComponent(canvas* c, int id);
 
 void canvas_setTextText(canvas* c, int id, const char* text);
+void canvas_setTextColour(canvas* c, int id, float r, float g, float b);
+void canvas_setTextFontSize(canvas* c, int id, int fontSize);
 
 #endif

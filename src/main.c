@@ -159,7 +159,7 @@ int main()
     fontHandler_init();
     init_canvas();
 
-    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 100, 0.2);
+    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
     cm = chunkManager_create(69, 5);
     init_renderer();
@@ -1109,9 +1109,12 @@ void init_canvas()
     //right side
     const char* vendor = glGetString(GL_VENDOR);
     const char* renderer = glGetString(GL_RENDERER);
+    int temp;
 
-    canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
-    canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
+    temp=canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
+    canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
+    temp = canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
+    canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
 }
 
 void end_canvas()
