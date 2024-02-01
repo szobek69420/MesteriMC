@@ -15,17 +15,19 @@
 struct canvas;
 typedef struct canvas canvas;
 
-struct canvasText;//stores all the information about a text component of the canvas
-typedef struct canvasText canvasText;
 
-
+//should be called after fontHandler_init
 canvas* canvas_create(int width, int height, const char* fontSauce);
+//should be called before fontHandler_close
 void canvas_destroy(canvas* c);
 
+void canvas_setSize(canvas* c, int width, int height);
+
 void canvas_render(canvas* c);
-void canvas_calculatePositions(canvas* c);
 
 int canvas_addText(canvas* c, const char* text, int hAlign, int vAlign, int x, int y, float r, float g, float b, int fontSize);
 void canvas_removeComponent(canvas* c, int id);
+
+void canvas_setTextText(canvas* c, int id, const char* text);
 
 #endif

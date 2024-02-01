@@ -20,6 +20,7 @@ struct canvasText {
 	float r, g, b;
 	float scale;//for the textRenderer
 };
+typedef struct canvasText canvasText;
 
 struct canvasComponent {
 	int id;
@@ -44,6 +45,7 @@ struct canvas {
 	seqtor_of(canvasComponent) components;
 };
 
+void canvas_calculatePositions(canvas* c);
 void canvas_destroyComponent(canvasComponent* cc);
 
 //font handler should be initialized before calling this
@@ -77,6 +79,16 @@ void canvas_destroy(canvas* c)
 	free(c);
 }
 
+void canvas_setSize(canvas* c, int width, int height)
+{
+	c->width = width;
+	c->height = height;
+
+	textRenderer_setSize(&c->tr, width, height);
+
+	canvas_calculatePositions(c);
+}
+
 void canvas_render(canvas* c)
 {
 	canvasComponent* cc;
@@ -95,6 +107,41 @@ void canvas_render(canvas* c)
 	}
 }
 
+void canvas_calculatePosition(canvas* c, canvasComponent* cc)
+{
+	//horizontal align
+	switch (cc->hAlign)
+	{
+	case CANVAS_ALIGN_LEFT: //x is the horizontal distance between the left side of the screen and the left side of the component (positive direction is to the right)
+		cc->originX = cc->x;
+		break;
+
+	case CANVAS_ALIGN_CENTER://x is the horizontal distance between the center of the screen and the center of the component (positive direction is to the right)
+		cc->originX = 0.5f * c->width + cc->x - 0.5f * cc->width;
+		break;
+
+	case CANVAS_ALIGN_RIGHT://x is the horizontal distance between the right side of the screen and the right side of the component (positive direction is to the left)
+		cc->originX = c->width - cc->x - cc->width;
+		break;
+	}
+
+	//vertical align
+	switch (cc->vAlign)
+	{
+	case CANVAS_ALIGN_BOTTOM://y is the vertical distance between the bottom side of the screen and the bottom side of the component (positive direction is up)
+		cc->originY = cc->y;
+		break;
+
+	case CANVAS_ALIGN_MIDDLE://y is the vertical distance between the center of the screen and the center of the component (positive direction is up)
+		cc->originY = 0.5f * c->height + cc->y - 0.5f * cc->height;
+		break;
+
+	case CANVAS_ALIGN_TOP://y is the vertical distance between the top side of the screen and the top side of the component (positive direction is down)
+		cc->originY = c->height - cc->y - cc->height;
+		break;
+	}
+}
+
 void canvas_calculatePositions(canvas* c)
 {
 	canvasComponent* cc;
@@ -102,37 +149,7 @@ void canvas_calculatePositions(canvas* c)
 	{
 		cc = &seqtor_at(c->components, i);
 
-		//horizontal align
-		switch (cc->hAlign)
-		{
-		case CANVAS_ALIGN_LEFT: //x is the horizontal distance between the left side of the screen and the left side of the component (positive direction is to the right)
-			cc->originX = cc->x;
-			break;
-
-		case CANVAS_ALIGN_CENTER://x is the horizontal distance between the center of the screen and the center of the component (positive direction is to the right)
-			cc->originX = 0.5f*c->width + cc->x - 0.5f * cc->width;
-			break;
-
-		case CANVAS_ALIGN_RIGHT://x is the horizontal distance between the right side of the screen and the right side of the component (positive direction is to the left)
-			cc->originX = c->width - cc->x - cc->width;
-			break;
-		}
-
-		//vertical align
-		switch (cc->vAlign)
-		{
-		case CANVAS_ALIGN_BOTTOM://y is the vertical distance between the bottom side of the screen and the bottom side of the component (positive direction is up)
-			cc->originY = cc->y;
-			break;
-
-		case CANVAS_ALIGN_MIDDLE://y is the vertical distance between the center of the screen and the center of the component (positive direction is up)
-			cc->originY = 0.5f * c->height + cc->y - 0.5f * cc->height;
-			break;
-
-		case CANVAS_ALIGN_TOP://y is the vertical distance between the top side of the screen and the top side of the component (positive direction is down)
-			cc->originY = c->height - cc->y - cc->height;
-			break;
-		}
+		canvas_calculatePosition(c, cc);
 	}
 }
 
@@ -159,6 +176,8 @@ int canvas_addText(canvas* c, const char* text, int hAlign, int vAlign, int x, i
 
 	seqtor_push_back(c->components, cc);
 
+	canvas_calculatePosition(c, &seqtor_back(c->components));
+
 	return cc.id;
 }
 
@@ -173,6 +192,30 @@ void canvas_removeComponent(canvas* c, int id)
 			break;
 		}
 	}
+}
+
+void canvas_setTextText(canvas* c, int id, const char* text)
+{
+	canvasComponent* cc=NULL;
+	for (int i = 0; i < c->components.size; i++)
+	{
+		if (id == seqtor_at(c->components, i).id)
+		{
+			cc = &seqtor_at(c->components, i).id;
+			break;
+		}
+	}
+
+	if (cc == NULL)
+		return;
+
+	free(cc->ct.text);
+	cc->ct.text = malloc((strlen(text) + 1) * sizeof(char));
+	strcpy(cc->ct.text, text);
+
+	cc->width = cc->ct.scale * fontHandler_calculateTextLength(&c->f, cc->ct.text);
+
+	canvas_calculatePosition(c, cc);
 }
 
 void canvas_destroyComponent(canvasComponent* cc)

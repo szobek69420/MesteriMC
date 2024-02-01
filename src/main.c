@@ -96,10 +96,15 @@ shader finalPassShader;
 shader fxaaShader;
 shader skyboxShader; mesh skyboxMesh;
 
-textRenderer tr;
-pthread_mutex_t mutex_tr;
-font f;
 canvas* vaszon;
+pthread_mutex_t mutex_vaszon;
+int vaszon_fps;
+int vaszon_pos;
+int vaszon_rot;
+int vaszon_render_distance;
+int vaszon_chunk_updates;
+int vaszon_chunks_loaded;
+int vaszon_chunks_rendered;
 
 unsigned int rectangleVAO;//a deferred resz hasznalja a kepernyo atrajzolasahoz
 unsigned int rectangleVBO;
@@ -126,6 +131,9 @@ void* loop_physics(void* arg);
 void init_renderer();
 void end_renderer();
 
+void init_canvas();
+void end_canvas();
+
 void render_cube();
 
 double lerp(double a, double b, double f);
@@ -147,14 +155,9 @@ int main()
     event_queue_init();
     input_init();
 
-    tr = textRenderer_create(window_getWidth(), window_getHeight());
-    textRenderer_setColour(&tr, 0, 0, 0);
-    fontHandler_init();
-    f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
 
-    vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
-    canvas_addText(vaszon, "Smogus", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 10, 10, 0, 0, 0, 100);
-    canvas_calculatePositions(vaszon);
+    fontHandler_init();
+    init_canvas();
 
     cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
@@ -178,7 +181,7 @@ int main()
     pthread_mutex_init(&mutex_cm, NULL);
     pthread_mutex_init(&mutex_pm, NULL);
     pthread_mutex_init(&mutex_cum, NULL);
-    pthread_mutex_init(&mutex_tr, NULL);
+    pthread_mutex_init(&mutex_vaszon, NULL);
 
 
     pthread_create(&thread_physics, NULL, loop_physics, NULL);
@@ -218,14 +221,14 @@ int main()
     pthread_mutex_destroy(&mutex_cm);
     pthread_mutex_destroy(&mutex_pm);
     pthread_mutex_destroy(&mutex_cum);
-    pthread_mutex_destroy(&mutex_tr);
+    pthread_mutex_destroy(&mutex_vaszon);
 
 
     glfwMakeContextCurrent(window);
 
     chunkManager_destroy(&cm);
-    textRenderer_destroy(&tr);
     textureHandler_destroyTextures();
+    end_canvas();
     fontHandler_close();
     end_renderer();
 
@@ -242,9 +245,6 @@ void* loop_render(void* arg)
 
     int windowWidth, windowHeight, lastWindowWidth=window_getWidth(), lastWindowHeight=window_getHeight(), shouldChangeSize=0;
     float windowAspectXY;
-
-    const char * vendor = glGetString(GL_VENDOR);
-    const char * renderer = glGetString(GL_RENDERER);
 
     float deltaTime;
     float lastFrame = glfwGetTime();
@@ -586,37 +586,40 @@ void* loop_render(void* arg)
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         //render 2d stuff (only text yet)
-        /*pthread_mutex_lock(&mutex_tr);
+        pthread_mutex_lock(&mutex_vaszon);
         
         if (shouldChangeSize)
         {
-            textRenderer_setSize(&tr, windowWidth, windowHeight);
+            canvas_setSize(vaszon, windowWidth, windowHeight);
         }
 
-        textRenderer_render(&tr, &f, vendor, windowWidth-0.5f*fontHandler_calculateTextLength(&f, vendor) - 15, windowHeight-30, 0.5);
-        textRenderer_render(&tr, &f, renderer, windowWidth - 0.5f * fontHandler_calculateTextLength(&f, renderer) - 15, windowHeight - 55, 0.5);
-
-
         static char buffer[50];
-        sprintf(buffer, "fps: %d", (int)(3.5f*framesInLastInterval));
-        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 30, 0.5);
+
+        sprintf(buffer, "fps: %d", (int)(3.5f * framesInLastInterval));
+        canvas_setTextText(vaszon, vaszon_fps, buffer);
+
         sprintf(buffer, "position: %d %d %d", (int)cum_render.position.x, (int)cum_render.position.y, (int)cum_render.position.z);
-        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 55, 0.5);
+        canvas_setTextText(vaszon, vaszon_pos, buffer);
+
         sprintf(buffer, "rotation: %.f %.f", cum_render.pitch, cum_render.yaw);
-        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 80, 0.5);
+        canvas_setTextText(vaszon, vaszon_rot, buffer);
 
         sprintf(buffer, "render distance: %d", cm.renderDistance);
-        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 120, 0.5);
+        canvas_setTextText(vaszon, vaszon_render_distance, buffer);
+
         sprintf(buffer, "chunk updates: %d/s", chunkUpdatesInLastSecond);
-        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 145, 0.5);
+        canvas_setTextText(vaszon, vaszon_chunk_updates, buffer);
+
         sprintf(buffer, "loaded chunks: %d", loadedChunks);
-        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 170, 0.5);
+        canvas_setTextText(vaszon, vaszon_chunks_loaded, buffer);
+
         sprintf(buffer, "rendered chunks: %d", renderedChunks);
-        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 195, 0.5);*/
+        canvas_setTextText(vaszon, vaszon_chunks_rendered, buffer);
+
 
         canvas_render(vaszon);
 
-        pthread_mutex_unlock(&mutex_tr);
+        pthread_mutex_unlock(&mutex_vaszon);
 
         glfwSwapBuffers(window);
 
@@ -1087,6 +1090,33 @@ void end_renderer()
 
     //player mesh
     playerMesh_destroy(&pm);
+}
+
+void init_canvas()
+{
+    vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
+
+    //left side
+    vaszon_fps = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 15, 0, 0, 0, 24);
+    vaszon_pos = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 40, 0, 0, 0, 24);
+    vaszon_rot = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 65, 0, 0, 0, 24);
+
+    vaszon_render_distance = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 105, 0, 0, 0, 24);
+    vaszon_chunk_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 130, 0, 0, 0, 24);
+    vaszon_chunks_loaded = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 155, 0, 0, 0, 24);
+    vaszon_chunks_rendered = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 180, 0, 0, 0, 24);
+
+    //right side
+    const char* vendor = glGetString(GL_VENDOR);
+    const char* renderer = glGetString(GL_RENDERER);
+
+    canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
+    canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
+}
+
+void end_canvas()
+{
+    canvas_destroy(vaszon);
 }
 
 
