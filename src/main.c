@@ -147,7 +147,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 int main()
 {
-    //_CrtSetBreakAlloc(4910);
+    //_CrtSetBreakAlloc(756);
     window_setWidth(1300);
     window_setHeight(800);
     window = init_window("amogus", window_getWidth(), window_getHeight());
@@ -159,7 +159,7 @@ int main()
     fontHandler_init();
     init_canvas();
 
-    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
+    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 100, 0.2);
 
     cm = chunkManager_create(69, 5);
     init_renderer();
