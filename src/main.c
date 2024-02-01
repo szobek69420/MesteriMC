@@ -38,6 +38,7 @@
 
 #include "ui/font_handler/font_handler.h"
 #include "ui/text/text_renderer.h"
+#include "ui/canvas/canvas.h"
 
 #include "post_processing/lens_flare/flare.h"
 
@@ -98,6 +99,7 @@ shader skyboxShader; mesh skyboxMesh;
 textRenderer tr;
 pthread_mutex_t mutex_tr;
 font f;
+canvas* vaszon;
 
 unsigned int rectangleVAO;//a deferred resz hasznalja a kepernyo atrajzolasahoz
 unsigned int rectangleVBO;
@@ -149,6 +151,10 @@ int main()
     textRenderer_setColour(&tr, 0, 0, 0);
     fontHandler_init();
     f = fontHandler_loadFont("../assets/fonts/Monocraft.ttf", 48);
+
+    vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
+    canvas_addText(vaszon, "Smogus", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 10, 10, 0, 0, 0, 100);
+    canvas_calculatePositions(vaszon);
 
     cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
@@ -580,7 +586,7 @@ void* loop_render(void* arg)
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         //render 2d stuff (only text yet)
-        pthread_mutex_lock(&mutex_tr);
+        /*pthread_mutex_lock(&mutex_tr);
         
         if (shouldChangeSize)
         {
@@ -606,7 +612,9 @@ void* loop_render(void* arg)
         sprintf(buffer, "loaded chunks: %d", loadedChunks);
         textRenderer_render(&tr, &f, buffer, 15, windowHeight - 170, 0.5);
         sprintf(buffer, "rendered chunks: %d", renderedChunks);
-        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 195, 0.5);
+        textRenderer_render(&tr, &f, buffer, 15, windowHeight - 195, 0.5);*/
+
+        canvas_render(vaszon);
 
         pthread_mutex_unlock(&mutex_tr);
 

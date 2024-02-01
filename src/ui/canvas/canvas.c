@@ -18,14 +18,16 @@ static int componentIDCounter = 0;
 struct canvasText {
 	char* text;
 	float r, g, b;
-	int fontSize;
+	float scale;//for the textRenderer
 };
 
 struct canvasComponent {
 	int id;
 	int componentType;
 	int hAlign, vAlign;
-	int x, y;
+	int x, y;//the position of the (0,0) point depends on the alignment (for example for a combo of CANVAS_ALIGN_LEFT and CANVAS_ALIGN_BOTTOM it is the bottom left corner of the screen, but for CANVAS_ALIGN_RIGHT and CANVAS_ALIGN_TOP it is the top right corner of the screen)
+	float originX, originY;//(0,0) is the bottom left corner (for example CANVAS_ALIGN_LEFT and CANVAS_ALIGN_TOP for (x,y)=(10,0) equals an (originX,originY)=(10,canvas_height-component_height)
+	float width, height;
 
 	union componentData {
 		canvasText ct;
@@ -45,17 +47,19 @@ struct canvas {
 void canvas_destroyComponent(canvasComponent* cc);
 
 //font handler should be initialized before calling this
-canvas canvas_create(int width, int height, const char* fontSauce)
+canvas* canvas_create(int width, int height, const char* fontSauce)
 {
-	canvas c;
-	c.width = width;
-	c.height = height;
+	canvas* c=malloc(sizeof(canvas));
+	c->width = width;
+	c->height = height;
 
-	c.f = fontHandler_loadFont(fontSauce,CANVAS_FONT_SIZE);
+	c->f = fontHandler_loadFont(fontSauce,CANVAS_FONT_SIZE);
 
-	c.tr = textRenderer_create(width, height);
+	c->tr = textRenderer_create(width, height);
 
-	seqtor_init(c.components, 1);
+	seqtor_init(c->components, 1);
+
+	return c;
 }
 
 void canvas_destroy(canvas* c)
@@ -69,9 +73,70 @@ void canvas_destroy(canvas* c)
 		seqtor_pop_back(c->components);
 	}
 	seqtor_destroy(c->components);
+
+	free(c);
 }
 
-int canvas_addText(canvas* c, const char* text, int hAlign, int vAlign, int x, int y,  float r, float g, float b)
+void canvas_render(canvas* c)
+{
+	canvasComponent* cc;
+	int x, y, width, height;
+	for (int i = 0; i < seqtor_size(c->components); i++)
+	{
+		cc = &seqtor_at(c->components,i);
+
+		switch (cc->componentType)
+		{
+		case CANVAS_COMPONENT_TEXT:
+			textRenderer_setColour(&c->tr, cc->ct.r, cc->ct.g, cc->ct.b);
+			textRenderer_render(&c->tr, &c->f, cc->ct.text, cc->originX, cc->originY, cc->ct.scale);
+			break;
+		}
+	}
+}
+
+void canvas_calculatePositions(canvas* c)
+{
+	canvasComponent* cc;
+	for (int i = 0; i < seqtor_size(c->components); i++)
+	{
+		cc = &seqtor_at(c->components, i);
+
+		//horizontal align
+		switch (cc->hAlign)
+		{
+		case CANVAS_ALIGN_LEFT: //x is the horizontal distance between the left side of the screen and the left side of the component (positive direction is to the right)
+			cc->originX = cc->x;
+			break;
+
+		case CANVAS_ALIGN_CENTER://x is the horizontal distance between the center of the screen and the center of the component (positive direction is to the right)
+			cc->originX = 0.5f*c->width + cc->x - 0.5f * cc->width;
+			break;
+
+		case CANVAS_ALIGN_RIGHT://x is the horizontal distance between the right side of the screen and the right side of the component (positive direction is to the left)
+			cc->originX = c->width - cc->x - cc->width;
+			break;
+		}
+
+		//vertical align
+		switch (cc->vAlign)
+		{
+		case CANVAS_ALIGN_BOTTOM://y is the vertical distance between the bottom side of the screen and the bottom side of the component (positive direction is up)
+			cc->originY = cc->y;
+			break;
+
+		case CANVAS_ALIGN_MIDDLE://y is the vertical distance between the center of the screen and the center of the component (positive direction is up)
+			cc->originY = 0.5f * c->height + cc->y - 0.5f * cc->height;
+			break;
+
+		case CANVAS_ALIGN_TOP://y is the vertical distance between the top side of the screen and the top side of the component (positive direction is down)
+			cc->originY = c->height - cc->y - cc->height;
+			break;
+		}
+	}
+}
+
+int canvas_addText(canvas* c, const char* text, int hAlign, int vAlign, int x, int y,  float r, float g, float b, int fontSize)
 {
 	canvasComponent cc;
 	cc.componentType = CANVAS_COMPONENT_TEXT;
@@ -87,6 +152,10 @@ int canvas_addText(canvas* c, const char* text, int hAlign, int vAlign, int x, i
 	cc.ct.r = r;
 	cc.ct.g = g;
 	cc.ct.b = b;
+
+	cc.ct.scale = (float)fontSize / CANVAS_FONT_SIZE;
+	cc.height = cc.ct.scale * c->f.lineHeight;
+	cc.width = cc.ct.scale * fontHandler_calculateTextLength(&c->f, cc.ct.text);
 
 	seqtor_push_back(c->components, cc);
 
@@ -115,3 +184,4 @@ void canvas_destroyComponent(canvasComponent* cc)
 		break;
 	}
 }
+
