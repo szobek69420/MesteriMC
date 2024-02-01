@@ -9,18 +9,33 @@ static void _fontHandler_loadGlyphs(font* f, FT_Face face);
 
 static FT_Library _ft;
 
+static int isInitialized = 0;
+
 int fontHandler_init()
 {
+    if (isInitialized)
+        return 0;
+
     if (FT_Init_FreeType(&_ft))
     {
         printf("ERROR::FREETYPE: Could not init FreeType Library\n");
         return 69;
     }
+    isInitialized = 69;
     return 0;
 }
 void fontHandler_close()
 {
+    if (isInitialized == 0)
+        return;
+
     FT_Done_FreeType(_ft);
+    isInitialized = 0;
+}
+
+int fontHandler_isInitialized()
+{
+    return isInitialized;
 }
 
 font fontHandler_loadFont(const char* fontPath, unsigned int fontSize)
@@ -43,6 +58,7 @@ font fontHandler_loadFont(const char* fontPath, unsigned int fontSize)
 
 static void _fontHandler_loadGlyphs(font* f, FT_Face face)
 {
+    unsigned int lineHeight = 0;
     for (unsigned char c = 0; c < 128; c++)
     {
         // load character glyphs
@@ -79,8 +95,21 @@ static void _fontHandler_loadGlyphs(font* f, FT_Face face)
             face->glyph->advance.x
         };
         f->characters[c] = ch;
+
+        if (ch.height > lineHeight)
+            lineHeight = ch.height;
     }
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    f->lineHeight = lineHeight;
+}
+
+void fontHandler_destroyFont(font* f)
+{
+    for (unsigned char c = 0; c < 128; c++)
+    {
+        glDeleteTextures(1, &f->characters->textureID);
+    }
 }
 
 float fontHandler_calculateTextLength(font* f, const char* text)
