@@ -7,6 +7,8 @@
 #include "../font_handler/font_handler.h"
 #include "../text/text_renderer.h"
 
+#include "../button/button_renderer.h"
+
 #include "../../utils/seqtor.h"
 
 #define CANVAS_FONT_SIZE 48
@@ -29,6 +31,7 @@ struct canvasButton {
 	float hoverR, hoverG, hoverB;
 	float clickedR, clickedG, clickedB;
 	float borderWidth, borderRadius;
+	int transparentBackground;
 	void (*clicked)(void*);
 	void* clickedParam;
 };
@@ -55,6 +58,8 @@ struct canvas {
 	font f;
 	textRenderer tr;
 
+	buttonRenderer* br;
+
 	seqtor_of(canvasComponent) components;
 };
 
@@ -72,6 +77,8 @@ canvas* canvas_create(int width, int height, const char* fontSauce)
 
 	c->tr = textRenderer_create(width, height);
 
+	c->br = buttonRenderer_create(width, height);
+
 	seqtor_init(c->components, 1);
 
 	return c;
@@ -81,6 +88,7 @@ void canvas_destroy(canvas* c)
 {
 	fontHandler_destroyFont(&c->f);
 	textRenderer_destroy(&c->tr);
+	buttonRenderer_destroy(c->br);
 
 	while (seqtor_size(c->components) > 0)
 	{
@@ -113,6 +121,7 @@ void canvas_setSize(canvas* c, int width, int height)
 	c->height = height;
 
 	textRenderer_setSize(&c->tr, width, height);
+	buttonRenderer_setSize(c->br, width, height);
 
 	canvas_calculatePositions(c);
 }
@@ -134,6 +143,15 @@ void canvas_render(canvas* c)
 			textRenderer_setColour(&c->tr, cc->ct.r, cc->ct.g, cc->ct.b);
 			textRenderer_render(&c->tr, &c->f, cc->ct.text, cc->originX, cc->originY, cc->ct.scale);
 			break;
+
+		case CANVAS_COMPONENT_BUTTON:
+			buttonRenderer_setBackgroundTransparency(c->br, cc->cb.transparentBackground);
+			buttonRenderer_setBorderColour(c->br, cc->cb.normalR, cc->cb.normalG, cc->cb.normalB);
+			buttonRenderer_render(c->br, cc->originX, cc->originY, cc->width, cc->height, cc->cb.borderWidth, cc->cb.borderRadius);
+			if (cc->cb.ct.text != NULL)
+			{
+				//render text
+			}
 		}
 	}
 }
@@ -363,6 +381,27 @@ void canvas_setButtonColourHover(canvas* c, int id, float hoverR, float hoverG, 
 		return;
 
 	cc->cb.hoverR = hoverR;		cc->cb.hoverG = hoverG;		cc->cb.hoverB = hoverB;
+}
+
+void canvas_setButtonBackgroundTransparency(canvas* c, int id, int transparentBackground)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_BUTTON)
+		return;
+
+	cc->cb.transparentBackground = transparentBackground;
+}
+
+void canvas_setButtonBorder(canvas* c, int id, float borderWidth, float borderRadius)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_BUTTON)
+		return;
+
+	cc->cb.borderRadius = borderRadius;
+	cc->cb.borderWidth = borderWidth;
 }
 
 void canvas_setButtonColourClicked(canvas* c, int id, float clickedR, float clickedG, float clickedB)

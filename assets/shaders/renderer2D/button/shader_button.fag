@@ -5,10 +5,63 @@ in vec2 uv;
 out vec4 fragColour;
 
 uniform vec4 buttonData;//width, height, borderWidth, borderRadius
-uniform vec4 borderColour;
-uniform vec4 fillColour;
+uniform vec3 borderColour;
+uniform vec3 fillColour;
+uniform int transparentBackground;
 
 void main()
 {
-	vec2 bottomLeft=
+	//uv is in [0;1] but i will transform it to [-0.5;0.5]
+	vec2 posInButt=vec2(uv.x*buttonData.x-0.5*buttonData.x, uv.y*buttonData.y-0.5*buttonData.y);
+
+	vec2 bottomLeft=vec2(
+		buttonData.w-0.5*buttonData.x,
+		buttonData.w-0.5*buttonData.y
+		);
+	vec2 bottomRight=vec2(
+		0.5*buttonData.x-buttonData.w, 
+		buttonData.w-0.5*buttonData.y
+		);
+	vec2 topRight=vec2(
+		0.5*buttonData.x-buttonData.w, 
+		0.5*buttonData.y-buttonData.w
+		);
+	vec2 topLeft=vec2(
+		buttonData.w-0.5*buttonData.x, 
+		0.5*buttonData.y-buttonData.w
+		);
+
+	float innerRadius=buttonData.w-buttonData.z;
+	if(innerRadius<0)
+		innerRadius=0;
+
+	vec2 innerBounds=topRight+vec2(innerRadius);
+
+	int isInOuter=1;
+	int isInInner=1;
+
+	posInButt=vec2(abs(posInButt.x), abs(posInButt.y));
+
+	if(posInButt.x>topRight.x&&posInButt.y>topRight.y)//check if the fragment is part of the outer box
+	{
+		if(length(posInButt-topRight)>buttonData.w)
+			isInOuter=0;
+	}
+
+	if(posInButt.x>innerBounds.x&&posInButt.y>innerBounds.y)
+		isInInner=0;
+	if(isInInner==1&&posInButt.x>topRight.x&&posInButt.y>topRight.y)
+		if(length(posInButt-topRight)>innerRadius)
+			isInOuter=0;
+
+	if(isInInner==0&&isInOuter==0)
+		discard;
+	if(isInInner==0&&isInOuter==1)
+		fragColour=vec4(borderColour,1);
+	if(isInInner==1)
+	{
+		if(transparentBackground!=0)
+			discard;
+		fragColour=vec4(fillColour,1);
+	}
 }

@@ -1115,6 +1115,11 @@ void init_canvas()
     canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
     temp = canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
     canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
+
+    //button test
+    temp = canvas_addButton(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 200, 200);
+    canvas_setButtonBorder(vaszon, temp, 10, 20);
+    canvas_setButtonBackgroundTransparency(vaszon, temp, 1);
 }
 
 void end_canvas()

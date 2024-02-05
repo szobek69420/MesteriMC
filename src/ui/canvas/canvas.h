@@ -40,6 +40,8 @@ int canvas_addButton(canvas* c, int hAlign, int vAlign, int x, int y, float widt
 void canvas_setButtonColourNormal(canvas* c, int id, float normalR, float normalG, float normalB);
 void canvas_setButtonColourHover(canvas* c, int id, float hoverR, float hoverG, float hoverB);
 void canvas_setButtonColourClicked(canvas* c, int id, float clickedR, float clickedG, float clickedB);
+void canvas_setButtonBackgroundTransparency(canvas* c, int id, int transparentBackground);
+void canvas_setButtonBorder(canvas* c, int id, float borderWidth, float borderRadius);
 void canvas_setButtonClicked(canvas* c, int id, void (*onClick)(void*), void* param);
 void canvas_setButtonText(canvas* c, int id, const char* text, int fontSize);
 
