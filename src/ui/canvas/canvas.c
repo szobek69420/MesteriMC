@@ -341,7 +341,7 @@ void canvas_setTextFontSize(canvas* c, int id, int fontSize)
 int canvas_addButton(canvas* c, int hAlign, int vAlign, int x, int y, float width, float height)
 {
 	canvasComponent cc;
-	cc.componentType = CANVAS_COMPONENT_TEXT;
+	cc.componentType = CANVAS_COMPONENT_BUTTON;
 	cc.id = componentIDCounter++;
 	cc.x = x;
 	cc.y = y;
@@ -355,6 +355,9 @@ int canvas_addButton(canvas* c, int hAlign, int vAlign, int x, int y, float widt
 	cc.cb.normalR = 1;		cc.cb.normalG = 1;		cc.cb.normalB = 1;
 	cc.cb.hoverR = 0.8f;	cc.cb.hoverG = 0.8f;	cc.cb.hoverB = 0.8f;
 	cc.cb.clickedR = 0.5f;	cc.cb.clickedG = 0.5f;	cc.cb.clickedB = 0.5f;
+
+	cc.cb.borderWidth = 10;	cc.cb.borderRadius = 20;
+	cc.cb.transparentBackground = 0;
 
 	seqtor_push_back(c->components, cc);
 

@@ -1118,7 +1118,6 @@ void init_canvas()
 
     //button test
     temp = canvas_addButton(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 200, 200);
-    canvas_setButtonBorder(vaszon, temp, 10, 20);
     canvas_setButtonBackgroundTransparency(vaszon, temp, 1);
 }
 
