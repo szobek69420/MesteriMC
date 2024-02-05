@@ -1,0 +1,13 @@
+#version 330 core
+layout (location=0) in vec2 aPos;//uv and pos is the same
+
+out vec2 uv;
+
+uniform vec4 pos_scale;//(posx, posy, scalex, scaley)
+uniform mat4 projection;
+
+void main()
+{
+	uv=aPos;
+	gl_Position=projection*vec4(pos_scale.x+pos_scale.z*aPos.x, pos_scale.y+pos_scale.w*aPos.y, 0,1);
+}

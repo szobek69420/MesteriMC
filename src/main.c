@@ -147,7 +147,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 int main()
 {
-    //_CrtSetBreakAlloc(4910);
+    //_CrtSetBreakAlloc(756);
     window_setWidth(1300);
     window_setHeight(800);
     window = init_window("amogus", window_getWidth(), window_getHeight());
@@ -617,7 +617,9 @@ void* loop_render(void* arg)
         canvas_setTextText(vaszon, vaszon_chunks_rendered, buffer);
 
 
-        canvas_render(vaszon);
+        int mouseX, mouseY;
+        input_get_mouse_position(&mouseX, &mouseY);
+        canvas_render(vaszon, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
 
         pthread_mutex_unlock(&mutex_vaszon);
 
@@ -697,7 +699,6 @@ void* loop_generation(void* arg)
 
 void* loop_physics(void* arg)
 {
-
     float deltaTime;
     float lastFrame = glfwGetTime();
     vec3 previousCumPosition = cum.position;
@@ -715,6 +716,10 @@ void* loop_physics(void* arg)
         event e;
         while ((e = event_queue_poll()).type != NONE)
             handle_event(e);
+
+        int mouseX, mouseY;
+        input_get_mouse_position(&mouseX, &mouseY);
+        canvas_checkMouseInput(vaszon, 650, 400, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
 
         pthread_mutex_lock(&mutex_cum);
         previousCumPosition = cum.position;
@@ -1109,9 +1114,12 @@ void init_canvas()
     //right side
     const char* vendor = glGetString(GL_VENDOR);
     const char* renderer = glGetString(GL_RENDERER);
+    int temp;
 
-    canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
-    canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
+    temp=canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
+    canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
+    temp = canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
+    canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
 }
 
 void end_canvas()

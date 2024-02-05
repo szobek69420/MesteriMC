@@ -685,9 +685,9 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 
 void chunk_destroy(chunk* chomk)
 {
-	for (int i = 0; i < CHUNK_WIDTH; i++)
+	for (int i = 0; i < CHUNK_WIDTH+2; i++)
 	{
-		for (int j = 0; j < CHUNK_WIDTH; j++)
+		for (int j = 0; j < CHUNK_WIDTH+2; j++)
 			free(chomk->blocks[i][j]);
 
 		free(chomk->blocks[i]);
