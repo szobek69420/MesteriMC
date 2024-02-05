@@ -127,13 +127,17 @@ void canvas_setSize(canvas* c, int width, int height)
 	canvas_calculatePositions(c);
 }
 
-void canvas_render(canvas* c)
+void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed)
 {
 	canvasComponent* cc;
-	int x, y, width, height;
+	int isInBounds;
 	for (int i = 0; i < seqtor_size(c->components); i++)
 	{
 		cc = &seqtor_at(c->components,i);
+
+		isInBounds = 1;
+		if (cc->originX > mouseX || cc->originX + cc->width<mouseX || cc->originY>mouseY || cc->originY + cc->height < mouseY)
+			isInBounds = 0;
 
 		switch (cc->componentType)
 		{
@@ -147,7 +151,13 @@ void canvas_render(canvas* c)
 
 		case CANVAS_COMPONENT_BUTTON:
 			buttonRenderer_setBackgroundTransparency(c->br, cc->cb.transparentBackground);
-			buttonRenderer_setBorderColour(c->br, cc->cb.normalR, cc->cb.normalG, cc->cb.normalB);
+			if (isInBounds)
+			{
+				if(mousePressed)
+					buttonRenderer_setBorderColour(c->br, cc->cb.clickedR, cc->cb.clickedG, cc->cb.clickedB);
+				else
+					buttonRenderer_setBorderColour(c->br, cc->cb.hoverR, cc->cb.hoverG, cc->cb.hoverB);
+			}
 			buttonRenderer_render(c->br, cc->originX, cc->originY, cc->width, cc->height, cc->cb.borderWidth, cc->cb.borderRadius);
 			if (cc->cb.ct.text != NULL)
 			{
@@ -160,6 +170,31 @@ void canvas_render(canvas* c)
 					cc->originY + 0.5f * cc->height - 0.5f * cc->cb.textHeight,
 					cc->ct.scale);
 			}
+			break;
+		}
+	}
+}
+
+void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseClicked)
+{
+	canvasComponent* cc;
+	for (int i = 0; i < seqtor_size(c->components); i++)
+	{
+		cc = &seqtor_at(c->components, i);
+
+		if (cc->originX > mouseX || cc->originX + cc->width<mouseX || cc->originY>mouseY || cc->originY + cc->height < mouseY)
+			continue;
+
+		switch (cc->componentType)
+		{
+
+		case CANVAS_COMPONENT_BUTTON:
+			if (mouseClicked&&cc->cb.clicked != NULL)
+				cc->cb.clicked(cc->cb.clickedParam);
+			break;
+
+		default:
+			continue;
 		}
 	}
 }

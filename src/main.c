@@ -617,7 +617,9 @@ void* loop_render(void* arg)
         canvas_setTextText(vaszon, vaszon_chunks_rendered, buffer);
 
 
-        canvas_render(vaszon);
+        int mouseX, mouseY;
+        input_get_mouse_position(&mouseX, &mouseY);
+        canvas_render(vaszon, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
 
         pthread_mutex_unlock(&mutex_vaszon);
 
@@ -697,7 +699,6 @@ void* loop_generation(void* arg)
 
 void* loop_physics(void* arg)
 {
-
     float deltaTime;
     float lastFrame = glfwGetTime();
     vec3 previousCumPosition = cum.position;
@@ -715,6 +716,10 @@ void* loop_physics(void* arg)
         event e;
         while ((e = event_queue_poll()).type != NONE)
             handle_event(e);
+
+        int mouseX, mouseY;
+        input_get_mouse_position(&mouseX, &mouseY);
+        canvas_checkMouseInput(vaszon, 650, 400, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
 
         pthread_mutex_lock(&mutex_cum);
         previousCumPosition = cum.position;
@@ -1115,11 +1120,6 @@ void init_canvas()
     canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
     temp = canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
     canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
-
-    //button test
-    temp = canvas_addButton(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 200, 200);
-    canvas_setButtonBackgroundTransparency(vaszon, temp, 1);
-    canvas_setButtonText(vaszon, temp, "amogus", 48);
 }
 
 void end_canvas()

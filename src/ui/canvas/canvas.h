@@ -24,7 +24,8 @@ void canvas_destroy(canvas* c);
 
 void canvas_setSize(canvas* c, int width, int height);
 
-void canvas_render(canvas* c);
+void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed);
+void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseClicked);
 
 void canvas_removeComponent(canvas* c, int id);
 void canvas_setComponentPosition(canvas* c, int id, int x, int y);
