@@ -27,6 +27,7 @@ typedef struct canvasText canvasText;
 
 struct canvasButton {
 	canvasText ct;
+	float textWidth, textHeight;
 	float normalR, normalG, normalB;
 	float hoverR, hoverG, hoverB;
 	float clickedR, clickedG, clickedB;
@@ -150,7 +151,14 @@ void canvas_render(canvas* c)
 			buttonRenderer_render(c->br, cc->originX, cc->originY, cc->width, cc->height, cc->cb.borderWidth, cc->cb.borderRadius);
 			if (cc->cb.ct.text != NULL)
 			{
-				//render text
+				textRenderer_setColour(&c->tr, cc->cb.ct.r, cc->cb.ct.g, cc->cb.ct.b);
+				textRenderer_render(
+					&c->tr, 
+					&c->f, 
+					cc->cb.ct.text, 
+					cc->originX+0.5f*cc->width-0.5f*cc->cb.textWidth, 
+					cc->originY + 0.5f * cc->height - 0.5f * cc->cb.textHeight,
+					cc->ct.scale);
 			}
 		}
 	}
@@ -351,6 +359,8 @@ int canvas_addButton(canvas* c, int hAlign, int vAlign, int x, int y, float widt
 	cc.height = height;
 
 	cc.cb.ct.text = NULL;
+	cc.cb.ct.r = 0;		cc.cb.ct.g = 0;		cc.cb.ct.b = 0;
+
 	cc.cb.clicked = NULL;
 	cc.cb.normalR = 1;		cc.cb.normalG = 1;		cc.cb.normalB = 1;
 	cc.cb.hoverR = 0.8f;	cc.cb.hoverG = 0.8f;	cc.cb.hoverB = 0.8f;
@@ -447,8 +457,8 @@ void canvas_setButtonText(canvas* c, int id, const char* text, int fontSize)
 	cc->cb.ct.text = malloc((strlen(text) + 1) * sizeof(char));
 	strcpy(cc->cb.ct.text, text);
 
-	cc->ct.scale = (float)fontSize / CANVAS_FONT_SIZE;
-	cc->height = cc->ct.scale * c->f.lineHeight;
-	cc->width = cc->ct.scale * fontHandler_calculateTextLength(&c->f, cc->ct.text);
+	cc->cb.ct.scale = (float)fontSize / CANVAS_FONT_SIZE;
+	cc->cb.textHeight = cc->cb.ct.scale * c->f.lineHeight;
+	cc->cb.textWidth = cc->cb.ct.scale * fontHandler_calculateTextLength(&c->f, cc->cb.ct.text);
 }
 
