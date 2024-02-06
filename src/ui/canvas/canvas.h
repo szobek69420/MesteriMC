@@ -29,7 +29,8 @@ void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseClicked)
 
 void canvas_removeComponent(canvas* c, int id);
 void canvas_setComponentPosition(canvas* c, int id, int x, int y);
-void canvasSetComponentAlignment(canvas* c, int id, int hAlign, int vAlign);
+void canvas_setComponentAlignment(canvas* c, int id, int hAlign, int vAlign);
+void canvas_setComponentSize(canvas* c, int id, float width, float height);
 
 int canvas_addText(canvas* c, const char* text, int hAlign, int vAlign, int x, int y, float r, float g, float b, int fontSize);
 
@@ -38,12 +39,16 @@ void canvas_setTextColour(canvas* c, int id, float r, float g, float b);
 void canvas_setTextFontSize(canvas* c, int id, int fontSize);
 
 int canvas_addButton(canvas* c, int hAlign, int vAlign, int x, int y, float width, float height);
-void canvas_setButtonColourNormal(canvas* c, int id, float normalR, float normalG, float normalB);
-void canvas_setButtonColourHover(canvas* c, int id, float hoverR, float hoverG, float hoverB);
-void canvas_setButtonColourClicked(canvas* c, int id, float clickedR, float clickedG, float clickedB);
+void canvas_setButtonFillColour(canvas* c, int id, float r, float g, float b);
+void canvas_setButtonBorderColour(canvas* c, int id, float r, float g, float b);
 void canvas_setButtonBackgroundTransparency(canvas* c, int id, int transparentBackground);
 void canvas_setButtonBorder(canvas* c, int id, float borderWidth, float borderRadius);
 void canvas_setButtonClicked(canvas* c, int id, void (*onClick)(void*), void* param);
-void canvas_setButtonText(canvas* c, int id, const char* text, int fontSize);
+void canvas_setButtonText(canvas* c, int id, const char* text, int fontSize, float r, float g, float b);
+
+
+int canvas_addImage(canvas* c, int hAlign, int vAlign, int x, int y, float width, float height, unsigned int textureId);
+void canvas_setImageTint(canvas* c, int id, float r, float g, float b);
+void canvas_setImageTexture(canvas* c, int id, unsigned int textureId);
 
 #endif

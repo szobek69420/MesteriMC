@@ -64,7 +64,6 @@ void buttonRenderer_destroy(buttonRenderer* br)
 
 void buttonRenderer_render(buttonRenderer* br, int x, int y, int width, int height, float borderWidth, float borderRadius)
 {
-	glDisable(GL_CULL_FACE);
 	glUseProgram(br->program.id);
 	glUniform4f(glGetUniformLocation(br->program.id, "pos_scale"), x, y, width, height);
 	glUniform4f(glGetUniformLocation(br->program.id, "buttonData"), width, height, borderWidth, borderRadius);
@@ -74,7 +73,6 @@ void buttonRenderer_render(buttonRenderer* br, int x, int y, int width, int heig
 
 	glBindVertexArray(0);
 	glUseProgram(0);
-	glEnable(GL_CULL_FACE);
 }
 
 void buttonRenderer_setBackgroundTransparency(buttonRenderer* br, int transparentBackground)
@@ -113,6 +111,6 @@ static float vertices[] = {
 };
 
 static unsigned int indices[] = {
-	0, 1, 2,
-	2, 3, 0
+	0, 2, 1,
+	3, 2, 0
 };

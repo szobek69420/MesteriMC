@@ -1,0 +1,15 @@
+#version 330 core
+
+in vec2 uv;
+out vec4 fragColour;
+
+uniform vec3 tint;
+uniform sampler2D tex;
+
+void main()
+{
+	fragColour=texture(tex, uv);
+	if(fragColour.a<0.01)
+		discard;
+	fragColour=vec4(fragColour.rgb*tint,1);
+}
