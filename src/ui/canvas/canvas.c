@@ -9,12 +9,15 @@
 
 #include "../button/button_renderer.h"
 
+#include "../image_renderer/image_renderer.h"
+
 #include "../../utils/seqtor.h"
 
 #define CANVAS_FONT_SIZE 48
 
 #define CANVAS_COMPONENT_TEXT 0
 #define CANVAS_COMPONENT_BUTTON 1
+#define CANVAS_COMPONENT_IMAGE 2
 
 static int componentIDCounter = 0;//increases by one if a component has been added to the canvas
 
@@ -38,6 +41,13 @@ struct canvasButton {
 };
 typedef struct canvasButton canvasButton;
 
+struct canvasImage {
+	unsigned int textureId;
+	float uvX, uvY, uvWidth, uvHeight;
+	float tintR, tintG, tintB;
+};
+typedef struct canvasImage canvasImage;
+
 struct canvasComponent {
 	int id;
 	int componentType;
@@ -49,6 +59,7 @@ struct canvasComponent {
 	union componentData {
 		canvasText ct;
 		canvasButton cb;
+		canvasImage ci;
 	};
 };
 typedef struct canvasComponent canvasComponent;
@@ -60,6 +71,8 @@ struct canvas {
 	textRenderer tr;
 
 	buttonRenderer* br;
+
+	imageRenderer* ir;
 
 	seqtor_of(canvasComponent) components;
 };
@@ -80,6 +93,8 @@ canvas* canvas_create(int width, int height, const char* fontSauce)
 
 	c->br = buttonRenderer_create(width, height);
 
+	c->ir = imageRenderer_create(width, height);
+
 	seqtor_init(c->components, 1);
 
 	return c;
@@ -90,6 +105,7 @@ void canvas_destroy(canvas* c)
 	fontHandler_destroyFont(&c->f);
 	textRenderer_destroy(&c->tr);
 	buttonRenderer_destroy(c->br);
+	imageRenderer_destroy(c->ir);
 
 	while (seqtor_size(c->components) > 0)
 	{
@@ -123,6 +139,7 @@ void canvas_setSize(canvas* c, int width, int height)
 
 	textRenderer_setSize(&c->tr, width, height);
 	buttonRenderer_setSize(c->br, width, height);
+	imageRenderer_setSize(c->ir, width, height);
 
 	canvas_calculatePositions(c);
 }
@@ -169,6 +186,24 @@ void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed)
 					cc->originX+0.5f*cc->width-0.5f*cc->cb.textWidth, 
 					cc->originY + 0.5f * cc->height - 0.5f * cc->cb.textHeight,
 					cc->ct.scale);
+			}
+			break;
+
+		case CANVAS_COMPONENT_IMAGE:
+			if (cc->ci.textureId != 0)
+			{
+				imageRenderer_setTint(c->ir, cc->ci.tintR, cc->ci.tintG, cc->ci.tintB);
+				imageRenderer_render(
+					c->ir,
+					cc->ci.textureId,
+					cc->originX,
+					cc->originY,
+					cc->width,
+					cc->height,
+					cc->ci.uvX,
+					cc->ci.uvY,
+					cc->ci.uvWidth,
+					cc->ci.uvHeight);
 			}
 			break;
 		}
@@ -273,6 +308,10 @@ void canvas_destroyComponent(canvasComponent* cc)
 		if (cc->cb.ct.text != NULL)
 			free(cc->cb.ct.text);
 		cc->cb.ct.text = NULL;
+		break;
+
+	case CANVAS_COMPONENT_IMAGE:
+		//nothing
 		break;
 	}
 }
@@ -495,5 +534,52 @@ void canvas_setButtonText(canvas* c, int id, const char* text, int fontSize)
 	cc->cb.ct.scale = (float)fontSize / CANVAS_FONT_SIZE;
 	cc->cb.textHeight = cc->cb.ct.scale * c->f.lineHeight;
 	cc->cb.textWidth = cc->cb.ct.scale * fontHandler_calculateTextLength(&c->f, cc->cb.ct.text);
+}
+
+//IMAGE----------------------------------------------------------------------------------------------
+
+int canvas_addImage(canvas* c, int hAlign, int vAlign, int x, int y, float width, float height, unsigned int textureId)
+{
+	canvasComponent cc;
+	cc.componentType = CANVAS_COMPONENT_IMAGE;
+	cc.id = componentIDCounter++;
+	cc.x = x;
+	cc.y = y;
+	cc.hAlign = hAlign;
+	cc.vAlign = vAlign;
+	cc.width = width;
+	cc.height = height;
+
+	cc.ci.textureId = textureId;
+	cc.ci.tintR = 1;	cc.ci.tintG = 1;	cc.ci.tintB = 1;
+	cc.ci.uvX = 0;	cc.ci.uvY = 0;	cc.ci.uvWidth = 1;	cc.ci.uvHeight = 1;
+
+	seqtor_push_back(c->components, cc);
+
+	canvas_calculatePosition(c, &seqtor_back(c->components));
+
+	return cc.id;
+}
+
+void canvas_setImageTint(canvas* c, int id, float r, float g, float b)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_IMAGE)
+		return;
+
+	cc->ci.tintR = r;
+	cc->ci.tintG = g;
+	cc->ci.tintB = b;
+}
+
+void canvas_setImageTexture(canvas* c, int id, unsigned int textureId)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_IMAGE)
+		return;
+
+	cc->ci.textureId = textureId;
 }
 

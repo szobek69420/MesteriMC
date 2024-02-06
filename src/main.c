@@ -10,8 +10,8 @@
 #define CRTDBG_ON 1
 #endif
 
-#include "zstages/game/game.h"
-#include "zstages/stages.h"
+#include "z_stages/game/game.h"
+#include "z_stages/stages.h"
 #include "window/window.h"
 
 //prototypes
@@ -19,7 +19,7 @@ GLFWwindow* init_window(const char* name, int width, int height);
 
 int main()
 {
-    //_CrtSetBreakAlloc(756);
+    //_CrtSetBreakAlloc(2119526);
 
     GLFWwindow* window=NULL;
     int currentStage = STAGE_INITIALIZE;
