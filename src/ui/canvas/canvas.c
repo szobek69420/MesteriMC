@@ -170,11 +170,13 @@ void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed)
 			buttonRenderer_setBackgroundTransparency(c->br, cc->cb.transparentBackground);
 			if (isInBounds)
 			{
-				if(mousePressed)
+				if (mousePressed)
 					buttonRenderer_setBorderColour(c->br, cc->cb.clickedR, cc->cb.clickedG, cc->cb.clickedB);
 				else
 					buttonRenderer_setBorderColour(c->br, cc->cb.hoverR, cc->cb.hoverG, cc->cb.hoverB);
 			}
+			else
+				buttonRenderer_setBorderColour(c->br, cc->cb.normalR, cc->cb.normalG, cc->cb.normalB);
 			buttonRenderer_render(c->br, cc->originX, cc->originY, cc->width, cc->height, cc->cb.borderWidth, cc->cb.borderRadius);
 			if (cc->cb.ct.text != NULL)
 			{
@@ -331,7 +333,7 @@ void canvas_setComponentPosition(canvas* c, int id, int x, int y)
 	canvas_calculatePosition(c, cc);
 }
 
-void canvasSetComponentAlignment(canvas* c, int id, int hAlign, int vAlign)
+void canvas_setComponentAlignment(canvas* c, int id, int hAlign, int vAlign)
 {
 	canvasComponent* cc;
 	cc = canvas_getComponent(c, id);
@@ -340,6 +342,19 @@ void canvasSetComponentAlignment(canvas* c, int id, int hAlign, int vAlign)
 
 	cc->hAlign = hAlign;
 	cc->vAlign = vAlign;
+
+	canvas_calculatePosition(c, cc);
+}
+
+void canvas_setComponentSize(canvas* c, int id, float width, float height)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL||cc->componentType==CANVAS_COMPONENT_TEXT)
+		return;
+
+	cc->width = width;
+	cc->height = height;
 
 	canvas_calculatePosition(c, cc);
 }
@@ -512,7 +527,7 @@ void canvas_setButtonClicked(canvas* c, int id, void (*onClick)(void*), void* pa
 	cc->cb.clickedParam = param;
 }
 
-void canvas_setButtonText(canvas* c, int id, const char* text, int fontSize)
+void canvas_setButtonText(canvas* c, int id, const char* text, int fontSize, float r, float g, float b)
 {
 	canvasComponent* cc;
 	cc = canvas_getComponent(c, id);
@@ -522,7 +537,7 @@ void canvas_setButtonText(canvas* c, int id, const char* text, int fontSize)
 	if (cc->cb.ct.text != NULL)
 		free(cc->cb.ct.text);
 
-	if (text == NULL || strcpy(text, "") == 0)
+	if (text == NULL || strlen(text) == 0)
 	{
 		cc->cb.ct.text = NULL;
 		return;
@@ -534,6 +549,10 @@ void canvas_setButtonText(canvas* c, int id, const char* text, int fontSize)
 	cc->cb.ct.scale = (float)fontSize / CANVAS_FONT_SIZE;
 	cc->cb.textHeight = cc->cb.ct.scale * c->f.lineHeight;
 	cc->cb.textWidth = cc->cb.ct.scale * fontHandler_calculateTextLength(&c->f, cc->cb.ct.text);
+
+	cc->cb.ct.r = r;
+	cc->cb.ct.g = g;
+	cc->cb.ct.b = b;
 }
 
 //IMAGE----------------------------------------------------------------------------------------------

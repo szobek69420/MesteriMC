@@ -166,7 +166,7 @@ void game(void* w, int* currentStage)
     cm = chunkManager_create(69, 5);
     init_renderer();
 
-    textureHandler_importTextures();
+    textureHandler_importTextures(TEXTURE_IN_GAME);
 
     glfwMakeContextCurrent(NULL);
 
@@ -209,7 +209,7 @@ void game(void* w, int* currentStage)
         if (shouldExit2!=EXIT_STATUS_REMAIN)
         {
             if (shouldExit2 == EXIT_STATUS_RETURN_TO_MENU)
-                *currentStage = STAGE_QUIT;
+                *currentStage = STAGE_MAIN_MENU;
             else
                 *currentStage = STAGE_QUIT;
             break;
@@ -235,7 +235,7 @@ void game(void* w, int* currentStage)
     glfwMakeContextCurrent(window);
 
     chunkManager_destroy(&cm);
-    textureHandler_destroyTextures();
+    textureHandler_destroyTextures(TEXTURE_IN_GAME);
     end_canvas();
     fontHandler_close();
     end_renderer();

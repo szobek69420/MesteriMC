@@ -11,6 +11,7 @@
 #endif
 
 #include "z_stages/game/game.h"
+#include "z_stages/main_menu/main_menu.h"
 #include "z_stages/stages.h"
 #include "window/window.h"
 
@@ -32,11 +33,11 @@ int main()
             window_setWidth(1300);
             window_setHeight(800);
             window = init_window("amogus", window_getWidth(), window_getHeight());
-            currentStage = STAGE_IN_GAME;
+            currentStage = STAGE_MAIN_MENU;
             break;
 
         case STAGE_MAIN_MENU:
-
+            mainMenu(window, &currentStage);
             break;
 
         case STAGE_IN_GAME:

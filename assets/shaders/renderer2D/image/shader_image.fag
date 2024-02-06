@@ -8,5 +8,8 @@ uniform sampler2D tex;
 
 void main()
 {
-	fragColour=vec4(tint*texture(tex, uv).rgb,1);
+	fragColour=texture(tex, uv);
+	if(fragColour.a<0.01)
+		discard;
+	fragColour=vec4(fragColour.rgb*tint,1);
 }
