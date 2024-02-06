@@ -897,6 +897,12 @@ void init_renderer()
     );
     glUseProgram(finalPassShader.id);
     glUniform1i(glGetUniformLocation(finalPassShader.id, "tex"), 0);
+    char buffer[11];
+    for (int i = 0; i < RENDERER_KAWASAKI_FBO_COUNT; i++)
+    {
+        sprintf(buffer, "bloom%d", i);
+        glUniform1i(glGetUniformLocation(finalPassShader.id, buffer), i+1);
+    }
     glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 0.2);
 
     fxaaShader = shader_import(

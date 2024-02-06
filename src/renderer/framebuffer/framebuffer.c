@@ -15,6 +15,9 @@ void renderer_destroySSAOFBO(ssaoFBO ssao);
 endFBO renderer_createEndFBO(int width, int height);
 void renderer_destroyEndFBO(endFBO endBuffer);
 
+bloomFBO renderer_createBloomFBO(int width, int height);
+void renderer_destroyBloomFBO(bloomFBO bloomBuffer);
+
 screenFBO renderer_createScreenFBO(int width, int height);
 void renderer_destroyScreenFBO(screenFBO screenBuffer);
 
@@ -23,18 +26,30 @@ renderer renderer_create(int width, int height)
     renderer rendor;
     rendor.shadowBuffer = renderer_createShadowFBO(RENDERER_SHADOW_RESOLUTION,RENDERER_SHADOW_RESOLUTION);
     rendor.gBuffer = renderer_createGeometryFBO(width, height);
-    rendor.ssaoBuffer = renderer_createSSAOFBO(width, height);
+    //rendor.ssaoBuffer = renderer_createSSAOFBO(width, height);
     rendor.endBuffer = renderer_createEndFBO(width, height);
     rendor.screenBuffer = renderer_createScreenFBO(width, height);
+
+    int width2 = width, height2 = height;
+    for (int i = 0; i < RENDERER_KAWASAKI_FBO_COUNT; i++)
+    {
+        width2 /= 2;
+        height2 /= 2;
+        rendor.bloomBuffers[i] = renderer_createBloomFBO(width2, height2);
+    }
+
     return rendor;
 }
 void renderer_destroy(renderer cucc)
 {
     renderer_destroyShadowFBO(cucc.shadowBuffer);
     renderer_destroyGeometryFBO(cucc.gBuffer);
-    renderer_destroySSAOFBO(cucc.ssaoBuffer);
+    //renderer_destroySSAOFBO(cucc.ssaoBuffer);
     renderer_destroyEndFBO(cucc.endBuffer);
     renderer_destroyScreenFBO(cucc.screenBuffer);
+
+    for (int i = 0; i < RENDERER_KAWASAKI_FBO_COUNT; i++)
+        renderer_destroyBloomFBO(cucc.bloomBuffers[i]);
 }
 
 
@@ -212,6 +227,39 @@ void renderer_destroyEndFBO(endFBO endBuffer)
     //glDeleteRenderbuffers(1, &endBuffer.depthBuffer);
     glDeleteTextures(1, &endBuffer.depthBuffer);
     glDeleteFramebuffers(1, &endBuffer.id);
+}
+
+bloomFBO renderer_createBloomFBO(int width, int height)
+{
+    bloomFBO bloomBuffer;
+
+    glGenFramebuffers(1, &(bloomBuffer.id));
+    glBindFramebuffer(GL_FRAMEBUFFER, bloomBuffer.id);
+
+    glGenTextures(1, &(bloomBuffer.colorBuffer));
+    glBindTexture(GL_TEXTURE_2D, bloomBuffer.colorBuffer);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bloomBuffer.colorBuffer, 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        printf("something is fucked with the bloom framebuffer");
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return bloomBuffer;
+}
+
+void renderer_destroyBloomFBO(bloomFBO bloomBuffer)
+{
+    glDeleteTextures(1, &bloomBuffer.colorBuffer);
+
+    glDeleteFramebuffers(1, &bloomBuffer.id);
 }
 
 screenFBO renderer_createScreenFBO(int width, int height)
