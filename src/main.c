@@ -32,7 +32,7 @@ int main()
         case STAGE_INITIALIZE:
             window_setWidth(1300);
             window_setHeight(800);
-            window = init_window("amogus", window_getWidth(), window_getHeight());
+            window = init_window("Mesteri MC", window_getWidth(), window_getHeight());
             currentStage = STAGE_MAIN_MENU;
             break;
 

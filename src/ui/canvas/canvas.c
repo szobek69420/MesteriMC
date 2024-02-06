@@ -31,9 +31,8 @@ typedef struct canvasText canvasText;
 struct canvasButton {
 	canvasText ct;
 	float textWidth, textHeight;
-	float normalR, normalG, normalB;
-	float hoverR, hoverG, hoverB;
-	float clickedR, clickedG, clickedB;
+	float borderR, borderG, borderB;
+	float fillR, fillG, fillB;
 	float borderWidth, borderRadius;
 	int transparentBackground;
 	void (*clicked)(void*);
@@ -171,12 +170,21 @@ void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed)
 			if (isInBounds)
 			{
 				if (mousePressed)
-					buttonRenderer_setBorderColour(c->br, cc->cb.clickedR, cc->cb.clickedG, cc->cb.clickedB);
+				{
+					buttonRenderer_setFillColour(c->br, 0.5f * cc->cb.fillR, 0.5f * cc->cb.fillG, 0.5f * cc->cb.fillB);
+					buttonRenderer_setBorderColour(c->br, 0.5f * cc->cb.borderR, 0.5f * cc->cb.borderG, 0.5f * cc->cb.borderB);
+				}
 				else
-					buttonRenderer_setBorderColour(c->br, cc->cb.hoverR, cc->cb.hoverG, cc->cb.hoverB);
+				{
+					buttonRenderer_setFillColour(c->br, 0.8f * cc->cb.fillR, 0.8f * cc->cb.fillG, 0.8f * cc->cb.fillB);
+					buttonRenderer_setBorderColour(c->br, 0.8f*cc->cb.borderR, 0.8f*cc->cb.borderG, 0.8f*cc->cb.borderB);
+				}
 			}
 			else
-				buttonRenderer_setBorderColour(c->br, cc->cb.normalR, cc->cb.normalG, cc->cb.normalB);
+			{
+				buttonRenderer_setFillColour(c->br, cc->cb.fillR, cc->cb.fillG, cc->cb.fillB);
+				buttonRenderer_setBorderColour(c->br, cc->cb.borderR, cc->cb.borderG, cc->cb.borderB);
+			}
 			buttonRenderer_render(c->br, cc->originX, cc->originY, cc->width, cc->height, cc->cb.borderWidth, cc->cb.borderRadius);
 			if (cc->cb.ct.text != NULL)
 			{
@@ -451,9 +459,8 @@ int canvas_addButton(canvas* c, int hAlign, int vAlign, int x, int y, float widt
 	cc.cb.ct.r = 0;		cc.cb.ct.g = 0;		cc.cb.ct.b = 0;
 
 	cc.cb.clicked = NULL;
-	cc.cb.normalR = 1;		cc.cb.normalG = 1;		cc.cb.normalB = 1;
-	cc.cb.hoverR = 0.8f;	cc.cb.hoverG = 0.8f;	cc.cb.hoverB = 0.8f;
-	cc.cb.clickedR = 0.5f;	cc.cb.clickedG = 0.5f;	cc.cb.clickedB = 0.5f;
+	cc.cb.fillR = 1;		cc.cb.fillG = 1;		cc.cb.fillB = 1;
+	cc.cb.borderR = 0.8f;	cc.cb.borderG = 0.8f;	cc.cb.borderB = 0.8f;
 
 	cc.cb.borderWidth = 10;	cc.cb.borderRadius = 20;
 	cc.cb.transparentBackground = 0;
@@ -465,24 +472,24 @@ int canvas_addButton(canvas* c, int hAlign, int vAlign, int x, int y, float widt
 	return cc.id;
 }
 
-void canvas_setButtonColourNormal(canvas* c, int id, float normalR, float normalG, float normalB)
+void canvas_setButtonFillColour(canvas* c, int id, float r, float g, float b)
 {
 	canvasComponent* cc;
 	cc = canvas_getComponent(c, id);
 	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_BUTTON)
 		return;
 
-	cc->cb.normalR = normalR;	cc->cb.normalG = normalG;	cc->cb.normalB = normalB;
+	cc->cb.fillR = r;	cc->cb.fillG = g;	cc->cb.fillB = b;
 }
 
-void canvas_setButtonColourHover(canvas* c, int id, float hoverR, float hoverG, float hoverB)
+void canvas_setButtonBorderColour(canvas* c, int id, float r, float g, float b)
 {
 	canvasComponent* cc;
 	cc = canvas_getComponent(c, id);
 	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_BUTTON)
 		return;
 
-	cc->cb.hoverR = hoverR;		cc->cb.hoverG = hoverG;		cc->cb.hoverB = hoverB;
+	cc->cb.borderR = r;		cc->cb.borderG = g;		cc->cb.borderB = b;
 }
 
 void canvas_setButtonBackgroundTransparency(canvas* c, int id, int transparentBackground)
@@ -504,16 +511,6 @@ void canvas_setButtonBorder(canvas* c, int id, float borderWidth, float borderRa
 
 	cc->cb.borderRadius = borderRadius;
 	cc->cb.borderWidth = borderWidth;
-}
-
-void canvas_setButtonColourClicked(canvas* c, int id, float clickedR, float clickedG, float clickedB)
-{
-	canvasComponent* cc;
-	cc = canvas_getComponent(c, id);
-	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_BUTTON)
-		return;
-
-	cc->cb.clickedR = clickedR;	cc->cb.clickedG = clickedG;	cc->cb.clickedB = clickedB;
 }
 
 void canvas_setButtonClicked(canvas* c, int id, void (*onClick)(void*), void* param)
