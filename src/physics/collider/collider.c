@@ -4,34 +4,6 @@
 
 static unsigned long colliderId=0;
 
-struct aabb {
-	vec3 sizePerTwo;
-};
-typedef struct aabb aabb;
-
-struct sphere {
-	float radius;
-};
-typedef struct sphere sphere;
-
-struct collider {
-	unsigned long id;
-	unsigned long flags;
-	/*
-	* flags: [000000ed cccccccc bbbbbbbb aaaaaaaa]
-	* a) type: 8 bits
-	* b) tag: 8 bits
-	* c) tag of the last collision: 8 bits
-	* d) isKinematic: 1 bit
-	* e) isSolid: 1 bit
-	*/
-	vec3 position;
-	vec3 velocity;
-	union {
-		aabb box;
-		sphere ball;
-	};
-};
 
 collider collider_createBoxCollider(vec3 position, vec3 size, unsigned char isKinematic, unsigned char isSolid, unsigned short tag)
 {
@@ -42,9 +14,9 @@ collider collider_createBoxCollider(vec3 position, vec3 size, unsigned char isKi
 	c.flags |= 0b11111111ul & COLLIDER_TYPE_BOX;
 	c.flags |= (0b11111111ul & tag) << 8;
 	if (isKinematic != 0)
-		c.flags |= 0b1000000000000000000000000ul;
+		c.flags |= 0b1000000000000000000000000000000ul;
 	if(isSolid!=0)
-		c.flags |= 0b10000000000000000000000000ul;
+		c.flags |= 0b10000000000000000000000000000000ul;
 
 	c.position = position;
 	c.box.sizePerTwo = vec3_scale(size, 0.5f);
@@ -58,12 +30,12 @@ collider collider_createBallCollider(vec3 position, float radius, unsigned char 
 	c.id = colliderId++;
 	
 	c.flags = 0b0ul;
-	c.flags |= 0b11111111ul & COLLIDER_TYPE_BOX;
+	c.flags |= 0b11111111ul & COLLIDER_TYPE_BALL;
 	c.flags |= (0b11111111ul & tag) << 8;
 	if (isKinematic != 0)
-		c.flags |= 0b1000000000000000000000000ul;
+		c.flags |= 0b1000000000000000000000000000000ul;
 	if (isSolid != 0)
-		c.flags |= 0b10000000000000000000000000ul;
+		c.flags |= 0b10000000000000000000000000000000ul;
 
 	c.position = position;
 	c.ball.radius=radius;
@@ -73,14 +45,14 @@ collider collider_createBallCollider(vec3 position, float radius, unsigned char 
 
 int collider_isKinematic(collider* c)
 {
-	if ((c->flags & 0b1000000000000000000000000ul) != 0)
+	if ((c->flags & 0b1000000000000000000000000000000ul) != 0)
 		return 69;
 	return 0;
 }
 
 int collider_isSolid(collider* c)
 {
-	if ((c->flags & 0b10000000000000000000000000ul) != 0)
+	if ((c->flags & 0b10000000000000000000000000000000ul) != 0)
 		return 69;
 	return 0;
 }
@@ -110,5 +82,25 @@ void collider_setLastCollisionTag(collider* c, unsigned long lastCollisionTag)
 {
 	c->flags &= 0b11111111000000001111111111111111ul;
 	c->flags |= (lastCollisionTag & 0b11111111ul) << 16;
+}
+
+void collider_setPosition(collider* c, vec3 position)
+{
+	c->position = position;
+}
+
+vec3 collider_getPosition(collider* c)
+{
+	return c->position;
+}
+
+void collider_setVelocity(collider* c, vec3 velocity)
+{
+	c->velocity = velocity;
+}
+
+vec3 collider_getVelocity(collider* c)
+{
+	return c->velocity;
 }
 
