@@ -943,7 +943,7 @@ void init_renderer()
     );
     glUseProgram(bloomFilterShader.id);
     glUniform1i(glGetUniformLocation(bloomFilterShader.id, "tex"), 0);
-    glUniform1f(glGetUniformLocation(bloomFilterShader.id, "threshold"), 3);
+    glUniform1f(glGetUniformLocation(bloomFilterShader.id, "threshold"), 5);
 
     bloomDownsampleShader = shader_import(
         "../assets/shaders/renderer/bloom/shader_bloom.vag",
@@ -1151,12 +1151,9 @@ void init_canvas()
     //right side
     const char* vendor = glGetString(GL_VENDOR);
     const char* renderer = glGetString(GL_RENDERER);
-    int temp;
 
-    temp = canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
-    canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
-    temp = canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
-    canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
+    canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
+    canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
 }
 
 void end_canvas()

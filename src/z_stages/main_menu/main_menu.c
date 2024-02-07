@@ -119,21 +119,21 @@ void init()
 
     int temp;
     temp = canvas_addButton(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 400, 60);
-    canvas_setButtonText(vaszon, temp, "become an enjoyer", 24, 1, 1, 1);
+    canvas_setButtonText(vaszon, temp, "mom's spaghetti", 24, 1, 1, 1);
     canvas_setButtonBorder(vaszon, temp, 5, 20);
     canvas_setButtonFillColour(vaszon, temp, 0.5, 0.5, 0.5);
     canvas_setButtonBorderColour(vaszon, temp, 0.3, 0.3, 0.3);
     canvas_setButtonClicked(vaszon, temp, startButton, currentStage);
 
     temp = canvas_addButton(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, -70, 400, 60);
-    canvas_setButtonText(vaszon, temp, "morb the experience", 24, 1, 1, 1);
+    canvas_setButtonText(vaszon, temp, "he keeps on adjustin'", 24, 1, 1, 1);
     canvas_setButtonBorder(vaszon, temp, 5, 20);
     canvas_setButtonFillColour(vaszon, temp, 0.5, 0.5, 0.5);
     canvas_setButtonBorderColour(vaszon, temp, 0.3, 0.3, 0.3);
     canvas_setButtonClicked(vaszon, temp, settingsButton, NULL);
 
     temp = canvas_addButton(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, -140, 400, 60);
-    canvas_setButtonText(vaszon, temp, "back to reality", 24, 1, 1, 1);
+    canvas_setButtonText(vaszon, temp, "step back to reality", 24, 1, 1, 1);
     canvas_setButtonBorder(vaszon, temp, 5, 20);
     canvas_setButtonFillColour(vaszon, temp, 0.5, 0.5, 0.5);
     canvas_setButtonBorderColour(vaszon, temp, 0.3, 0.3, 0.3);
