@@ -59,7 +59,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	chomk.model = mat4_translate(mat4_create(1), vec3_create2(basedX, basedY, basedZ));
 
 	chomk.blocks = (char***)malloc((CHUNK_HEIGHT+2) * sizeof(char**));
-	for (int i = 0; i < CHUNK_WIDTH+2; i++)
+	for (int i = 0; i < CHUNK_HEIGHT+2; i++)
 	{
 		chomk.blocks[i] = (char**)malloc((CHUNK_WIDTH+2) * sizeof(char*));
 		for (int j = 0; j < CHUNK_WIDTH+2; j++)
@@ -685,7 +685,7 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 
 void chunk_destroy(chunk* chomk)
 {
-	for (int i = 0; i < CHUNK_WIDTH+2; i++)
+	for (int i = 0; i < CHUNK_HEIGHT+2; i++)
 	{
 		for (int j = 0; j < CHUNK_WIDTH+2; j++)
 			free(chomk->blocks[i][j]);
@@ -693,6 +693,7 @@ void chunk_destroy(chunk* chomk)
 		free(chomk->blocks[i]);
 	}
 	free(chomk->blocks);
+
 
 	if (chomk->isThereNormalMesh != 0) {
 		chomk->isThereNormalMesh = 0;

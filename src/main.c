@@ -20,7 +20,7 @@ GLFWwindow* init_window(const char* name, int width, int height);
 
 int main()
 {
-    //_CrtSetBreakAlloc(2119526);
+    //_CrtSetBreakAlloc(1710975);
 
     GLFWwindow* window=NULL;
     int currentStage = STAGE_INITIALIZE;

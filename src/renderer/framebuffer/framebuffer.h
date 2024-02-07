@@ -60,7 +60,7 @@ typedef struct renderer {
 	geometryFBO gBuffer;
 	ssaoFBO ssaoBuffer;
 	endFBO endBuffer;
-	bloomFBO bloomBuffers[RENDERER_KAWASAKI_FBO_COUNT];//tobb kell, mert Kawasaki blur lesz
+	bloomFBO bloomBuffers[RENDERER_KAWASAKI_FBO_COUNT];//tobb kell, mert Kawasaki blur lesz (az elso csak a filterre van, feles felbontassal, a tobbi a kawasaki, ahol az elso feles felbontasu, es a tobbi felbontasa mindig az ot megelozo fele)
 	screenFBO screenBuffer;
 } renderer;
 

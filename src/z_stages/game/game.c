@@ -89,6 +89,7 @@ shader ssaoBlurShader;
 shader lightingPassShader;
 shader waterShader;
 shader forwardPassShader;
+shader bloomFilterShader; shader bloomDownsampleShader;
 shader finalPassShader;
 shader fxaaShader;
 shader skyboxShader; mesh skyboxMesh;
@@ -542,7 +543,46 @@ void* loop_render(void* arg)
         //get lens flare data
         flare_queryQueryResult(&lensFlare);
         flare_query(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
+
+        //prepare bloom--------------------------------------------------------------------------------
+        int viewportWidth = RENDERER_WIDTH/2, viewportHeight = RENDERER_HEIGHT/2;
+        glViewport(0, 0, viewportWidth, viewportHeight);
+
+        glBindVertexArray(rectangleVAO);
+        glActiveTexture(GL_TEXTURE0);
+
+        //filter dark areas
+        glBindFramebuffer(GL_FRAMEBUFFER, rendor.bloomBuffers[0].id);
+        glClearColor(0, 0, 0, 0);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
+        
+        glUseProgram(bloomFilterShader.id);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        
+        //downsample
+        glUseProgram(bloomDownsampleShader.id);
+        unsigned int loc = glGetUniformLocation(bloomDownsampleShader.id, "radius");
+        for (int i = 1; i < RENDERER_KAWASAKI_FBO_COUNT; i++)
+        {
+            glViewport(0, 0, viewportWidth, viewportHeight);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, rendor.bloomBuffers[i].id);
+            glClearColor(0, 0, 0, 0);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            glBindTexture(GL_TEXTURE_2D, rendor.bloomBuffers[i-1].colorBuffer);
+            glUniform2f(loc, (float)(i)/RENDERER_WIDTH, (float)(i)/RENDERER_HEIGHT);
+
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+
+            viewportWidth /= 2;
+            viewportHeight /= 2;
+        }
+
         //switch to screen fbo ------------------------------------------------------------------------
+        glViewport(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT);
         glBindFramebuffer(GL_FRAMEBUFFER, rendor.screenBuffer.id);
 
         //skybox
@@ -568,6 +608,12 @@ void* loop_render(void* arg)
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
+
+        for (int i = GL_TEXTURE1; i < GL_TEXTURE1 + RENDERER_KAWASAKI_FBO_COUNT-1; i++)//-1, mert az elso bloombufferbol nincs mintavetelezes, mert azon nincs blur effekt
+        {
+            glActiveTexture(i);
+            glBindTexture(GL_TEXTURE_2D, rendor.bloomBuffers[i-GL_TEXTURE1+1].colorBuffer);
+        }
 
         glUseProgram(finalPassShader.id);
         glBindVertexArray(rectangleVAO);
@@ -890,6 +936,23 @@ void init_renderer()
         NULL
     );
 
+    bloomFilterShader = shader_import(
+        "../assets/shaders/renderer/bloom/shader_bloom.vag",
+        "../assets/shaders/renderer/bloom/shader_bloom_filter.fag",
+        NULL
+    );
+    glUseProgram(bloomFilterShader.id);
+    glUniform1i(glGetUniformLocation(bloomFilterShader.id, "tex"), 0);
+    glUniform1f(glGetUniformLocation(bloomFilterShader.id, "threshold"), 3);
+
+    bloomDownsampleShader = shader_import(
+        "../assets/shaders/renderer/bloom/shader_bloom.vag",
+        "../assets/shaders/renderer/bloom/shader_bloom_downsample.fag",
+        NULL
+    );
+    glUseProgram(bloomDownsampleShader.id);
+    glUniform1i(glGetUniformLocation(bloomDownsampleShader.id, "tex"), 0);
+
     finalPassShader = shader_import(
         "../assets/shaders/renderer/final_pass/shader_final_pass.vag",
         "../assets/shaders/renderer/final_pass/shader_final_pass.fag",
@@ -898,10 +961,10 @@ void init_renderer()
     glUseProgram(finalPassShader.id);
     glUniform1i(glGetUniformLocation(finalPassShader.id, "tex"), 0);
     char buffer[11];
-    for (int i = 0; i < RENDERER_KAWASAKI_FBO_COUNT; i++)
+    for (int i = 1; i < RENDERER_KAWASAKI_FBO_COUNT; i++)//1tol indul, mert az elso bloombuffer nincs mintavetelezve
     {
         sprintf(buffer, "bloom%d", i);
-        glUniform1i(glGetUniformLocation(finalPassShader.id, buffer), i+1);
+        glUniform1i(glGetUniformLocation(finalPassShader.id, buffer), i);
     }
     glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 0.2);
 
@@ -1042,6 +1105,8 @@ void end_renderer()
     shader_delete(&lightingPassShader);
     shader_delete(&waterShader);
     shader_delete(&forwardPassShader);
+    shader_delete(&bloomFilterShader);
+    shader_delete(&bloomDownsampleShader);
     shader_delete(&finalPassShader);
     shader_delete(&fxaaShader);
 

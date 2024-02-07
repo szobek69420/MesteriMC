@@ -30,12 +30,13 @@ renderer renderer_create(int width, int height)
     rendor.endBuffer = renderer_createEndFBO(width, height);
     rendor.screenBuffer = renderer_createScreenFBO(width, height);
 
-    int width2 = width, height2 = height;
-    for (int i = 0; i < RENDERER_KAWASAKI_FBO_COUNT; i++)
+    int width2 = width/2, height2 = height/2;
+    rendor.bloomBuffers[0] = renderer_createBloomFBO(width2, height2);
+    for (int i = 1; i < RENDERER_KAWASAKI_FBO_COUNT; i++)
     {
+        rendor.bloomBuffers[i] = renderer_createBloomFBO(width2, height2);
         width2 /= 2;
         height2 /= 2;
-        rendor.bloomBuffers[i] = renderer_createBloomFBO(width2, height2);
     }
 
     return rendor;

@@ -6,7 +6,7 @@ out vec4 fragColour;
 
 uniform sampler2D tex;
 
-uniform sampler2D bloom0;
+//uniform sampler2D bloom0; ez nincs hasznalva, mert ez nincs elmosodva
 uniform sampler2D bloom1;
 uniform sampler2D bloom2;
 uniform sampler2D bloom3;
@@ -16,19 +16,20 @@ uniform float exposure;
 
 void main()
 {
-	fragColour=texture(tex,uv);
+	vec4 temp=texture(tex,uv);
+	vec3 colour=temp.rgb;
+	float alpha=temp.a;
 
 	//bloom
-	fragColour.rgb+=texture(bloom0, uv).rgb;
-	fragColour.rgb+=texture(bloom1, uv).rgb;
-	fragColour.rgb+=texture(bloom2, uv).rgb;
-	fragColour.rgb+=texture(bloom3, uv).rgb;
+	colour+=texture(bloom1, uv).rgb;
+	colour+=texture(bloom2, uv).rgb;
+	colour+=texture(bloom3, uv).rgb;
 
 	// exposure tone mapping
-    fragColour.rgb = vec3(1.0) - exp(-fragColour.rgb * exposure);
+    colour = vec3(1.0) - exp(-colour * exposure);
 
     // gamma correction 
-    fragColour.rgb = pow(fragColour.rgb, vec3(0.4545));
+    colour = pow(colour, vec3(0.4545));
 
-    //fragColour=texture(tex,uv);
+    fragColour=vec4(colour,alpha);
 }
