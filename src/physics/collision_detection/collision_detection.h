@@ -3,8 +3,5 @@
 
 #include "../collider/collider.h"
 
-int collisionDetection_shouldResolve(collider* c1, collider* c2);
-
-void collisionDetection_collisionBoxBox(collider* non_kinematic_box_collider, collider* kinematic_box_collider);
-
+int collisionDetection_collision(collider* collider_non_kinematic, collider* collider_kinematic);
 #endif

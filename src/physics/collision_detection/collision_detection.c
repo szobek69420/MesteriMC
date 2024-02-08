@@ -6,7 +6,9 @@
 
 #include "../../glm2/vec3.h"
 
-int collisionDetection_shouldResolve(collider* c1, collider* c2)
+int collisionDetection_collisionBoxBox(collider* cn, collider* ck);
+
+int collisionDetection_collision(collider* c1, collider* c2)
 {
 	int temp=0;
 	switch (collider_getType(c1))
@@ -15,19 +17,87 @@ int collisionDetection_shouldResolve(collider* c1, collider* c2)
 		switch (collider_getType(c2))
 		{
 		case COLLIDER_TYPE_BOX://box with box
-			if (fabsf(c1->position.x - c2->position.x) > c1->box.sizePerTwo.x + c2->box.sizePerTwo.x)
-				return 0;
-			if (fabsf(c1->position.y - c2->position.y) > c1->box.sizePerTwo.y + c2->box.sizePerTwo.y)
-				return 0;
-			if (fabsf(c1->position.z - c2->position.z) > c1->box.sizePerTwo.z + c2->box.sizePerTwo.z)
-				return 0;
-			return 69;
+			return collisionDetection_collisionBoxBox(c1, c2);
 		}
 		break;
 	}
 }
 
-void collisionDetection_collisionBoxBox(collider* cn, collider* ck)
-{
 
+int collisionDetection_collisionBoxBox(collider* cn, collider* ck)
+{
+	float minDistanceX = cn->box.sizePerTwo.x + ck->box.sizePerTwo.x;
+	float minDistanceY = cn->box.sizePerTwo.y + ck->box.sizePerTwo.y;
+	float minDistanceZ = cn->box.sizePerTwo.z + ck->box.sizePerTwo.z;
+
+	//a cheap pre-check
+	if (fabsf(cn->position.x - ck->position.x) > minDistanceX)
+		return 0;
+	if (fabsf(cn->position.y - ck->position.y) > minDistanceY)
+		return 0;
+	if (fabsf(cn->position.z - ck->position.z) > minDistanceZ)
+		return 0;
+
+	//resolve in the direction in which the penetration is the least
+
+	float distanceX = fabsf(cn->position.x - ck->position.x);
+	float distanceY = fabsf(cn->position.y - ck->position.y);
+	float distanceZ = fabsf(cn->position.z - ck->position.z);
+
+	float penetrations[3] = { minDistanceX - distanceX,minDistanceY - distanceY,minDistanceZ - distanceZ };
+	int minIndex = 0;
+	if (penetrations[1] < penetrations[0])
+		minIndex = 1;
+	if (penetrations[2] < penetrations[minIndex])
+		minIndex = 2;
+
+	switch (minIndex)
+	{
+	case 0://x ist minimal
+		if (cn->position.x > ck->position.x)
+		{
+			COLLISION_SET_NEG_Z(cn->flags);//mert a non-kinematic-kal a negativ z iranybol utkozott a kinematic
+			cn->position.x = ck->position.x + minDistanceX;
+			cn->velocity.x = 0;
+		}
+		else
+		{
+			COLLISION_SET_POS_Z(cn->flags);
+			cn->position.x = ck->position.x - minDistanceX;
+			cn->velocity.x = 0;
+		}
+		break;
+
+	case 1://y ist minimal
+		if (cn->position.y > ck->position.y)
+		{
+			COLLISION_SET_NEG_Y(cn->flags);
+			cn->position.y = ck->position.y + minDistanceY;
+			cn->velocity.y = 0;
+		}
+		else
+		{
+			COLLISION_SET_POS_Y(cn->flags);
+			cn->position.y = ck->position.y - minDistanceY;
+			cn->velocity.y = 0;
+		}
+		break;
+
+	default://z ist minimal
+		if (cn->position.z > ck->position.z)
+		{
+			COLLISION_SET_NEG_Z(cn->flags);
+			cn->position.z = ck->position.z + minDistanceZ;
+			cn->velocity.z = 0;
+		}
+		else
+		{
+			COLLISION_SET_POS_Z(cn->flags);
+			cn->position.z = ck->position.z - minDistanceZ;
+			cn->velocity.z = 0;
+		}
+		break;
+	}
+
+	return 69;
 }
