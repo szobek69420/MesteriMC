@@ -790,32 +790,51 @@ void* loop_physics(void* arg)
         canvas_checkMouseInput(vaszon, mouseX, mouseY, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
 
         //player part
-        vec3 cumVelocity = (vec3){ 0,0,0 };
-        vec3 cumForward = vec3_normalize(vec3_create2(cum.front.x, 0, cum.front.z));
-        if (input_is_key_down(GLFW_KEY_W))
-            cumVelocity = vec3_sum(cumVelocity, vec3_scale(cumForward, cum.move_speed));
-        if (input_is_key_down(GLFW_KEY_S))
-            cumVelocity = vec3_sum(cumVelocity, vec3_scale(cumForward, -cum.move_speed));
-        if (input_is_key_down(GLFW_KEY_A))
-            cumVelocity = vec3_sum(cumVelocity, vec3_scale(cum.right, -cum.move_speed));
-        if (input_is_key_down(GLFW_KEY_D))
-            cumVelocity = vec3_sum(cumVelocity, vec3_scale(cum.right, cum.move_speed));
-        if (input_is_key_down(GLFW_KEY_LEFT_SHIFT))
-            cumVelocity.y -= cum.move_speed;
-        if (input_is_key_down(GLFW_KEY_SPACE))
-            cumVelocity.y += cum.move_speed;
-
-        playerCollider->velocity = cumVelocity;
 
         //updating camera orientation
         pthread_mutex_lock(&mutex_cum);
         previousCumPosition = cum.position;
-        camera_update(&cum, deltaTime);
-        cum.position = playerCollider->position;
+        //camera_update(&cum, deltaTime);
+        
+        //keyboard
+        float velocity = cum.move_speed * deltaTime;
+        vec3 forward = vec3_normalize(vec3_create2(cum.front.x, 0, cum.front.z));
+        if (input_is_key_down(GLFW_KEY_W))
+            cum.position = vec3_sum(cum.position, vec3_scale(forward, velocity));
+        if (input_is_key_down(GLFW_KEY_S))
+            cum.position = vec3_sum(cum.position, vec3_scale(forward, -velocity));
+        if (input_is_key_down(GLFW_KEY_A))
+            cum.position = vec3_sum(cum.position, vec3_scale(cum.right, -velocity));
+        if (input_is_key_down(GLFW_KEY_D))
+            cum.position = vec3_sum(cum.position, vec3_scale(cum.right, velocity));
+        if (input_is_key_down(GLFW_KEY_LEFT_SHIFT))
+            cum.position = vec3_sum(cum.position, vec3_create2(0, -velocity, 0));
+        if (input_is_key_down(GLFW_KEY_SPACE))
+            cum.position = vec3_sum(cum.position, vec3_create2(0, velocity, 0));
+
+        //mouse movement
+        double dx, dy;
+        input_get_mouse_delta(&dx, &dy);
+        dx *= cum.mouse_sensitivity;
+        dy *= cum.mouse_sensitivity;
+        cum.yaw -= dx;
+        if (cum.yaw > 180.0f)
+            cum.yaw -= 360.0f;
+        if (cum.yaw < -180.0f)
+            cum.yaw += 360.0f;
+
+        cum.pitch -= dy;
+        if (cum.pitch > 89.0f)
+            cum.pitch = 89.0f;
+        if (cum.pitch < -89.0f)
+            cum.pitch = -89.0f;
+
+        camera_updateVectors(&cum);
         pthread_mutex_unlock(&mutex_cum);
 
         //physics update
         physicsSystem_update(&ps, deltaTime);
+        
 
         //player animation
         pthread_mutex_lock(&mutex_pm);
