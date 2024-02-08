@@ -40,6 +40,7 @@
 #include "../../glm2/vec3.h"
 #include "../../glm2/mat3.h"
 
+#include "../../physics/collider/collider.h"
 #include "../../physics/physics_system/physics_system.h"
 
 #include "../../utils/list.h"
@@ -757,6 +758,12 @@ void* loop_generation(void* arg)
 
 void* loop_physics(void* arg)
 {
+    collider* playerCollider;
+    collider temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.5f, 1.8f, 0.5f }, 0, 1, 0);
+    physicsSystem_addCollider(&ps, temp);
+    physicsSystem_processPending(&ps);
+    playerCollider = physicsSystem_getCollider(&ps, temp.id);
+
     float deltaTime;
     float lastFrame = glfwGetTime();
     vec3 previousCumPosition = cum.position;
@@ -772,7 +779,7 @@ void* loop_physics(void* arg)
         lastFrame = currentTime;
 
        
-        //update
+        //input
         input_update();
         event e;
         while ((e = event_queue_poll()).type != NONE)
@@ -782,10 +789,33 @@ void* loop_physics(void* arg)
         input_get_mouse_position(&mouseX, &mouseY);
         canvas_checkMouseInput(vaszon, mouseX, mouseY, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
 
+        //player part
+        vec3 cumVelocity = (vec3){ 0,0,0 };
+        vec3 cumForward = vec3_normalize(vec3_create2(cum.front.x, 0, cum.front.z));
+        if (input_is_key_down(GLFW_KEY_W))
+            cumVelocity = vec3_sum(cumVelocity, vec3_scale(cumForward, cum.move_speed));
+        if (input_is_key_down(GLFW_KEY_S))
+            cumVelocity = vec3_sum(cumVelocity, vec3_scale(cumForward, -cum.move_speed));
+        if (input_is_key_down(GLFW_KEY_A))
+            cumVelocity = vec3_sum(cumVelocity, vec3_scale(cum.right, -cum.move_speed));
+        if (input_is_key_down(GLFW_KEY_D))
+            cumVelocity = vec3_sum(cumVelocity, vec3_scale(cum.right, cum.move_speed));
+        if (input_is_key_down(GLFW_KEY_LEFT_SHIFT))
+            cumVelocity.y -= cum.move_speed;
+        if (input_is_key_down(GLFW_KEY_SPACE))
+            cumVelocity.y += cum.move_speed;
+
+        playerCollider->velocity = cumVelocity;
+
+        //updating camera orientation
         pthread_mutex_lock(&mutex_cum);
         previousCumPosition = cum.position;
         camera_update(&cum, deltaTime);
+        cum.position = playerCollider->position;
         pthread_mutex_unlock(&mutex_cum);
+
+        //physics update
+        physicsSystem_update(&ps, deltaTime);
 
         //player animation
         pthread_mutex_lock(&mutex_pm);

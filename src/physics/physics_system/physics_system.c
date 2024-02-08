@@ -68,12 +68,22 @@ void physicsSystem_removeGroup(physicsSystem* ps, int colliderGroupId)
 	pthread_mutex_unlock(&ps->mutex_pending);
 }
 
+colliderGroup* physicsSystem_getGroup(physicsSystem* ps, int colliderGroupId)
+{
+	for (lista_element_of(colliderGroup)* it = ps->colliderGroups.head; it != NULL; it = it->next)
+	{
+		if (it->data.id == colliderGroupId)
+			return &it->data;
+	}
+	return NULL;
+}
+
 void physicsSystem_addCollider(physicsSystem* ps, collider c)
 {
 	physicsSystemUpdate psu;
 	psu.type = PHYSICS_ADD_COLLIDER;
 	psu.c = c;
-	lista_push_back(ps->pendingUpdates, psu);
+	lista_push(ps->pendingUpdates,0, psu);//azert a legelejere rakja, mert lehet, hogy amint hozza lesz adva egy collider, vissza is kell kerni a ra mutato mutatot es igy egy processPending hivassal be is lehet vinni a rendszerbe
 }
 
 void physicsSystem_removeCollider(physicsSystem* ps, int colliderId)
@@ -82,6 +92,16 @@ void physicsSystem_removeCollider(physicsSystem* ps, int colliderId)
 	psu.type = PHYSICS_REMOVE_COLLIDER;
 	psu.colliderId = colliderId;
 	lista_push_back(ps->pendingUpdates, psu);
+}
+
+collider* physicsSystem_getCollider(physicsSystem* ps, int colliderId)
+{
+	for (lista_element_of(collider)* it = ps->simulatedColliders.head; it != NULL; it = it->next)
+	{
+		if (it->data.id == colliderId)
+			return &it->data;
+	}
+	return NULL;
 }
 
 void physicsSystem_processPending(physicsSystem* ps)
@@ -227,9 +247,9 @@ void physicsSystem_resolveCollisions(colliderGroup* cg, collider* c)
 
 	//sort colliders nach distance in collision group in ascending order
 	//bubble sort ftw
-	for (int i = 0; i < seqtor_size(colliding) - 1; i++)
+	for (int i = 0; i < (int)seqtor_size(colliding) - 1; i++)
 	{
-		for (int j = 0; j < seqtor_size(colliding) - i - 1; j++)
+		for (int j = 0; j < (int)seqtor_size(colliding) - i - 1; j++)
 		{
 			if (distances[j] > distances[j + 1])
 			{
@@ -251,4 +271,5 @@ void physicsSystem_resolveCollisions(colliderGroup* cg, collider* c)
 	{
 		collisionDetection_collision(c, &seqtor_at(colliding, i));
 	}
+	seqtor_destroy(colliding);
 }

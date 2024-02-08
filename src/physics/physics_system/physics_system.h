@@ -38,9 +38,14 @@ void physicsSystem_destroy(physicsSystem* ps);
 
 void physicsSystem_addGroup(physicsSystem* ps, colliderGroup cg);
 void physicsSystem_removeGroup(physicsSystem* ps, int colliderGroupId);
+colliderGroup* physicsSystem_getGroup(physicsSystem* ps, int colliderGroupId);
+
 void physicsSystem_addCollider(physicsSystem* ps, collider c);
 void physicsSystem_removeCollider(physicsSystem* ps, int colliderId);
+collider* physicsSystem_getCollider(physicsSystem* ps, int colliderId);
 
 void physicsSystem_processPending(physicsSystem* ps);
+
+void physicsSystem_update(physicsSystem* ps, float deltaTime);
 
 #endif
