@@ -6,7 +6,7 @@
 #include "../../utils/seqtor.h"
 
 struct colliderGroup {
-	int id1, id2, id3;//chunk szam lesz valszeg
+	int id;
 
 	//egy doboz, amely magaba foglalja az osszes collidert a colliderGroupban
 	vec3 lowerBound;
@@ -16,5 +16,13 @@ struct colliderGroup {
 };
 
 typedef struct colliderGroup colliderGroup;
+
+colliderGroup colliderGroup_create(vec3 lowerBound, vec3 upperBound);
+void colliderGroup_destroy(colliderGroup* cg);
+
+void colliderGroup_addCollider(colliderGroup* cg, collider c);
+void colliderGroup_removeCollider(colliderGroup* cg, int colliderId);
+
+int colliderGroup_isColliderInBounds(colliderGroup* cg, collider* c);
 
 #endif
