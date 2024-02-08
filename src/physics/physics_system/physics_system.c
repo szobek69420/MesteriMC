@@ -2,10 +2,12 @@
 
 #include "../collider/collider.h"
 #include "../collider_group/collider_group.h"
+#include "../collision_detection/collision_detection.h"
 
 #include "../../utils/lista.h"
 
 #include <stdlib.h>
+#include <math.h>
 #include <pthread.h>
 
 physicsSystem physicsSystem_create()
@@ -134,5 +136,119 @@ void physicsSystem_processPending(physicsSystem* ps)
 			index++;
 		}
 		break;
+	}
+}
+
+void physicsSystem_resolveCollisions(colliderGroup* cg, collider* c);
+
+void physicsSystem_update(physicsSystem* ps, float deltaTime)
+{
+	for (lista_element_of(collider)* it1 = ps->simulatedColliders.head; it1 != NULL; it1 = it1->next)
+	{
+		it1->data.position = vec3_sum(it1->data.position, vec3_scale(it1->data.velocity, deltaTime));
+
+		for (lista_element_of(colliderGroup)* it2 = ps->colliderGroups.head; it2 != NULL; it2 = it2->next)
+		{
+			if (colliderGroup_isColliderInBounds(&it2->data, &it1->data) == 0)
+				continue;
+
+			physicsSystem_resolveCollisions(&it2->data, &it1->data);
+		}
+	}
+}
+
+//should be called, if a simulated collider is in a collider group
+//currently it assumes that all of the colliders in cg are box colliders
+void physicsSystem_resolveCollisions(colliderGroup* cg, collider* c)
+{
+	//obtain colliders that are in collision distance
+	seqtor_of(collider) colliding;
+	seqtor_init(colliding, 10);
+	
+	switch (collider_getType(c))
+	{
+	case COLLIDER_TYPE_BOX:
+		for (int i = 0; i < seqtor_size(cg->colliders); i++)
+		{
+			float minDistanceX = c->box.sizePerTwo.x + seqtor_at(cg->colliders, i).box.sizePerTwo.x;
+			float minDistanceY = c->box.sizePerTwo.y + seqtor_at(cg->colliders, i).box.sizePerTwo.y;
+			float minDistanceZ = c->box.sizePerTwo.z + seqtor_at(cg->colliders, i).box.sizePerTwo.z;
+
+			if (fabsf(c->position.x - seqtor_at(cg->colliders, i).position.x) > minDistanceX)
+				continue;
+			if (fabsf(c->position.y - seqtor_at(cg->colliders, i).position.y) > minDistanceY)
+				continue;
+			if (fabsf(c->position.z - seqtor_at(cg->colliders, i).position.z) > minDistanceZ)
+				continue;
+
+			seqtor_push_back(colliding, seqtor_at(cg->colliders, i));
+		}
+		break;
+
+	case COLLIDER_TYPE_BALL:
+		for (int i = 0; i < seqtor_size(cg->colliders); i++)
+		{
+			float minDistanceX = c->ball.radius + seqtor_at(cg->colliders, i).box.sizePerTwo.x;
+			float minDistanceY = c->ball.radius + seqtor_at(cg->colliders, i).box.sizePerTwo.y;
+			float minDistanceZ = c->ball.radius + seqtor_at(cg->colliders, i).box.sizePerTwo.z;
+
+			if (fabsf(c->position.x - seqtor_at(cg->colliders, i).position.x) > minDistanceX)
+				continue;
+			if (fabsf(c->position.y - seqtor_at(cg->colliders, i).position.y) > minDistanceY)
+				continue;
+			if (fabsf(c->position.z - seqtor_at(cg->colliders, i).position.z) > minDistanceZ)
+				continue;
+
+			seqtor_push_back(colliding, seqtor_at(cg->colliders, i));
+		}
+		break;
+	}
+
+	//calculate distance between colliders and THE collider
+	float* distances = calloc(colliding.size, sizeof(float));
+	switch (collider_getType(c))
+	{
+	case COLLIDER_TYPE_BOX://manhattan distance, where in each direction the zero distance is when the two would be touching
+		for (int i = 0; i < seqtor_size(colliding); i++)
+		{
+			float minDistanceX = c->box.sizePerTwo.x + seqtor_at(cg->colliders, i).box.sizePerTwo.x;
+			float minDistanceY = c->box.sizePerTwo.y + seqtor_at(cg->colliders, i).box.sizePerTwo.y;
+			float minDistanceZ = c->box.sizePerTwo.z + seqtor_at(cg->colliders, i).box.sizePerTwo.z;
+
+			distances[i] += fabsf(c->position.x - seqtor_at(cg->colliders, i).position.x) - minDistanceX;
+			distances[i] += fabsf(c->position.y - seqtor_at(cg->colliders, i).position.y) - minDistanceY;
+			distances[i] += fabsf(c->position.z - seqtor_at(cg->colliders, i).position.z) - minDistanceZ;
+		}
+		break;
+
+	case COLLIDER_TYPE_BALL:
+		break;
+	}
+
+	//sort colliders nach distance in collision group in ascending order
+	//bubble sort ftw
+	for (int i = 0; i < seqtor_size(colliding) - 1; i++)
+	{
+		for (int j = 0; j < seqtor_size(colliding) - i - 1; j++)
+		{
+			if (distances[j] > distances[j + 1])
+			{
+				float temp = distances[j];
+				distances[j] = distances[j + 1];
+				distances[j + 1] = temp;
+
+				collider temp2 = seqtor_at(colliding, j);
+				seqtor_at(colliding, j) = seqtor_at(colliding, j + 1);
+				seqtor_at(colliding, j + 1) = temp2;
+			}
+		}
+	}
+
+	free(distances);
+
+	//resolve collisions in that order
+	for (int i = 0; i < seqtor_size(colliding); i++)
+	{
+		collisionDetection_collision(c, &seqtor_at(colliding, i));
 	}
 }

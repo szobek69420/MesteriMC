@@ -15,6 +15,8 @@
 #include "z_stages/stages.h"
 #include "window/window.h"
 
+#include <stdlib.h>
+
 //prototypes
 GLFWwindow* init_window(const char* name, int width, int height);
 
