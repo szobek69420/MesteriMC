@@ -6,6 +6,8 @@
 
 #include "../../utils/lista.h"
 
+#include <pthread.h>
+
 #define PHYSICS_ADD_GROUP 1
 #define PHYSICS_REMOVE_GROUP 2
 #define PHYSICS_ADD_COLLIDER 3
@@ -27,6 +29,7 @@ struct physicsSystem {
 	lista_of(collider) simulatedColliders;//list of non kinematic colliders
 	lista_of(colliderGroup) colliderGroups;
 	lista_of(physicsSystemUpdate) pendingUpdates;
+	pthread_mutex_t mutex_pending;
 };
 typedef struct physicsSystem physicsSystem;
 

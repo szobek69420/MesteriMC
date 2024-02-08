@@ -764,10 +764,14 @@ void* loop_physics(void* arg)
     {
         float currentTime = glfwGetTime();
         while (currentTime - lastFrame < PHYSICS_UPDATE)
+        {
+            physicsSystem_processPending(&ps);
             currentTime = glfwGetTime();
+        }
         deltaTime = currentTime - lastFrame;
         lastFrame = currentTime;
 
+       
         //update
         input_update();
         event e;

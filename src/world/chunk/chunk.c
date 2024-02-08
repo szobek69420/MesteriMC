@@ -506,6 +506,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 	//normal mesh
 	colliderGroup cg;
+	chomk.colliderGroupId = 0;
 	if (verticesNormal.size > 0)
 	{
 		meshNormal->sizeVertices = verticesNormal.size * sizeof(unsigned long);
@@ -522,7 +523,6 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		physicsSystem_addGroup(cm->ps, cg);
 		chomk.colliderGroupId = cg.id;
 	}
-	chomk.colliderGroupId = 0;
 
 	seqtor_destroy(verticesNormal);
 	seqtor_destroy(indicesNormal);
@@ -720,7 +720,7 @@ void chunk_destroy(chunkManager* cm, chunk* chomk)
 	}
 
 	//physics
-	if(chomk->colliderGroupId!=0)
+	if (chomk->colliderGroupId != 0)
 		physicsSystem_removeGroup(cm->ps, chomk->colliderGroupId);
 }
 

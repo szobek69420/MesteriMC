@@ -6,6 +6,7 @@
 #include "../../utils/lista.h"
 
 #include <stdlib.h>
+#include <pthread.h>
 
 physicsSystem physicsSystem_create()
 {
@@ -13,6 +14,7 @@ physicsSystem physicsSystem_create()
 	lista_init(ps.simulatedColliders);
 	lista_init(ps.colliderGroups);
 	lista_init(ps.pendingUpdates);
+	pthread_mutex_init(&ps.mutex_pending, NULL);
 	return ps;
 }
 
@@ -29,6 +31,7 @@ void physicsSystem_destroy(physicsSystem* ps)
 	}
 
 	physicsSystemUpdate psu;
+	pthread_mutex_lock(&ps->mutex_pending);
 	while (ps->pendingUpdates.size > 0)
 	{
 		lista_at(ps->pendingUpdates, 0, &psu);
@@ -36,6 +39,9 @@ void physicsSystem_destroy(physicsSystem* ps)
 			colliderGroup_destroy(&psu.cg);
 		lista_remove_at(ps->pendingUpdates, 0);
 	}
+	pthread_mutex_unlock(&ps->mutex_pending);
+
+	pthread_mutex_destroy(&ps->mutex_pending);
 }
 
 void physicsSystem_addGroup(physicsSystem* ps, colliderGroup cg)
@@ -43,7 +49,10 @@ void physicsSystem_addGroup(physicsSystem* ps, colliderGroup cg)
 	physicsSystemUpdate psu;
 	psu.type = PHYSICS_ADD_GROUP;
 	psu.cg = cg;
+
+	pthread_mutex_lock(&ps->mutex_pending);
 	lista_push_back(ps->pendingUpdates, psu);
+	pthread_mutex_unlock(&ps->mutex_pending);
 }
 
 void physicsSystem_removeGroup(physicsSystem* ps, int colliderGroupId)
@@ -51,7 +60,10 @@ void physicsSystem_removeGroup(physicsSystem* ps, int colliderGroupId)
 	physicsSystemUpdate psu;
 	psu.type = PHYSICS_REMOVE_GROUP;
 	psu.colliderGroupId = colliderGroupId;
+
+	pthread_mutex_lock(&ps->mutex_pending);
 	lista_push_back(ps->pendingUpdates, psu);
+	pthread_mutex_unlock(&ps->mutex_pending);
 }
 
 void physicsSystem_addCollider(physicsSystem* ps, collider c)
@@ -76,8 +88,10 @@ void physicsSystem_processPending(physicsSystem* ps)
 		return;
 
 	physicsSystemUpdate psu;
+	pthread_mutex_lock(&ps->mutex_pending);
 	lista_at(ps->pendingUpdates, 0, &psu);
 	lista_remove_at(ps->pendingUpdates, 0);
+	pthread_mutex_unlock(&ps->mutex_pending);
 
 	int index=0;
 	lista_element_of(colliderGroup) * it1=NULL;
@@ -85,7 +99,7 @@ void physicsSystem_processPending(physicsSystem* ps)
 	switch (psu.type)
 	{
 	case PHYSICS_ADD_GROUP:
-		lista_push_back(ps->colliderGroups, psu.cg);
+		lista_push_back(ps->colliderGroups,  psu.cg);
 		break;
 
 	case PHYSICS_REMOVE_GROUP:
@@ -96,6 +110,7 @@ void physicsSystem_processPending(physicsSystem* ps)
 			{
 				colliderGroup_destroy(&it1->data);
 				lista_remove_at(ps->colliderGroups, index);
+				break;
 			}
 			it1 = it1->next;
 			index++;
@@ -111,7 +126,10 @@ void physicsSystem_processPending(physicsSystem* ps)
 		while (it2 != NULL)
 		{
 			if (it2->data.id == psu.colliderId)
+			{
 				lista_remove_at(ps->simulatedColliders, index);
+				break;
+			}
 			it2 = it2->next;
 			index++;
 		}
