@@ -5,6 +5,11 @@
 
 #include "../../glm2/vec3.h"
 #include "../../glm2/mat4.h"
+
+#include "../../physics/collider/collider.h"
+#include "../../physics/collider_group/collider_group.h"
+#include "../../physics/physics_system/physics_system.h"
+
 #include "../../utils/seqtor.h"
 
 #include <stdlib.h>
@@ -500,6 +505,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 
 	//normal mesh
+	colliderGroup cg;
 	if (verticesNormal.size > 0)
 	{
 		meshNormal->sizeVertices = verticesNormal.size * sizeof(unsigned long);
@@ -511,7 +517,12 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		memcpy(meshNormal->indices, indicesNormal.data, meshNormal->sizeIndices);
 
 		meshNormal->indexCount = indicesNormal.size;
+
+		cg = colliderGroup_create((vec3) { 0, 0, 0 }, (vec3) { 0, 0, 0 });
+		physicsSystem_addGroup(cm->ps, cg);
+		chomk.colliderGroupId = cg.id;
 	}
+	chomk.colliderGroupId = 0;
 
 	seqtor_destroy(verticesNormal);
 	seqtor_destroy(indicesNormal);
@@ -683,7 +694,7 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 	}
 }
 
-void chunk_destroy(chunk* chomk)
+void chunk_destroy(chunkManager* cm, chunk* chomk)
 {
 	for (int i = 0; i < CHUNK_HEIGHT+2; i++)
 	{
@@ -707,6 +718,10 @@ void chunk_destroy(chunk* chomk)
 		glDeleteBuffers(1, &(chomk->waterMesh.vbo));
 		glDeleteBuffers(1, &(chomk->waterMesh.ebo));
 	}
+
+	//physics
+	if(chomk->colliderGroupId!=0)
+		physicsSystem_removeGroup(cm->ps, chomk->colliderGroupId);
 }
 
 void chunk_getChunkFromPos(vec3 pos, int* chunkX, int* chunkY, int* chunkZ)

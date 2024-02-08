@@ -20,7 +20,7 @@ struct physicsSystemUpdate {
 		collider c;
 		int colliderId;
 	};
-};;
+};
 typedef struct physicsSystemUpdate physicsSystemUpdate;
 
 struct physicsSystem {
@@ -29,5 +29,15 @@ struct physicsSystem {
 	lista_of(physicsSystemUpdate) pendingUpdates;
 };
 typedef struct physicsSystem physicsSystem;
+
+physicsSystem physicsSystem_create();
+void physicsSystem_destroy(physicsSystem* ps);
+
+void physicsSystem_addGroup(physicsSystem* ps, colliderGroup cg);
+void physicsSystem_removeGroup(physicsSystem* ps, int colliderGroupId);
+void physicsSystem_addCollider(physicsSystem* ps, collider c);
+void physicsSystem_removeCollider(physicsSystem* ps, int colliderId);
+
+void physicsSystem_processPending(physicsSystem* ps);
 
 #endif

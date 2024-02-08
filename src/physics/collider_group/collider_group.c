@@ -6,7 +6,7 @@
 
 #include "../../glm2/vec3.h"
 
-static unsigned int colliderGroupId = 0;
+static unsigned int colliderGroupId = 1;
 
 colliderGroup colliderGroup_create(vec3 lowerBound, vec3 upperBound)
 {
@@ -18,6 +18,8 @@ colliderGroup colliderGroup_create(vec3 lowerBound, vec3 upperBound)
 	cg.upperBound = upperBound;
 
 	seqtor_init(cg.colliders, 1);
+
+	return cg;
 }
 
 void colliderGroup_destroy(colliderGroup* cg)

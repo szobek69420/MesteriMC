@@ -80,8 +80,8 @@ void physicsSystem_processPending(physicsSystem* ps)
 	lista_remove_at(ps->pendingUpdates, 0);
 
 	int index=0;
-	lista_element_of(colliderGroup) * it1;
-	lista_element_of(collider) * it2;
+	lista_element_of(colliderGroup) * it1=NULL;
+	lista_element_of(collider) * it2=NULL;
 	switch (psu.type)
 	{
 	case PHYSICS_ADD_GROUP:
@@ -107,9 +107,9 @@ void physicsSystem_processPending(physicsSystem* ps)
 		break;
 
 	case PHYSICS_REMOVE_COLLIDER:
+		it2 = ps->simulatedColliders.head;
 		while (it2 != NULL)
 		{
-			it2 = ps->simulatedColliders.head;
 			if (it2->data.id == psu.colliderId)
 				lista_remove_at(ps->simulatedColliders, index);
 			it2 = it2->next;

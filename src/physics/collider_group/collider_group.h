@@ -4,6 +4,7 @@
 //kinematikus colliderek csoportja
 
 #include "../../utils/seqtor.h"
+#include "../collider/collider.h"
 
 struct colliderGroup {
 	int id;

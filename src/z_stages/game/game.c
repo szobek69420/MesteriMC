@@ -40,6 +40,8 @@
 #include "../../glm2/vec3.h"
 #include "../../glm2/mat3.h"
 
+#include "../../physics/physics_system/physics_system.h"
+
 #include "../../utils/list.h"
 #include "../../utils/vector.h"
 #include "../../utils/lista.h"
@@ -69,6 +71,8 @@ enum {
 };
 
 pthread_mutex_t mutex_window;//for window calls (like window_getHeight())
+
+physicsSystem ps;
 
 chunkManager cm;
 pthread_mutex_t mutex_cm;
@@ -164,7 +168,9 @@ void game(void* w, int* currentStage)
 
     cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
-    cm = chunkManager_create(69, 5);
+    ps = physicsSystem_create();
+
+    cm = chunkManager_create(69, 5, &ps);
     init_renderer();
 
     textureHandler_importTextures(TEXTURE_IN_GAME);
@@ -236,6 +242,7 @@ void game(void* w, int* currentStage)
     glfwMakeContextCurrent(window);
 
     chunkManager_destroy(&cm);
+    physicsSystem_destroy(&ps);
     textureHandler_destroyTextures(TEXTURE_IN_GAME);
     end_canvas();
     fontHandler_close();

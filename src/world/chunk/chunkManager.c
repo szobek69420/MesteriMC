@@ -15,11 +15,13 @@
 char chunkManager_checkIfInFrustum(vec4* vec, char* frustumX, char* frustumY, char* frustumZ);
 int chunkManager_isChunkRegistered(chunkManager* cm, int chunkX, int chunkY, int chunkZ);//elso generalaskor a chunknak foglalni kell helyet a changedBlocks vektorban
 
-chunkManager chunkManager_create(int seed, int renderDistance)
+chunkManager chunkManager_create(int seed, int renderDistance, physicsSystem* ps)
 {
 	chunkManager cm;
 	cm.seed = seed;
 	cm.renderDistance = renderDistance;
+
+	cm.ps = ps;
 
 	cm.noise= fnlCreateState();
 	cm.noise.noise_type = FNL_NOISE_OPENSIMPLEX2;
@@ -52,7 +54,7 @@ void chunkManager_destroy(chunkManager* cm)
 
 		lista_remove_at(cm->loadedChunks, 0);
 
-		chunk_destroy(&chomk);
+		chunk_destroy(cm, &chomk);
 	}
 
 	lista_clear(cm->pendingUpdates);
@@ -76,7 +78,7 @@ void chunkManager_destroy(chunkManager* cm)
 				free(chomkDown.meshWalter.vertices);
 				free(chomkDown.meshWalter.indices);
 			}
-			chunk_destroy(&chomkDown.chomk);
+			chunk_destroy(cm, &chomkDown.chomk);
 			break;
 		}
 	}
@@ -304,7 +306,7 @@ void chunkManager_updateMesh(chunkManager* cm)
 		break;
 
 	case CHUNKMANAGER_UNLOAD_CHUNK:
-		chunk_destroy(&cmu.chomk);
+		chunk_destroy(cm, &cmu.chomk);
 		break;
 
 
