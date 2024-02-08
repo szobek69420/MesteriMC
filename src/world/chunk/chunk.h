@@ -54,7 +54,8 @@ struct chunk {
 
 	mat4 model;
 
-	unsigned int colliderGroupId;
+	unsigned int normalColliderGroupId;
+	unsigned int waterColliderGroupId;
 };
 
 typedef struct chunk chunk;

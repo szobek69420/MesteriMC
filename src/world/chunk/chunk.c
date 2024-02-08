@@ -61,6 +61,11 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	int basedY = CHUNK_HEIGHT * chunkY;
 	int basedZ = CHUNK_WIDTH * chunkZ;
 
+	chomk.normalColliderGroupId = 0;
+	chomk.waterColliderGroupId = 0;
+	colliderGroup normalCg = colliderGroup_create((vec3) { basedX, basedY, basedZ }, (vec3) { basedX + CHUNK_WIDTH, basedY + CHUNK_HEIGHT, basedZ + CHUNK_WIDTH });
+	colliderGroup waterCg = colliderGroup_create((vec3) { basedX, basedY, basedZ }, (vec3) { basedX + CHUNK_WIDTH, basedY + CHUNK_HEIGHT, basedZ + CHUNK_WIDTH });
+
 	chomk.model = mat4_translate(mat4_create(1), vec3_create2(basedX, basedY, basedZ));
 
 	chomk.blocks = (char***)malloc((CHUNK_HEIGHT+2) * sizeof(char**));
@@ -287,6 +292,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	unsigned int currentVertex = 0;//melyik az oldal elso csucsa (kell az indexeleshez)
 	float x, y, z;
 	unsigned long ao;
+	unsigned char isBlockVisible = 0;
 	for (int i = 1; i < CHUNK_HEIGHT+1; i++)//y
 	{
 		for (int j = 1; j < CHUNK_WIDTH+1; j++)//x
@@ -295,6 +301,8 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 			{
 				if (chomk.blocks[i][j][k] == BLOCK_AIR||chomk.blocks[i][j][k]==BLOCK_WATER)
 					continue;
+
+				isBlockVisible = 0;
 
 				//pos z
 				if (chomk.blocks[i][j][k + 1] != chomk.blocks[i][j][k] && (chomk.blocks[i][j][k + 1] == BLOCK_AIR || chomk.blocks[i][j][k + 1] >= BLOCK_TRANSPARENCY_START))
@@ -328,6 +336,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					}
 
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
 
 				//pos x
@@ -362,6 +371,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
 
 				//neg z
@@ -396,6 +406,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
 
 				//neg x
@@ -430,6 +441,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
 
 				//pos y
@@ -464,6 +476,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
 
 				//neg y
@@ -498,15 +511,18 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
+
+				//add a collider only if the block is visible
+				if (isBlockVisible != 0)
+					colliderGroup_addCollider(&normalCg, collider_createBoxCollider( (vec3) { j + 0.5f, i + 0.5f, k + 0.5f }, (vec3) { 1, 1, 1 }, 1, 1, 0 ) );
 			}
 		}
 	}
 
 
 	//normal mesh
-	colliderGroup cg;
-	chomk.colliderGroupId = 0;
 	if (verticesNormal.size > 0)
 	{
 		meshNormal->sizeVertices = verticesNormal.size * sizeof(unsigned long);
@@ -518,12 +534,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		memcpy(meshNormal->indices, indicesNormal.data, meshNormal->sizeIndices);
 
 		meshNormal->indexCount = indicesNormal.size;
-
-		cg = colliderGroup_create((vec3) { 0, 0, 0 }, (vec3) { 0, 0, 0 });
-		physicsSystem_addGroup(cm->ps, cg);
-		chomk.colliderGroupId = cg.id;
 	}
-
 	seqtor_destroy(verticesNormal);
 	seqtor_destroy(indicesNormal);
 	chomk.isThereNormalMesh = 0;
@@ -597,6 +608,24 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	seqtor_destroy(verticesWalter);
 	seqtor_destroy(indicesWalter);
 	chomk.isThereWaterMesh = 0;
+
+
+	//check for colliders
+	if (normalCg.colliders.size > 0)
+	{
+		physicsSystem_addGroup(cm->ps, normalCg);
+		chomk.normalColliderGroupId = normalCg.id;
+	}
+	else
+		colliderGroup_destroy(&normalCg);
+
+	if (waterCg.colliders.size > 0)
+	{
+		physicsSystem_addGroup(cm->ps, waterCg);
+		chomk.waterColliderGroupId = waterCg.id;
+	}
+	else
+		colliderGroup_destroy(&waterCg);
 
 	//check for changedBlocks
 	if (isCurrentCreatedHere)
@@ -720,8 +749,10 @@ void chunk_destroy(chunkManager* cm, chunk* chomk)
 	}
 
 	//physics
-	if (chomk->colliderGroupId != 0)
-		physicsSystem_removeGroup(cm->ps, chomk->colliderGroupId);
+	if (chomk->normalColliderGroupId != 0)
+		physicsSystem_removeGroup(cm->ps, chomk->normalColliderGroupId);
+	if (chomk->waterColliderGroupId != 0)
+		physicsSystem_removeGroup(cm->ps, chomk->waterColliderGroupId);
 }
 
 void chunk_getChunkFromPos(vec3 pos, int* chunkX, int* chunkY, int* chunkZ)
