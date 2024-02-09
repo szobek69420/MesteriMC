@@ -73,4 +73,7 @@ void chunk_drawWalter(chunk* chomk);
 
 void chunk_getChunkFromPos(vec3 pos, int* chunkX, int* chunkY, int* chunkZ);
 
+void chunk_resetGenerationInfo();
+void chunk_getGenerationInfo(int* _generated, int* _destroyed);
+
 #endif

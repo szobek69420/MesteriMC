@@ -52,6 +52,7 @@
 #define CLIP_FAR 200.0f
 
 #define PHYSICS_UPDATE 0.02f
+#define PHYSICS_STEPS_PER_UPDATE 100
 #define GENERATION_UPDATE 0.005f
 #define CHUNK_UPDATES_PER_GENERATION_UPDATE 2
 
@@ -172,6 +173,7 @@ void game(void* w, int* currentStage)
     ps = physicsSystem_create();
 
     cm = chunkManager_create(69, 5, &ps);
+    chunk_resetGenerationInfo();
     init_renderer();
 
     textureHandler_importTextures(TEXTURE_IN_GAME);
@@ -249,6 +251,9 @@ void game(void* w, int* currentStage)
     fontHandler_close();
     end_renderer();
 
+    int chunksGenerated, chunksDestroyed;
+    chunk_getGenerationInfo(&chunksGenerated, &chunksDestroyed);
+    printf("chunks generated: %d, chunks destroyed: %d\n", chunksGenerated, chunksDestroyed);
     
     return 69;
 }
@@ -761,7 +766,7 @@ void* loop_physics(void* arg)
     collider* playerCollider;
     collider temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.5f, 1.8f, 0.5f }, 0, 1, 0);
     physicsSystem_addCollider(&ps, temp);
-    physicsSystem_processPending(&ps);
+    physicsSystem_processPending(&ps);//make sure that the collider is loaded into the physics system
     playerCollider = physicsSystem_getCollider(&ps, temp.id);
 
     float deltaTime;
@@ -790,27 +795,27 @@ void* loop_physics(void* arg)
         canvas_checkMouseInput(vaszon, mouseX, mouseY, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
 
         //player part
-
-        //updating camera orientation
         pthread_mutex_lock(&mutex_cum);
         previousCumPosition = cum.position;
-        //camera_update(&cum, deltaTime);
+        cum.position = playerCollider->position;
         
         //keyboard
-        float velocity = cum.move_speed * deltaTime;
+        vec3 velocity = (vec3){ 0,0,0 };
         vec3 forward = vec3_normalize(vec3_create2(cum.front.x, 0, cum.front.z));
         if (input_is_key_down(GLFW_KEY_W))
-            cum.position = vec3_sum(cum.position, vec3_scale(forward, velocity));
+            velocity = vec3_sum(velocity, vec3_scale(forward, cum.move_speed));
         if (input_is_key_down(GLFW_KEY_S))
-            cum.position = vec3_sum(cum.position, vec3_scale(forward, -velocity));
+            velocity = vec3_sum(velocity, vec3_scale(forward, -cum.move_speed));
         if (input_is_key_down(GLFW_KEY_A))
-            cum.position = vec3_sum(cum.position, vec3_scale(cum.right, -velocity));
+            velocity = vec3_sum(velocity, vec3_scale(cum.right, -cum.move_speed));
         if (input_is_key_down(GLFW_KEY_D))
-            cum.position = vec3_sum(cum.position, vec3_scale(cum.right, velocity));
+            velocity = vec3_sum(velocity, vec3_scale(cum.right, cum.move_speed));
         if (input_is_key_down(GLFW_KEY_LEFT_SHIFT))
-            cum.position = vec3_sum(cum.position, vec3_create2(0, -velocity, 0));
+            velocity = vec3_sum(velocity, (vec3) { 0, -cum.move_speed, 0 });
         if (input_is_key_down(GLFW_KEY_SPACE))
-            cum.position = vec3_sum(cum.position, vec3_create2(0, velocity, 0));
+            velocity = vec3_sum(velocity, (vec3) { 0, cum.move_speed, 0 });
+
+        playerCollider->velocity = velocity;
 
         //mouse movement
         double dx, dy;
@@ -831,11 +836,16 @@ void* loop_physics(void* arg)
 
         camera_updateVectors(&cum);
         pthread_mutex_unlock(&mutex_cum);
+        //player part done
+
 
         //physics update
-        physicsSystem_update(&ps, deltaTime);
+        double time = glfwGetTime();
+        for (int i = 0; i < PHYSICS_STEPS_PER_UPDATE; i++)
+        {
+            physicsSystem_update(&ps, PHYSICS_UPDATE/PHYSICS_STEPS_PER_UPDATE);
+        }
         
-
         //player animation
         pthread_mutex_lock(&mutex_pm);
         pm.position = (vec3){ cum.position.x, cum.position.y - 1.6f, cum.position.z };

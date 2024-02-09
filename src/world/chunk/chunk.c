@@ -22,6 +22,8 @@
 
 static blockModel model_oak_tree[67];
 
+static int generated = 0, destroyed = 0;
+
 
 void chunk_drawTerrain(chunk* chomk)
 {
@@ -44,6 +46,8 @@ void chunk_drawWalter(chunk* chomk)
 
 chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshRaw* meshNormal, meshRaw* meshWalter)
 {
+	generated++;
+
 	meshNormal->vertices = NULL; meshNormal->sizeVertices = 0;
 	meshNormal->indices = NULL; meshNormal->sizeIndices = 0;
 	meshNormal->indexCount = 0;
@@ -516,7 +520,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 				//add a collider only if the block is visible
 				if (isBlockVisible != 0)
-					colliderGroup_addCollider(&normalCg, collider_createBoxCollider( (vec3) { j + 0.5f, i + 0.5f, k + 0.5f }, (vec3) { 1, 1, 1 }, 1, 1, 0 ) );
+					colliderGroup_addCollider(&normalCg, collider_createBoxCollider( (vec3) { basedX + j - 0.5f, basedY + i - 0.5f, basedZ + k - 0.5f }, (vec3) { 1, 1, 1 }, 1, 1, 0 ) );//azert -0.5f, mert az i,j,k 1-rol kezdodnek
 			}
 		}
 	}
@@ -725,6 +729,8 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 
 void chunk_destroy(chunkManager* cm, chunk* chomk)
 {
+	destroyed++;
+
 	for (int i = 0; i < CHUNK_HEIGHT+2; i++)
 	{
 		for (int j = 0; j < CHUNK_WIDTH+2; j++)
@@ -753,6 +759,18 @@ void chunk_destroy(chunkManager* cm, chunk* chomk)
 		physicsSystem_removeGroup(cm->ps, chomk->normalColliderGroupId);
 	if (chomk->waterColliderGroupId != 0)
 		physicsSystem_removeGroup(cm->ps, chomk->waterColliderGroupId);
+}
+
+void chunk_resetGenerationInfo()
+{
+	generated = 0;
+	destroyed = 0;
+}
+
+void chunk_getGenerationInfo(int* _generated, int* _destroyed)
+{
+	*_generated = generated;
+	*_destroyed = destroyed;
 }
 
 void chunk_getChunkFromPos(vec3 pos, int* chunkX, int* chunkY, int* chunkZ)

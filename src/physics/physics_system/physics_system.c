@@ -171,7 +171,7 @@ void physicsSystem_update(physicsSystem* ps, float deltaTime)
 		{
 			if (colliderGroup_isColliderInBounds(&it2->data, &it1->data) == 0)
 				continue;
-
+			
 			physicsSystem_resolveCollisions(&it2->data, &it1->data);
 		}
 	}
@@ -200,7 +200,6 @@ void physicsSystem_resolveCollisions(colliderGroup* cg, collider* c)
 				continue;
 			if (fabsf(c->position.z - seqtor_at(cg->colliders, i).position.z) > minDistanceZ)
 				continue;
-
 			seqtor_push_back(colliding, seqtor_at(cg->colliders, i));
 		}
 		break;
