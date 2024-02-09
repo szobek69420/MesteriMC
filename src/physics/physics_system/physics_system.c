@@ -161,6 +161,12 @@ void physicsSystem_processPending(physicsSystem* ps)
 
 void physicsSystem_resolveCollisions(colliderGroup* cg, collider* c);
 
+void physicsSystem_resetCollisions(physicsSystem* ps)
+{
+	for (lista_element_of(collider)* it1 = ps->simulatedColliders.head; it1 != NULL; it1 = it1->next)
+		COLLISION_RESET(it1->data.flags);
+}
+
 void physicsSystem_update(physicsSystem* ps, float deltaTime)
 {
 	for (lista_element_of(collider)* it1 = ps->simulatedColliders.head; it1 != NULL; it1 = it1->next)
@@ -271,4 +277,69 @@ void physicsSystem_resolveCollisions(colliderGroup* cg, collider* c)
 		collisionDetection_collision(c, &seqtor_at(colliding, i));
 	}
 	seqtor_destroy(colliding);
+}
+
+int physicsSystem_raycast(physicsSystem* ps, vec3 origin, vec3 direction, float distance, float precision, raycastHit* rh)
+{
+	collider raycaster = collider_createBoxCollider(origin, vec3_create(precision), 0, 1, 0);
+	vec3 dir = vec3_scale(vec3_normalize(direction), precision);
+	int stepCount = (int)(distance / precision);
+	colliderGroup* currentCg=NULL;//save the current colliderGroup and reuse as long as the raycaster is in this group
+
+	raycastHit rh2;
+
+	for (int i = 0; i < stepCount; i++)
+	{
+		if (currentCg == NULL || colliderGroup_isColliderInBounds(currentCg, &raycaster) == 0)//ha meg nincsen vizsgalt collidergroup vagy az elozo mar elavult, akkor keres egy ujat
+		{
+			currentCg = NULL;
+			for (lista_element_of(colliderGroup)* it2 = ps->colliderGroups.head; it2 != NULL; it2 = it2->next)
+			{
+				if (colliderGroup_isColliderInBounds(&it2->data, &raycaster) == 0)
+					continue;
+
+				currentCg = &it2->data;
+				break;
+			}
+		}
+		if (currentCg == NULL)//nincs olyan collider group, amiben az aktualis mintavetelezes benne lenne
+		{
+			raycaster.position = vec3_sum(raycaster.position, dir);
+			continue;
+		}
+
+		rh2.position = raycaster.position;
+		physicsSystem_resolveCollisions(currentCg, &raycaster);
+		if (COLLISION_HAS_COLLIDED(raycaster.flags))
+			break;
+
+		raycaster.position = vec3_sum(raycaster.position, dir);
+	}
+
+	if (COLLISION_HAS_COLLIDED(raycaster.flags))
+	{
+		if (rh != NULL)
+		{
+			rh2.tag = collider_getLastCollisionTag(&raycaster);
+
+			if (COLLISION_GET_NEG_Z(raycaster.flags))
+				rh2.normal = (vec3){ 0,0,1 };
+			if (COLLISION_GET_NEG_X(raycaster.flags))
+				rh2.normal = (vec3){ 1,0,0 };
+			if (COLLISION_GET_POS_Z(raycaster.flags))
+				rh2.normal = (vec3){ 0,0,-1 };
+			if (COLLISION_GET_POS_X(raycaster.flags))
+				rh2.normal = (vec3){ -1,0,0 };
+			if (COLLISION_GET_POS_Y(raycaster.flags))
+				rh2.normal = (vec3){ 0,-1,0 };
+			if (COLLISION_GET_NEG_Y(raycaster.flags))
+				rh2.normal = (vec3){ 0,1,0 };
+
+			*rh = rh2;
+		}
+
+		return 69;
+	}
+
+	return 0;
 }
