@@ -75,6 +75,9 @@ enum {
 pthread_mutex_t mutex_window;//for window calls (like window_getHeight())
 
 physicsSystem ps;
+raycastHit rh;
+int raycastChunkX, raycastChunkY, raycastChunkZ;
+int raycastBlockX, raycastBlockY, raycastBlockZ;
 
 chunkManager cm;
 pthread_mutex_t mutex_cm;
@@ -138,7 +141,9 @@ void end_renderer();
 void init_canvas();
 void end_canvas();
 
-void render_cube();
+unsigned int cubeVAO = 0, cubeVBO = 0;
+void init_cube();
+void end_cube();
 
 double lerp(double a, double b, double f);
 
@@ -175,6 +180,8 @@ void game(void* w, int* currentStage)
     cm = chunkManager_create(69, 5, &ps);
     chunk_resetGenerationInfo();
     init_renderer();
+
+    init_cube();//egyszer majd ki kene szedni
 
     textureHandler_importTextures(TEXTURE_IN_GAME);
 
@@ -250,6 +257,8 @@ void game(void* w, int* currentStage)
     end_canvas();
     fontHandler_close();
     end_renderer();
+
+    end_cube();
 
     int chunksGenerated, chunksDestroyed;
     chunk_getGenerationInfo(&chunksGenerated, &chunksDestroyed);
@@ -508,8 +517,26 @@ void* loop_render(void* arg)
             model = mat4_scale(model, vec3_create(0.125f));
             glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "model"), 1, GL_FALSE, model.data);
             glUniform3fv(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, (float*)&(((light*)vector_get(lights, i))->colour.x));
-            render_cube();
+            // render Cube
+            glBindVertexArray(cubeVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glBindVertexArray(0);
         }
+
+        //raycast
+        glDisable(GL_DEPTH_TEST);
+        do{
+            mat4 model = mat4_create(1.0f);
+            model = mat4_translate(model, (vec3) { CHUNK_WIDTH* raycastChunkX + raycastBlockX + 0.5f, CHUNK_HEIGHT* raycastChunkY + raycastBlockY + 0.5f, CHUNK_WIDTH* raycastChunkZ + raycastBlockZ + 0.5f });
+            model = mat4_scale(model, vec3_create(0.5f));
+            glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "model"), 1, GL_FALSE, model.data);
+            glUniform3f(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, 1, 1);
+            // render Cube
+            glBindVertexArray(cubeVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glBindVertexArray(0);
+        } while (0);
+        glEnable(GL_DEPTH_TEST);
 
         //walter
         glUseProgram(waterShader.id);
@@ -769,7 +796,7 @@ void* loop_physics(void* arg)
     physicsSystem_processPending(&ps);//make sure that the collider is loaded into the physics system
     playerCollider = physicsSystem_getCollider(&ps, temp.id);
 
-    float deltaTime;
+
     float lastFrame = glfwGetTime();
     vec3 previousCumPosition = cum.position;
     while (69)
@@ -780,7 +807,6 @@ void* loop_physics(void* arg)
             physicsSystem_processPending(&ps);
             currentTime = glfwGetTime();
         }
-        deltaTime = currentTime - lastFrame;
         lastFrame = currentTime;
 
        
@@ -841,10 +867,20 @@ void* loop_physics(void* arg)
 
         //physics update
         double time = glfwGetTime();
+        physicsSystem_resetCollisions(&ps);
         for (int i = 0; i < PHYSICS_STEPS_PER_UPDATE; i++)
         {
             physicsSystem_update(&ps, PHYSICS_UPDATE/PHYSICS_STEPS_PER_UPDATE);
         }
+        rh.position = (vec3){ 0,100000,0 };
+        physicsSystem_raycast(&ps, cum.position, cum.front, 6, 0.01f, &rh);
+        rh.position=vec3_sum(rh.position, vec3_scale(rh.normal, -0.02f));
+        rh.position = vec3_sum(rh.position, vec3_scale(cum.front, 0.02f));
+        chunk_getChunkFromPos(rh.position, &raycastChunkX, &raycastChunkY, &raycastChunkZ);
+        raycastBlockX = (int)(rh.position.x - CHUNK_WIDTH * raycastChunkX);
+        raycastBlockY = (int)(rh.position.y - CHUNK_HEIGHT * raycastChunkY);
+        raycastBlockZ = (int)(rh.position.z - CHUNK_WIDTH * raycastChunkZ);
+        //printf("%.2f %.2f %.2f | %d %d %d\n", rh.position.x, rh.position.y, rh.position.z, CHUNK_WIDTH* raycastChunkX + raycastBlockX, CHUNK_HEIGHT* raycastChunkY + raycastBlockY, CHUNK_WIDTH* raycastChunkZ + raycastBlockZ);
         
         //player animation
         pthread_mutex_lock(&mutex_pm);
@@ -852,7 +888,7 @@ void* loop_physics(void* arg)
         pm.rotX = cum.pitch;
         pm.rotY = cum.yaw;
         pm.rotHeadX = cum.pitch;
-        playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) { previousCumPosition.x - cum.position.x, 0, previousCumPosition.z - cum.position.z }) > 0.00001f) ? PLAYER_MESH_ANIMATION_WALK : PLAYER_MESH_ANIMATION_IDLE, deltaTime);
+        playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) { previousCumPosition.x - cum.position.x, 0, previousCumPosition.z - cum.position.z }) > 0.00001f) ? PLAYER_MESH_ANIMATION_WALK : PLAYER_MESH_ANIMATION_IDLE, PHYSICS_UPDATE);
         playerMesh_calculateOuterModelMatrix(&pm);
         playerMesh_calculateInnerModelMatrices(&pm);
         pthread_mutex_unlock(&mutex_pm);
@@ -1262,9 +1298,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     event_queue_push((event) { .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
 }
 
-unsigned int cubeVAO = 0;
-unsigned int cubeVBO = 0;
-void render_cube()
+void init_cube()
 {
     // initialize (if necessary)
     if (cubeVAO == 0)
@@ -1329,10 +1363,12 @@ void render_cube()
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
     }
-    // render Cube
-    glBindVertexArray(cubeVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    glBindVertexArray(0);
+}
+
+void end_cube()
+{
+    glDeleteVertexArrays(1, &cubeVAO);
+    glDeleteBuffers(1, &cubeVBO);
 }
 
 double lerp(double a, double b, double f)

@@ -58,7 +58,6 @@ void chunkManager_destroy(chunkManager* cm)
 	}
 
 	lista_clear(cm->pendingUpdates);
-
 	while (cm->pendingMeshUpdates.size>0)
 	{
 		lista_at(cm->pendingMeshUpdates, 0, &chomkDown);
@@ -78,6 +77,10 @@ void chunkManager_destroy(chunkManager* cm)
 				free(chomkDown.meshWalter.vertices);
 				free(chomkDown.meshWalter.indices);
 			}
+			chunk_destroy(cm, &chomkDown.chomk);
+			break;
+
+		case CHUNKMANAGER_UNLOAD_CHUNK:
 			chunk_destroy(cm, &chomkDown.chomk);
 			break;
 		}

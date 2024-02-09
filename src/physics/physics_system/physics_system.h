@@ -33,6 +33,13 @@ struct physicsSystem {
 };
 typedef struct physicsSystem physicsSystem;
 
+struct raycastHit {
+	vec3 position;
+	vec3 normal;
+	unsigned int tag;
+};
+typedef struct raycastHit raycastHit;
+
 physicsSystem physicsSystem_create();
 void physicsSystem_destroy(physicsSystem* ps);
 
@@ -46,6 +53,9 @@ collider* physicsSystem_getCollider(physicsSystem* ps, int colliderId);
 
 void physicsSystem_processPending(physicsSystem* ps);
 
+void physicsSystem_resetCollisions(physicsSystem* ps);
 void physicsSystem_update(physicsSystem* ps, float deltaTime);
+
+int physicsSystem_raycast(physicsSystem* ps, vec3 origin, vec3 direction, float distance, float precision, raycastHit* rh);//return value is zero, if nothing has been hit
 
 #endif
