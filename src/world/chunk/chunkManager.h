@@ -15,6 +15,8 @@
 #include "chunk.h"
 #include "../blocks/blocks.h"
 
+#include "../../physics/physics_system/physics_system.h"
+
 #include <pthread.h>
 
 /*
@@ -68,11 +70,13 @@ struct chunkManager {
 	seqtor_of(changedBlocksInChunk) changedBlocks;//a kulso vektor chunkonkent osztja fel
 
 	fnl_state noise, noise2;//terrain generation
+
+	physicsSystem* ps;
 };
 typedef struct chunkManager chunkManager;
 
 
-chunkManager chunkManager_create(int seed, int renderDistance);
+chunkManager chunkManager_create(int seed, int renderDistance, physicsSystem* ps);
 void chunkManager_destroy(chunkManager* cm);
 
 void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ);//adds an Eintrag to the pendingUpdates if needed

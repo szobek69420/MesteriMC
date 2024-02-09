@@ -40,6 +40,9 @@
 #include "../../glm2/vec3.h"
 #include "../../glm2/mat3.h"
 
+#include "../../physics/collider/collider.h"
+#include "../../physics/physics_system/physics_system.h"
+
 #include "../../utils/list.h"
 #include "../../utils/vector.h"
 #include "../../utils/lista.h"
@@ -49,6 +52,7 @@
 #define CLIP_FAR 200.0f
 
 #define PHYSICS_UPDATE 0.02f
+#define PHYSICS_STEPS_PER_UPDATE 100
 #define GENERATION_UPDATE 0.005f
 #define CHUNK_UPDATES_PER_GENERATION_UPDATE 2
 
@@ -70,6 +74,8 @@ enum {
 
 pthread_mutex_t mutex_window;//for window calls (like window_getHeight())
 
+physicsSystem ps;
+
 chunkManager cm;
 pthread_mutex_t mutex_cm;
 int chunkUpdatesInLastSecond = 0;
@@ -89,6 +95,7 @@ shader ssaoBlurShader;
 shader lightingPassShader;
 shader waterShader;
 shader forwardPassShader;
+shader bloomFilterShader; shader bloomDownsampleShader;
 shader finalPassShader;
 shader fxaaShader;
 shader skyboxShader; mesh skyboxMesh;
@@ -163,7 +170,10 @@ void game(void* w, int* currentStage)
 
     cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
 
-    cm = chunkManager_create(69, 5);
+    ps = physicsSystem_create();
+
+    cm = chunkManager_create(69, 5, &ps);
+    chunk_resetGenerationInfo();
     init_renderer();
 
     textureHandler_importTextures(TEXTURE_IN_GAME);
@@ -235,11 +245,15 @@ void game(void* w, int* currentStage)
     glfwMakeContextCurrent(window);
 
     chunkManager_destroy(&cm);
+    physicsSystem_destroy(&ps);
     textureHandler_destroyTextures(TEXTURE_IN_GAME);
     end_canvas();
     fontHandler_close();
     end_renderer();
 
+    int chunksGenerated, chunksDestroyed;
+    chunk_getGenerationInfo(&chunksGenerated, &chunksDestroyed);
+    printf("chunks generated: %d, chunks destroyed: %d\n", chunksGenerated, chunksDestroyed);
     
     return 69;
 }
@@ -542,7 +556,46 @@ void* loop_render(void* arg)
         //get lens flare data
         flare_queryQueryResult(&lensFlare);
         flare_query(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
+
+        //prepare bloom--------------------------------------------------------------------------------
+        int viewportWidth = RENDERER_WIDTH/2, viewportHeight = RENDERER_HEIGHT/2;
+        glViewport(0, 0, viewportWidth, viewportHeight);
+
+        glBindVertexArray(rectangleVAO);
+        glActiveTexture(GL_TEXTURE0);
+
+        //filter dark areas
+        glBindFramebuffer(GL_FRAMEBUFFER, rendor.bloomBuffers[0].id);
+        glClearColor(0, 0, 0, 0);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
+        
+        glUseProgram(bloomFilterShader.id);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        
+        //downsample
+        glUseProgram(bloomDownsampleShader.id);
+        unsigned int loc = glGetUniformLocation(bloomDownsampleShader.id, "radius");
+        for (int i = 1; i < RENDERER_KAWASAKI_FBO_COUNT; i++)
+        {
+            glViewport(0, 0, viewportWidth, viewportHeight);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, rendor.bloomBuffers[i].id);
+            glClearColor(0, 0, 0, 0);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            glBindTexture(GL_TEXTURE_2D, rendor.bloomBuffers[i-1].colorBuffer);
+            glUniform2f(loc, (float)(i)/RENDERER_WIDTH, (float)(i)/RENDERER_HEIGHT);
+
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+
+            viewportWidth /= 2;
+            viewportHeight /= 2;
+        }
+
         //switch to screen fbo ------------------------------------------------------------------------
+        glViewport(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT);
         glBindFramebuffer(GL_FRAMEBUFFER, rendor.screenBuffer.id);
 
         //skybox
@@ -568,6 +621,12 @@ void* loop_render(void* arg)
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, rendor.endBuffer.colorBuffer);
+
+        for (int i = GL_TEXTURE1; i < GL_TEXTURE1 + RENDERER_KAWASAKI_FBO_COUNT-1; i++)//-1, mert az elso bloombufferbol nincs mintavetelezes, mert azon nincs blur effekt
+        {
+            glActiveTexture(i);
+            glBindTexture(GL_TEXTURE_2D, rendor.bloomBuffers[i-GL_TEXTURE1+1].colorBuffer);
+        }
 
         glUseProgram(finalPassShader.id);
         glBindVertexArray(rectangleVAO);
@@ -704,6 +763,12 @@ void* loop_generation(void* arg)
 
 void* loop_physics(void* arg)
 {
+    collider* playerCollider;
+    collider temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.5f, 1.8f, 0.5f }, 0, 1, 0);
+    physicsSystem_addCollider(&ps, temp);
+    physicsSystem_processPending(&ps);//make sure that the collider is loaded into the physics system
+    playerCollider = physicsSystem_getCollider(&ps, temp.id);
+
     float deltaTime;
     float lastFrame = glfwGetTime();
     vec3 previousCumPosition = cum.position;
@@ -711,11 +776,15 @@ void* loop_physics(void* arg)
     {
         float currentTime = glfwGetTime();
         while (currentTime - lastFrame < PHYSICS_UPDATE)
+        {
+            physicsSystem_processPending(&ps);
             currentTime = glfwGetTime();
+        }
         deltaTime = currentTime - lastFrame;
         lastFrame = currentTime;
 
-        //update
+       
+        //input
         input_update();
         event e;
         while ((e = event_queue_poll()).type != NONE)
@@ -725,11 +794,58 @@ void* loop_physics(void* arg)
         input_get_mouse_position(&mouseX, &mouseY);
         canvas_checkMouseInput(vaszon, mouseX, mouseY, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
 
+        //player part
         pthread_mutex_lock(&mutex_cum);
         previousCumPosition = cum.position;
-        camera_update(&cum, deltaTime);
-        pthread_mutex_unlock(&mutex_cum);
+        cum.position = playerCollider->position;
+        
+        //keyboard
+        vec3 velocity = (vec3){ 0,0,0 };
+        vec3 forward = vec3_normalize(vec3_create2(cum.front.x, 0, cum.front.z));
+        if (input_is_key_down(GLFW_KEY_W))
+            velocity = vec3_sum(velocity, vec3_scale(forward, cum.move_speed));
+        if (input_is_key_down(GLFW_KEY_S))
+            velocity = vec3_sum(velocity, vec3_scale(forward, -cum.move_speed));
+        if (input_is_key_down(GLFW_KEY_A))
+            velocity = vec3_sum(velocity, vec3_scale(cum.right, -cum.move_speed));
+        if (input_is_key_down(GLFW_KEY_D))
+            velocity = vec3_sum(velocity, vec3_scale(cum.right, cum.move_speed));
+        if (input_is_key_down(GLFW_KEY_LEFT_SHIFT))
+            velocity = vec3_sum(velocity, (vec3) { 0, -cum.move_speed, 0 });
+        if (input_is_key_down(GLFW_KEY_SPACE))
+            velocity = vec3_sum(velocity, (vec3) { 0, cum.move_speed, 0 });
 
+        playerCollider->velocity = velocity;
+
+        //mouse movement
+        double dx, dy;
+        input_get_mouse_delta(&dx, &dy);
+        dx *= cum.mouse_sensitivity;
+        dy *= cum.mouse_sensitivity;
+        cum.yaw -= dx;
+        if (cum.yaw > 180.0f)
+            cum.yaw -= 360.0f;
+        if (cum.yaw < -180.0f)
+            cum.yaw += 360.0f;
+
+        cum.pitch -= dy;
+        if (cum.pitch > 89.0f)
+            cum.pitch = 89.0f;
+        if (cum.pitch < -89.0f)
+            cum.pitch = -89.0f;
+
+        camera_updateVectors(&cum);
+        pthread_mutex_unlock(&mutex_cum);
+        //player part done
+
+
+        //physics update
+        double time = glfwGetTime();
+        for (int i = 0; i < PHYSICS_STEPS_PER_UPDATE; i++)
+        {
+            physicsSystem_update(&ps, PHYSICS_UPDATE/PHYSICS_STEPS_PER_UPDATE);
+        }
+        
         //player animation
         pthread_mutex_lock(&mutex_pm);
         pm.position = (vec3){ cum.position.x, cum.position.y - 1.6f, cum.position.z };
@@ -890,6 +1006,23 @@ void init_renderer()
         NULL
     );
 
+    bloomFilterShader = shader_import(
+        "../assets/shaders/renderer/bloom/shader_bloom.vag",
+        "../assets/shaders/renderer/bloom/shader_bloom_filter.fag",
+        NULL
+    );
+    glUseProgram(bloomFilterShader.id);
+    glUniform1i(glGetUniformLocation(bloomFilterShader.id, "tex"), 0);
+    glUniform1f(glGetUniformLocation(bloomFilterShader.id, "threshold"), 5);
+
+    bloomDownsampleShader = shader_import(
+        "../assets/shaders/renderer/bloom/shader_bloom.vag",
+        "../assets/shaders/renderer/bloom/shader_bloom_downsample.fag",
+        NULL
+    );
+    glUseProgram(bloomDownsampleShader.id);
+    glUniform1i(glGetUniformLocation(bloomDownsampleShader.id, "tex"), 0);
+
     finalPassShader = shader_import(
         "../assets/shaders/renderer/final_pass/shader_final_pass.vag",
         "../assets/shaders/renderer/final_pass/shader_final_pass.fag",
@@ -897,6 +1030,12 @@ void init_renderer()
     );
     glUseProgram(finalPassShader.id);
     glUniform1i(glGetUniformLocation(finalPassShader.id, "tex"), 0);
+    char buffer[11];
+    for (int i = 1; i < RENDERER_KAWASAKI_FBO_COUNT; i++)//1tol indul, mert az elso bloombuffer nincs mintavetelezve
+    {
+        sprintf(buffer, "bloom%d", i);
+        glUniform1i(glGetUniformLocation(finalPassShader.id, buffer), i);
+    }
     glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 0.2);
 
     fxaaShader = shader_import(
@@ -1036,6 +1175,8 @@ void end_renderer()
     shader_delete(&lightingPassShader);
     shader_delete(&waterShader);
     shader_delete(&forwardPassShader);
+    shader_delete(&bloomFilterShader);
+    shader_delete(&bloomDownsampleShader);
     shader_delete(&finalPassShader);
     shader_delete(&fxaaShader);
 
@@ -1080,12 +1221,9 @@ void init_canvas()
     //right side
     const char* vendor = glGetString(GL_VENDOR);
     const char* renderer = glGetString(GL_RENDERER);
-    int temp;
 
-    temp = canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
-    canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
-    temp = canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
-    canvas_setTextColour(vaszon, temp, 1, 0.85f, 0);
+    canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
+    canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
 }
 
 void end_canvas()

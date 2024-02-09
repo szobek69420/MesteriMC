@@ -16,6 +16,7 @@ typedef struct {
 
 camera camera_create(vec3 position, vec3 world_up, float yaw, float pitch, float fov, float move_speed, float mouse_sensitivity);
 void camera_update(camera* cam, float delta_time);
+void camera_updateVectors(camera* cam);
 
 mat4 camera_getViewMatrix(camera* cam);
 

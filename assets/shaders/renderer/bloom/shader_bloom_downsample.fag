@@ -1,0 +1,18 @@
+#version 330 core
+in vec2 uv;
+
+out vec4 fragColour;
+
+uniform sampler2D tex;//screen color buffer
+uniform vec2 radius;//blur radius
+
+void main()
+{            
+    vec3 col = texture( tex, uv + vec2( radius.x, radius.y ) ).rgb;
+    col += texture( tex, uv + vec2( radius.x, -radius.y ) ).rgb;
+    col += texture( tex, uv + vec2( -radius.x, radius.y ) ).rgb;
+    col += texture( tex, uv + vec2( -radius.x, -radius.y ) ).rgb;
+    col *= 0.25;
+
+    fragColour=vec4(col, 1);
+}

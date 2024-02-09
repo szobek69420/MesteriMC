@@ -5,6 +5,9 @@
 #define RENDERER_WIDTH 1920
 #define RENDERER_HEIGHT 1080
 
+//ha ez valtozik, akkor a final pass shadernek is kell
+#define RENDERER_KAWASAKI_FBO_COUNT 4
+
 //buffer types
 #define RENDERER_END_BUFFER 2
 #define RENDERER_G_BUFFER 3
@@ -47,11 +50,17 @@ typedef struct screenFBO {
 	unsigned int colorBuffer;//rgb
 } screenFBO;//a legutolso framebuffer a kepernyo elott
 
+typedef struct bloomFBO {
+	unsigned int id;
+	unsigned int colorBuffer;
+} bloomFBO;
+
 typedef struct renderer {
 	shadowFBO shadowBuffer;
 	geometryFBO gBuffer;
 	ssaoFBO ssaoBuffer;
 	endFBO endBuffer;
+	bloomFBO bloomBuffers[RENDERER_KAWASAKI_FBO_COUNT];//tobb kell, mert Kawasaki blur lesz (az elso csak a filterre van, feles felbontassal, a tobbi a kawasaki, ahol az elso feles felbontasu, es a tobbi felbontasa mindig az ot megelozo fele)
 	screenFBO screenBuffer;
 } renderer;
 

@@ -5,6 +5,11 @@
 
 #include "../../glm2/vec3.h"
 #include "../../glm2/mat4.h"
+
+#include "../../physics/collider/collider.h"
+#include "../../physics/collider_group/collider_group.h"
+#include "../../physics/physics_system/physics_system.h"
+
 #include "../../utils/seqtor.h"
 
 #include <stdlib.h>
@@ -16,6 +21,8 @@
 #include "chunk_ambient_occlusion.h"
 
 static blockModel model_oak_tree[67];
+
+static int generated = 0, destroyed = 0;
 
 
 void chunk_drawTerrain(chunk* chomk)
@@ -39,6 +46,8 @@ void chunk_drawWalter(chunk* chomk)
 
 chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshRaw* meshNormal, meshRaw* meshWalter)
 {
+	generated++;
+
 	meshNormal->vertices = NULL; meshNormal->sizeVertices = 0;
 	meshNormal->indices = NULL; meshNormal->sizeIndices = 0;
 	meshNormal->indexCount = 0;
@@ -56,10 +65,15 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	int basedY = CHUNK_HEIGHT * chunkY;
 	int basedZ = CHUNK_WIDTH * chunkZ;
 
+	chomk.normalColliderGroupId = 0;
+	chomk.waterColliderGroupId = 0;
+	colliderGroup normalCg = colliderGroup_create((vec3) { basedX, basedY, basedZ }, (vec3) { basedX + CHUNK_WIDTH, basedY + CHUNK_HEIGHT, basedZ + CHUNK_WIDTH });
+	colliderGroup waterCg = colliderGroup_create((vec3) { basedX, basedY, basedZ }, (vec3) { basedX + CHUNK_WIDTH, basedY + CHUNK_HEIGHT, basedZ + CHUNK_WIDTH });
+
 	chomk.model = mat4_translate(mat4_create(1), vec3_create2(basedX, basedY, basedZ));
 
 	chomk.blocks = (char***)malloc((CHUNK_HEIGHT+2) * sizeof(char**));
-	for (int i = 0; i < CHUNK_WIDTH+2; i++)
+	for (int i = 0; i < CHUNK_HEIGHT+2; i++)
 	{
 		chomk.blocks[i] = (char**)malloc((CHUNK_WIDTH+2) * sizeof(char*));
 		for (int j = 0; j < CHUNK_WIDTH+2; j++)
@@ -282,6 +296,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	unsigned int currentVertex = 0;//melyik az oldal elso csucsa (kell az indexeleshez)
 	float x, y, z;
 	unsigned long ao;
+	unsigned char isBlockVisible = 0;
 	for (int i = 1; i < CHUNK_HEIGHT+1; i++)//y
 	{
 		for (int j = 1; j < CHUNK_WIDTH+1; j++)//x
@@ -290,6 +305,8 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 			{
 				if (chomk.blocks[i][j][k] == BLOCK_AIR||chomk.blocks[i][j][k]==BLOCK_WATER)
 					continue;
+
+				isBlockVisible = 0;
 
 				//pos z
 				if (chomk.blocks[i][j][k + 1] != chomk.blocks[i][j][k] && (chomk.blocks[i][j][k + 1] == BLOCK_AIR || chomk.blocks[i][j][k + 1] >= BLOCK_TRANSPARENCY_START))
@@ -323,6 +340,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					}
 
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
 
 				//pos x
@@ -357,6 +375,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
 
 				//neg z
@@ -391,6 +410,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
 
 				//neg x
@@ -425,6 +445,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
 
 				//pos y
@@ -459,6 +480,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
 
 				//neg y
@@ -493,7 +515,12 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 						seqtor_push_back(verticesNormal, data);
 					}
 					currentVertex += 4;
+					isBlockVisible = 1;
 				}
+
+				//add a collider only if the block is visible
+				if (isBlockVisible != 0)
+					colliderGroup_addCollider(&normalCg, collider_createBoxCollider( (vec3) { basedX + j - 0.5f, basedY + i - 0.5f, basedZ + k - 0.5f }, (vec3) { 1, 1, 1 }, 1, 1, 0 ) );//azert -0.5f, mert az i,j,k 1-rol kezdodnek
 			}
 		}
 	}
@@ -512,7 +539,6 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 		meshNormal->indexCount = indicesNormal.size;
 	}
-
 	seqtor_destroy(verticesNormal);
 	seqtor_destroy(indicesNormal);
 	chomk.isThereNormalMesh = 0;
@@ -586,6 +612,24 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	seqtor_destroy(verticesWalter);
 	seqtor_destroy(indicesWalter);
 	chomk.isThereWaterMesh = 0;
+
+
+	//check for colliders
+	if (normalCg.colliders.size > 0)
+	{
+		physicsSystem_addGroup(cm->ps, normalCg);
+		chomk.normalColliderGroupId = normalCg.id;
+	}
+	else
+		colliderGroup_destroy(&normalCg);
+
+	if (waterCg.colliders.size > 0)
+	{
+		physicsSystem_addGroup(cm->ps, waterCg);
+		chomk.waterColliderGroupId = waterCg.id;
+	}
+	else
+		colliderGroup_destroy(&waterCg);
 
 	//check for changedBlocks
 	if (isCurrentCreatedHere)
@@ -683,9 +727,11 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 	}
 }
 
-void chunk_destroy(chunk* chomk)
+void chunk_destroy(chunkManager* cm, chunk* chomk)
 {
-	for (int i = 0; i < CHUNK_WIDTH+2; i++)
+	destroyed++;
+
+	for (int i = 0; i < CHUNK_HEIGHT+2; i++)
 	{
 		for (int j = 0; j < CHUNK_WIDTH+2; j++)
 			free(chomk->blocks[i][j]);
@@ -693,6 +739,7 @@ void chunk_destroy(chunk* chomk)
 		free(chomk->blocks[i]);
 	}
 	free(chomk->blocks);
+
 
 	if (chomk->isThereNormalMesh != 0) {
 		chomk->isThereNormalMesh = 0;
@@ -706,6 +753,24 @@ void chunk_destroy(chunk* chomk)
 		glDeleteBuffers(1, &(chomk->waterMesh.vbo));
 		glDeleteBuffers(1, &(chomk->waterMesh.ebo));
 	}
+
+	//physics
+	if (chomk->normalColliderGroupId != 0)
+		physicsSystem_removeGroup(cm->ps, chomk->normalColliderGroupId);
+	if (chomk->waterColliderGroupId != 0)
+		physicsSystem_removeGroup(cm->ps, chomk->waterColliderGroupId);
+}
+
+void chunk_resetGenerationInfo()
+{
+	generated = 0;
+	destroyed = 0;
+}
+
+void chunk_getGenerationInfo(int* _generated, int* _destroyed)
+{
+	*_generated = generated;
+	*_destroyed = destroyed;
 }
 
 void chunk_getChunkFromPos(vec3 pos, int* chunkX, int* chunkY, int* chunkZ)

@@ -23,7 +23,7 @@ camera camera_create(vec3 position, vec3 world_up, float yaw, float pitch, float
 }
 void camera_update(camera* cam, float delta_time)
 {
-    //keyboard
+    //keyboard (it is no longer updated here)
     float velocity = cam->move_speed * delta_time;
     vec3 forward = vec3_normalize(vec3_create2(cam->front.x, 0, cam->front.z));
     if (input_is_key_down(GLFW_KEY_W))
@@ -69,6 +69,18 @@ void camera_update(camera* cam, float delta_time)
 mat4 camera_getViewMatrix(camera* cam)
 {
     return cam->view_matrix;
+}
+
+void camera_updateVectors(camera* cam)
+{
+    vec3 front;
+    front.x = -sinf(cam->yaw * DEG2RAD) * cosf(cam->pitch * DEG2RAD);
+    front.y = sinf(cam->pitch * DEG2RAD);
+    front.z = -cosf(cam->yaw * DEG2RAD) * cosf(cam->pitch * DEG2RAD);
+    cam->front = vec3_normalize(front);
+    cam->right = vec3_normalize(vec3_cross(cam->front, cam->world_up));
+    cam->up = vec3_normalize(vec3_cross(cam->right, cam->front));
+    cam->view_matrix = mat4_lookAt(cam->position, cam->front, cam->up);
 }
 
 static void _camera_update_vectors(camera* cam)
