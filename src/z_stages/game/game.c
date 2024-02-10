@@ -78,6 +78,7 @@ physicsSystem ps;
 raycastHit rh;
 int raycastChunkX, raycastChunkY, raycastChunkZ;
 int raycastBlockX, raycastBlockY, raycastBlockZ;
+int raycastFound = 0;
 
 chunkManager cm;
 pthread_mutex_t mutex_cm;
@@ -767,8 +768,6 @@ void* loop_generation(void* arg)
         chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
         pthread_mutex_unlock(&mutex_cm);
 
-        chunkManager_reloadChunk(&cm, &mutex_cm, 10000, 0, 0);
-
         for (int i = 0; i < CHUNK_UPDATES_PER_GENERATION_UPDATE; i++)
         {
             if (cm.pendingUpdates.size > 0)
@@ -845,6 +844,13 @@ void* loop_physics(void* arg)
 
         playerCollider->velocity = velocity;
 
+        //mouse buttons
+        if (raycastFound!=0&&input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT))
+        {
+            chunkManager_changeBlock(&cm, raycastChunkX, raycastChunkY, raycastChunkZ, raycastBlockX, raycastBlockY, raycastBlockZ, BLOCK_AIR);
+            chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ);
+        }
+
         //mouse movement
         double dx, dy;
         input_get_mouse_delta(&dx, &dy);
@@ -875,7 +881,8 @@ void* loop_physics(void* arg)
             physicsSystem_update(&ps, PHYSICS_UPDATE/PHYSICS_STEPS_PER_UPDATE);
         }
         rh.position = (vec3){ 0,100000,0 };
-        physicsSystem_raycast(&ps, cum.position, cum.front, 6, 0.01f, &rh);
+        raycastFound=physicsSystem_raycast(&ps, cum.position, cum.front, 6, 0.01f, &rh);
+
         rh.position=vec3_sum(rh.position, vec3_scale(rh.normal, -0.02f));
         rh.position = vec3_sum(rh.position, vec3_scale(cum.front, 0.02f));
         chunk_getChunkFromPos(rh.position, &raycastChunkX, &raycastChunkY, &raycastChunkZ);

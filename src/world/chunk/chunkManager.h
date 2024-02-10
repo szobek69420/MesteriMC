@@ -42,6 +42,7 @@ chunk unload :
 struct chunkGenerationUpdate{
 	int chunkX, chunkY, chunkZ;
 	int type;
+	int isUrgent;//if true, the generated chunkMeshUpdate will be added to the front of the pendingMeshUpdates list
 };
 typedef struct chunkGenerationUpdate chunkGenerationUpdate;
 

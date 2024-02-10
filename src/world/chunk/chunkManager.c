@@ -175,6 +175,7 @@ void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playe
 						ceu.chunkY = playerChunkY + y;
 						ceu.chunkZ = playerChunkZ + z;
 						ceu.type = CHUNKMANAGER_LOAD_CHUNK;
+						ceu.isUrgent = 0;
 
 						lista_push_back(cm->pendingUpdates, ceu);
 						goto exit_load;
@@ -203,6 +204,7 @@ exit_load:
 				ceu.chunkY = iterator->data.chunkY;
 				ceu.chunkZ = iterator->data.chunkZ;
 				ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
+				ceu.isUrgent = 0;
 
 				lista_push_back(cm->pendingUpdates, ceu);
 
@@ -243,7 +245,10 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 			cmu.chomk=chunk_generate(cm, ceu.chunkX, ceu.chunkY, ceu.chunkZ, &cmu.meshNormal, &cmu.meshWalter);
 			cmu.type = CHUNKMANAGER_LOAD_CHUNK;
 			pthread_mutex_lock(pmutex);
-			lista_push_back(cm->pendingMeshUpdates, cmu);
+			if(ceu.isUrgent!=0)
+				lista_push(cm->pendingMeshUpdates, 0, cmu);
+			else
+				lista_push_back(cm->pendingMeshUpdates, cmu);
 			pthread_mutex_unlock(pmutex);
 			break;
 
@@ -258,7 +263,10 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 				{
 					cmu.chomk = chomk;
 					cmu.type = CHUNKMANAGER_UNLOAD_CHUNK;
-					lista_push_back(cm->pendingMeshUpdates, cmu);
+					if (ceu.isUrgent != 0)
+						lista_push(cm->pendingMeshUpdates, 0, cmu);
+					else
+						lista_push_back(cm->pendingMeshUpdates, cmu);
 
 					lista_remove_at(cm->loadedChunks, index);
 					break;
@@ -631,6 +639,7 @@ void chunkManager_reloadChunk(chunkManager* cm, pthread_mutex_t* pmutex, int chu
 		ceu.chunkY = chunkY;
 		ceu.chunkZ = chunkZ;
 		ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
+		ceu.isUrgent = 69;
 		lista_push(cm->pendingUpdates, 0, ceu);
 	}
 	//add a load update for the chunk
@@ -639,6 +648,7 @@ void chunkManager_reloadChunk(chunkManager* cm, pthread_mutex_t* pmutex, int chu
 	ceu2.chunkY = chunkY;
 	ceu2.chunkZ = chunkZ;
 	ceu2.type = CHUNKMANAGER_LOAD_CHUNK;
+	ceu2.isUrgent = 69;
 	lista_push(cm->pendingUpdates, 1, ceu2);
 
 	pthread_mutex_unlock(pmutex);
