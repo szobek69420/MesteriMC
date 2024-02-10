@@ -767,6 +767,8 @@ void* loop_generation(void* arg)
         chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
         pthread_mutex_unlock(&mutex_cm);
 
+        chunkManager_reloadChunk(&cm, &mutex_cm, 10000, 0, 0);
+
         for (int i = 0; i < CHUNK_UPDATES_PER_GENERATION_UPDATE; i++)
         {
             if (cm.pendingUpdates.size > 0)
@@ -966,7 +968,7 @@ void init_renderer()
     geometryPassShader = shader_import(
         "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.vag",
         "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.fag",
-        "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.gag");
+        NULL);//"../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.gag"
 
     glUseProgram(geometryPassShader.id);
     glUniform1i(glGetUniformLocation(geometryPassShader.id, "texture_albedo"), 0);
