@@ -845,10 +845,45 @@ void* loop_physics(void* arg)
         playerCollider->velocity = velocity;
 
         //mouse buttons
-        if (raycastFound!=0&&input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT))
+        if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT))
         {
-            chunkManager_changeBlock(&cm, raycastChunkX, raycastChunkY, raycastChunkZ, raycastBlockX, raycastBlockY, raycastBlockZ, BLOCK_AIR);
-            chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ);
+            if (raycastFound != 0)
+            {
+                chunkManager_changeBlock(&cm, raycastChunkX, raycastChunkY, raycastChunkZ, raycastBlockX, raycastBlockY, raycastBlockZ, BLOCK_AIR);
+                chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ);
+            }
+        }
+        if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_RIGHT))
+        {
+            if (raycastFound != 0)
+            {
+                int tempRaycastChunk[3] = { raycastChunkX, raycastChunkY, raycastChunkZ };
+                int tempRaycastBlock[3] = { raycastBlockX, raycastBlockY, raycastBlockZ };
+                int tempChunkBounds[3] = { CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_WIDTH };
+                for (int i = 0; i < 3; i++)
+                {
+                    if ((&rh.normal.x)[i] > 0.01f) 
+                    {
+                        tempRaycastBlock[i]++;
+                        if (tempRaycastBlock[i] == tempChunkBounds[i])
+                        {
+                            tempRaycastBlock[i] = 0;
+                            tempRaycastChunk[i]++;
+                        }
+                    }
+                    else if ((&rh.normal.x)[i] < -0.01f)
+                    {
+                        tempRaycastBlock[i]--;
+                        if (tempRaycastBlock[i] == -1)
+                        {
+                            tempRaycastBlock[i] = tempChunkBounds[i]-1;
+                            tempRaycastChunk[i]--;
+                        }
+                    }
+                }
+                chunkManager_changeBlock(&cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2], tempRaycastBlock[0], tempRaycastBlock[1], tempRaycastBlock[2], BLOCK_SUS);
+                chunkManager_reloadChunk(&cm, &mutex_cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2]);
+            }
         }
 
         //mouse movement

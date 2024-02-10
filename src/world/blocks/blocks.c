@@ -5,7 +5,7 @@ static float vertexPosition[72];
 static float vertexNormal[18];
 static float vertexTangent[18];
 static float vertexBitangent[18];
-static float vertexUV[144];
+static float vertexUV[162];
 
 void blocks_getVertexPosition(int side, int index, float* x, float* y, float* z)
 {
@@ -97,6 +97,14 @@ static float vertexUV[] = {
 	0.0,0.7,0.1,
 	0.1,0.7,0.1,
 	0.1,0.7,0.1,
+
+	//sus
+	0.0,0.0,0.1,
+	0.0,0.0,0.1,
+	0.0,0.0,0.1,
+	0.0,0.0,0.1,
+	0.0,0.0,0.1,
+	0.0,0.0,0.1,
 
 	//water
 	0.0,0.0,1.0,

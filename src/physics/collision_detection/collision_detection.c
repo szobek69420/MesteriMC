@@ -6,7 +6,7 @@
 
 #include "../../glm2/vec3.h"
 
-int collisionDetection_collisionBoxBox(collider* cn, collider* ck);
+int collisionDetection_collisionBoxBox(struct collider* cn, struct collider* ck);
 
 int collisionDetection_collision(collider* c1, collider* c2)
 {
@@ -24,7 +24,7 @@ int collisionDetection_collision(collider* c1, collider* c2)
 }
 
 
-int collisionDetection_collisionBoxBox(collider* cn, collider* ck)
+int collisionDetection_collisionBoxBox(struct collider* cn, struct collider* ck)
 {
 	float minDistanceX = cn->box.sizePerTwo.x + ck->box.sizePerTwo.x;
 	float minDistanceY = cn->box.sizePerTwo.y + ck->box.sizePerTwo.y;
@@ -56,13 +56,13 @@ int collisionDetection_collisionBoxBox(collider* cn, collider* ck)
 	case 0://x ist minimal
 		if (cn->position.x > ck->position.x)
 		{
-			COLLISION_SET_NEG_Z(cn->flags);//mert a non-kinematic-kal a negativ z iranybol utkozott a kinematic
+			COLLISION_SET_NEG_X(cn->flags);//mert a non-kinematic-kal a negativ z iranybol utkozott a kinematic
 			cn->position.x = ck->position.x + minDistanceX;
 			cn->velocity.x = 0;
 		}
 		else
 		{
-			COLLISION_SET_POS_Z(cn->flags);
+			COLLISION_SET_POS_X(cn->flags);
 			cn->position.x = ck->position.x - minDistanceX;
 			cn->velocity.x = 0;
 		}
