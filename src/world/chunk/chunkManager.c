@@ -631,6 +631,16 @@ void chunkManager_reloadChunk(chunkManager* cm, pthread_mutex_t* pmutex, int chu
 	}
 
 	//these updates go to the front of the pendingUpdates
+	
+	//add a load update for the chunk
+	chunkGenerationUpdate ceu2;
+	ceu2.chunkX = chunkX;
+	ceu2.chunkY = chunkY;
+	ceu2.chunkZ = chunkZ;
+	ceu2.type = CHUNKMANAGER_LOAD_CHUNK;
+	ceu2.isUrgent = 69;
+	lista_push(cm->pendingUpdates, 0, ceu2);
+	
 	//add an unload update if the chunk is already loaded
 	if (chunkManager_isChunkLoaded(cm, chunkX, chunkY, chunkZ))
 	{
@@ -640,16 +650,8 @@ void chunkManager_reloadChunk(chunkManager* cm, pthread_mutex_t* pmutex, int chu
 		ceu.chunkZ = chunkZ;
 		ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
 		ceu.isUrgent = 69;
-		lista_push(cm->pendingUpdates, 0, ceu);
+		lista_push(cm->pendingUpdates, 1, ceu);
 	}
-	//add a load update for the chunk
-	chunkGenerationUpdate ceu2;
-	ceu2.chunkX = chunkX;
-	ceu2.chunkY = chunkY;
-	ceu2.chunkZ = chunkZ;
-	ceu2.type = CHUNKMANAGER_LOAD_CHUNK;
-	ceu2.isUrgent = 69;
-	lista_push(cm->pendingUpdates, 1, ceu2);
 
 	pthread_mutex_unlock(pmutex);
 }

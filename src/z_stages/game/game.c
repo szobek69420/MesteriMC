@@ -792,7 +792,7 @@ void* loop_generation(void* arg)
 void* loop_physics(void* arg)
 {
     collider* playerCollider;
-    collider temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.5f, 1.8f, 0.5f }, 0, 1, 0);
+    collider temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.5f, 1.79f, 0.5f }, 0, 1, 0);
     physicsSystem_addCollider(&ps, temp);
     physicsSystem_processPending(&ps);//make sure that the collider is loaded into the physics system
     playerCollider = physicsSystem_getCollider(&ps, temp.id);
@@ -824,7 +824,7 @@ void* loop_physics(void* arg)
         //player part
         pthread_mutex_lock(&mutex_cum);
         previousCumPosition = cum.position;
-        cum.position = playerCollider->position;
+        cum.position = vec3_sum(playerCollider->position, (vec3) { 0, 0.69f, 0 });
         
         //keyboard
         vec3 velocity = (vec3){ 0,0,0 };
