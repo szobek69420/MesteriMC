@@ -91,4 +91,6 @@ void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* 
 
 void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjection);
 
+void chunkManager_changeBlock(chunkManager* cm, int chunkX, int chunkY, int chunkZ, int x, int y, int z, int type);
+
 #endif

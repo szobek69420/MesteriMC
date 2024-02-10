@@ -149,89 +149,6 @@ int chunkManager_isChunkRegistered(chunkManager* cm, int chunkX, int chunkY, int
 	return isChunkRegistered;
 }
 
-void chunkManager_reloadChunk(chunkManager* cm, pthread_mutex_t* pmutex, int chunkX, int chunkY, int chunkZ)
-{
-	int index = 0;
-	lista_element_of(chunkGenerationUpdate)* it=NULL;
-	lista_element_of(chunkMeshUpdate)* it2=NULL;
-
-	//remove other updates (for example a load update could cause the chunk to be loaded 2 times)
-	pthread_mutex_lock(pmutex);
-	for (index=0, it = cm->pendingUpdates.head; it != NULL; it = it->next, index++)//remove every entry from pending updates
-	{
-		if (it->data.chunkX != chunkX)
-			continue;
-		if (it->data.chunkY != chunkY)
-			continue;
-		if (it->data.chunkZ != chunkZ)
-			continue;
-
-		it = it->next;
-		lista_remove_at(cm->pendingUpdates, index);
-		index++;
-		if (it == NULL)
-			break;
-	}
-
-
-	for (index = 0, it2 = cm->pendingMeshUpdates.head; it2 != NULL; it2 = it2->next, index++)//remove every entry from pending mesh updates while deleting the data that these half-generated chunks have
-	{
-		if (it2->data.chomk.chunkX != chunkX)
-			continue;
-		if (it2->data.chomk.chunkY != chunkY)
-			continue;
-		if (it2->data.chomk.chunkZ != chunkZ)
-			continue;
-
-		switch (it2->data.type)
-		{
-		case CHUNKMANAGER_LOAD_CHUNK:
-			chunk_destroy(cm, &it2->data.chomk);//destroy the chunk that has been generated but not added yet
-
-			if (it2->data.meshNormal.indexCount != 0)
-			{
-				free(it2->data.meshNormal.vertices);
-				free(it2->data.meshNormal.indices);
-			}
-			if (it2->data.meshWalter.indexCount != 0)
-			{
-				free(it2->data.meshWalter.vertices);
-				free(it2->data.meshWalter.indices);
-			}
-			break;
-
-		case CHUNKMANAGER_UNLOAD_CHUNK:
-			break;
-		}
-
-		it2 = it2->next;
-		lista_remove_at(cm->pendingMeshUpdates, index);
-		index++;
-		if (it2 == NULL)
-			break;
-	}
-
-	//these updates go to the front of the pendingUpdates
-	//add an unload update if the chunk is already loaded
-	if (chunkManager_isChunkLoaded(cm, chunkX, chunkY, chunkZ))
-	{
-		chunkGenerationUpdate ceu;
-		ceu.chunkX = chunkX;
-		ceu.chunkY = chunkY;
-		ceu.chunkZ = chunkZ;
-		ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
-		lista_push(cm->pendingUpdates, 0, ceu);
-	}
-	//add a load update for the chunk
-	chunkGenerationUpdate ceu2;
-	ceu2.chunkX = chunkX;
-	ceu2.chunkY = chunkY;
-	ceu2.chunkZ = chunkZ;
-	ceu2.type = CHUNKMANAGER_LOAD_CHUNK;
-	lista_push(cm->pendingUpdates, 1, ceu2);
-
-	pthread_mutex_unlock(pmutex);
-}
 
 void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ)
 {
@@ -641,5 +558,135 @@ char chunkManager_checkIfInFrustum(vec4* point, char* frustumX, char* frustumY, 
 	if (isPointInFrustum == 3)
 		return 69;
 	return 0;
+}
+
+void chunkManager_reloadChunk(chunkManager* cm, pthread_mutex_t* pmutex, int chunkX, int chunkY, int chunkZ)
+{
+	int index = 0;
+	lista_element_of(chunkGenerationUpdate)* it = NULL;
+	lista_element_of(chunkMeshUpdate)* it2 = NULL;
+
+	//remove other updates (for example a load update could cause the chunk to be loaded 2 times)
+	pthread_mutex_lock(pmutex);
+	for (index = 0, it = cm->pendingUpdates.head; it != NULL; it = it->next, index++)//remove every entry from pending updates
+	{
+		if (it->data.chunkX != chunkX)
+			continue;
+		if (it->data.chunkY != chunkY)
+			continue;
+		if (it->data.chunkZ != chunkZ)
+			continue;
+
+		it = it->next;
+		lista_remove_at(cm->pendingUpdates, index);
+		index++;
+		if (it == NULL)
+			break;
+	}
+
+
+	for (index = 0, it2 = cm->pendingMeshUpdates.head; it2 != NULL; it2 = it2->next, index++)//remove every entry from pending mesh updates while deleting the data that these half-generated chunks have
+	{
+		if (it2->data.chomk.chunkX != chunkX)
+			continue;
+		if (it2->data.chomk.chunkY != chunkY)
+			continue;
+		if (it2->data.chomk.chunkZ != chunkZ)
+			continue;
+
+		switch (it2->data.type)
+		{
+		case CHUNKMANAGER_LOAD_CHUNK:
+			chunk_destroy(cm, &it2->data.chomk);//destroy the chunk that has been generated but not added yet
+
+			if (it2->data.meshNormal.indexCount != 0)
+			{
+				free(it2->data.meshNormal.vertices);
+				free(it2->data.meshNormal.indices);
+			}
+			if (it2->data.meshWalter.indexCount != 0)
+			{
+				free(it2->data.meshWalter.vertices);
+				free(it2->data.meshWalter.indices);
+			}
+			break;
+
+		case CHUNKMANAGER_UNLOAD_CHUNK:
+			break;
+		}
+
+		it2 = it2->next;
+		lista_remove_at(cm->pendingMeshUpdates, index);
+		index++;
+		if (it2 == NULL)
+			break;
+	}
+
+	//these updates go to the front of the pendingUpdates
+	//add an unload update if the chunk is already loaded
+	if (chunkManager_isChunkLoaded(cm, chunkX, chunkY, chunkZ))
+	{
+		chunkGenerationUpdate ceu;
+		ceu.chunkX = chunkX;
+		ceu.chunkY = chunkY;
+		ceu.chunkZ = chunkZ;
+		ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
+		lista_push(cm->pendingUpdates, 0, ceu);
+	}
+	//add a load update for the chunk
+	chunkGenerationUpdate ceu2;
+	ceu2.chunkX = chunkX;
+	ceu2.chunkY = chunkY;
+	ceu2.chunkZ = chunkZ;
+	ceu2.type = CHUNKMANAGER_LOAD_CHUNK;
+	lista_push(cm->pendingUpdates, 1, ceu2);
+
+	pthread_mutex_unlock(pmutex);
+}
+
+//doesnt reload the chunk
+void chunkManager_changeBlock(chunkManager* cm, int chunkX, int chunkY, int chunkZ, int x, int y, int z, int type)
+{
+	if (x < 0 || x >= CHUNK_WIDTH || y < 0 || y >= CHUNK_HEIGHT || z < 0 || z >= CHUNK_WIDTH)
+		return;
+
+	int found = 0;
+	for (int i = 0; i < seqtor_size(cm->changedBlocks); i++)
+	{
+		if (seqtor_at(cm->changedBlocks, i).chunkX != chunkX)
+			continue;
+		if (seqtor_at(cm->changedBlocks, i).chunkY != chunkY)
+			continue;
+		if (seqtor_at(cm->changedBlocks, i).chunkZ != chunkZ)
+			continue;
+
+		found = 69;
+		blockModel bm;
+		bm.type = type;
+		bm.x = x;
+		bm.y = y;
+		bm.z = z;
+		seqtor_push_back(seqtor_at(cm->changedBlocks, i).blocks, bm);
+		break;
+	}
+
+	if (found == 0)
+	{
+		blockModel bm;
+		bm.type = type;
+		bm.x = x;
+		bm.y = y;
+		bm.z = z;
+
+		changedBlocksInChunk cbic;
+		cbic.chunkX = chunkX;
+		cbic.chunkY = chunkY;
+		cbic.chunkZ = chunkZ;
+		cbic.isRegistered = 0;
+		seqtor_init(cbic.blocks, 1);
+		seqtor_push_back(cbic.blocks, bm);
+
+		seqtor_push_back(cm->changedBlocks, cbic);
+	}
 }
 
