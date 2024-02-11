@@ -13,6 +13,7 @@
 
 #include "../../mesh/mesh.h"
 #include "chunk.h"
+#include "chunk_low_res.h"
 #include "../blocks/blocks.h"
 
 #include "../../physics/physics_system/physics_system.h"
@@ -67,6 +68,10 @@ struct chunkManager {
 	lista_of(chunk) loadedChunks;//list of chunks
 	lista_of(chunkGenerationUpdate) pendingUpdates;//list of chunk updates
 	lista_of(chunkMeshUpdate) pendingMeshUpdates;//list of chunk mesh updates
+
+	lista_of(chunkLowRes) loadedChunksLOD;
+	lista_of(chunkGenerationUpdate) pendingUpdatesLOD;
+	lista_of(chunkMeshUpdate) pendingMeshUpdatesLOD;
 
 	seqtor_of(changedBlocksInChunk) changedBlocks;//a kulso vektor chunkonkent osztja fel
 
