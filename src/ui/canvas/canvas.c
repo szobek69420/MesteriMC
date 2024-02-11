@@ -599,3 +599,16 @@ void canvas_setImageTexture(canvas* c, int id, unsigned int textureId)
 	cc->ci.textureId = textureId;
 }
 
+void canvas_setImageUV(canvas* c, int id, float uvX, float uvY, float uvWidth, float uvHeight)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_IMAGE)
+		return;
+
+	cc->ci.uvX = uvX;
+	cc->ci.uvY = uvY;
+	cc->ci.uvWidth = uvWidth;
+	cc->ci.uvHeight = uvHeight;
+}
+

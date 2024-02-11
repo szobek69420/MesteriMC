@@ -2,7 +2,7 @@
 layout (location = 0) out vec4 gNormal; //vec4(normalX, normalY, normalZ, ao)
 layout (location = 1) out vec4 gAlbedoSpec;
 
-in GS_OUT{
+in VS_OUT{
     vec2 TexCoords;
     vec3 viewDir;//view direction in tangent space (fragment to player)
     float ao;

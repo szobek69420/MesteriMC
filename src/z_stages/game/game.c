@@ -30,6 +30,8 @@
 #include "../../mesh/kuba/kuba.h"
 #include "../../mesh/player_mesh/player_mesh.h"
 
+#include "../../renderer/block_selection/block_selection.h"
+
 #include "../../ui/font_handler/font_handler.h"
 #include "../../ui/text/text_renderer.h"
 #include "../../ui/canvas/canvas.h"
@@ -78,6 +80,7 @@ physicsSystem ps;
 raycastHit rh;
 int raycastChunkX, raycastChunkY, raycastChunkZ;
 int raycastBlockX, raycastBlockY, raycastBlockZ;
+int raycastFound = 0;
 
 chunkManager cm;
 pthread_mutex_t mutex_cm;
@@ -166,6 +169,8 @@ void game(void* w, int* currentStage)
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 
+    textureHandler_importTextures(TEXTURE_IN_GAME);
+
     event_queue_init();
     input_init();
 
@@ -183,7 +188,7 @@ void game(void* w, int* currentStage)
 
     init_cube();//egyszer majd ki kene szedni
 
-    textureHandler_importTextures(TEXTURE_IN_GAME);
+    blockSelection_init();
 
     glfwMakeContextCurrent(NULL);
 
@@ -259,6 +264,8 @@ void game(void* w, int* currentStage)
     end_renderer();
 
     end_cube();
+
+    blockSelection_close();
 
     int chunksGenerated, chunksDestroyed;
     chunk_getGenerationInfo(&chunksGenerated, &chunksDestroyed);
@@ -524,19 +531,11 @@ void* loop_render(void* arg)
         }
 
         //raycast
-        glDisable(GL_DEPTH_TEST);
-        do{
-            mat4 model = mat4_create(1.0f);
-            model = mat4_translate(model, (vec3) { CHUNK_WIDTH* raycastChunkX + raycastBlockX + 0.5f, CHUNK_HEIGHT* raycastChunkY + raycastBlockY + 0.5f, CHUNK_WIDTH* raycastChunkZ + raycastBlockZ + 0.5f });
-            model = mat4_scale(model, vec3_create(0.5f));
-            glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "model"), 1, GL_FALSE, model.data);
-            glUniform3f(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, 1, 1);
-            // render Cube
-            glBindVertexArray(cubeVAO);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-            glBindVertexArray(0);
+        do {
+            vec3 sPos = (vec3){ CHUNK_WIDTH * raycastChunkX + raycastBlockX + 0.5f, CHUNK_HEIGHT * raycastChunkY + raycastBlockY + 0.5f, CHUNK_WIDTH * raycastChunkZ + raycastBlockZ + 0.5f };
+            vec3 sSize = vec3_create2(1.005f, 1.005f, 1.005f);
+            blockSelection_render(sPos, sSize, &pv);
         } while (0);
-        glEnable(GL_DEPTH_TEST);
 
         //walter
         glUseProgram(waterShader.id);
@@ -791,7 +790,7 @@ void* loop_generation(void* arg)
 void* loop_physics(void* arg)
 {
     collider* playerCollider;
-    collider temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.5f, 1.8f, 0.5f }, 0, 1, 0);
+    collider temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.5f, 1.79f, 0.5f }, 0, 1, 0);
     physicsSystem_addCollider(&ps, temp);
     physicsSystem_processPending(&ps);//make sure that the collider is loaded into the physics system
     playerCollider = physicsSystem_getCollider(&ps, temp.id);
@@ -823,7 +822,7 @@ void* loop_physics(void* arg)
         //player part
         pthread_mutex_lock(&mutex_cum);
         previousCumPosition = cum.position;
-        cum.position = playerCollider->position;
+        cum.position = vec3_sum(playerCollider->position, (vec3) { 0, 0.69f, 0 });
         
         //keyboard
         vec3 velocity = (vec3){ 0,0,0 };
@@ -842,6 +841,61 @@ void* loop_physics(void* arg)
             velocity = vec3_sum(velocity, (vec3) { 0, cum.move_speed, 0 });
 
         playerCollider->velocity = velocity;
+
+        //mouse buttons
+        if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT))
+        {
+            if (raycastFound != 0)
+            {
+                chunkManager_changeBlock(&cm, raycastChunkX, raycastChunkY, raycastChunkZ, raycastBlockX, raycastBlockY, raycastBlockZ, BLOCK_AIR);
+                chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ);
+
+                if (raycastBlockX == 0)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX - 1, raycastChunkY, raycastChunkZ);
+                else if (raycastBlockX == CHUNK_WIDTH - 1)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX + 1, raycastChunkY, raycastChunkZ);
+                if (raycastBlockY == 0)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY - 1, raycastChunkZ);
+                else if (raycastBlockY == CHUNK_HEIGHT - 1)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY + 1, raycastChunkZ);
+                if (raycastBlockZ == 0)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ - 1);
+                else if (raycastBlockZ == CHUNK_WIDTH - 1)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ + 1);
+            }
+        }
+        if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_RIGHT))
+        {
+            if (raycastFound != 0)
+            {
+                int tempRaycastChunk[3] = { raycastChunkX, raycastChunkY, raycastChunkZ };
+                int tempRaycastBlock[3] = { raycastBlockX, raycastBlockY, raycastBlockZ };
+                int tempChunkBounds[3] = { CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_WIDTH };
+                for (int i = 0; i < 3; i++)
+                {
+                    if ((&rh.normal.x)[i] > 0.01f) 
+                    {
+                        tempRaycastBlock[i]++;
+                        if (tempRaycastBlock[i] == tempChunkBounds[i])
+                        {
+                            tempRaycastBlock[i] = 0;
+                            tempRaycastChunk[i]++;
+                        }
+                    }
+                    else if ((&rh.normal.x)[i] < -0.01f)
+                    {
+                        tempRaycastBlock[i]--;
+                        if (tempRaycastBlock[i] == -1)
+                        {
+                            tempRaycastBlock[i] = tempChunkBounds[i]-1;
+                            tempRaycastChunk[i]--;
+                        }
+                    }
+                }
+                chunkManager_changeBlock(&cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2], tempRaycastBlock[0], tempRaycastBlock[1], tempRaycastBlock[2], BLOCK_SUS);
+                chunkManager_reloadChunk(&cm, &mutex_cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2]);
+            }
+        }
 
         //mouse movement
         double dx, dy;
@@ -873,7 +927,8 @@ void* loop_physics(void* arg)
             physicsSystem_update(&ps, PHYSICS_UPDATE/PHYSICS_STEPS_PER_UPDATE);
         }
         rh.position = (vec3){ 0,100000,0 };
-        physicsSystem_raycast(&ps, cum.position, cum.front, 6, 0.01f, &rh);
+        raycastFound=physicsSystem_raycast(&ps, cum.position, cum.front, 6, 0.01f, &rh);
+
         rh.position=vec3_sum(rh.position, vec3_scale(rh.normal, -0.02f));
         rh.position = vec3_sum(rh.position, vec3_scale(cum.front, 0.02f));
         chunk_getChunkFromPos(rh.position, &raycastChunkX, &raycastChunkY, &raycastChunkZ);
@@ -966,7 +1021,7 @@ void init_renderer()
     geometryPassShader = shader_import(
         "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.vag",
         "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.fag",
-        "../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.gag");
+        NULL);//"../assets/shaders/renderer/deferred_geometry/shader_deferred_geometry.gag"
 
     glUseProgram(geometryPassShader.id);
     glUniform1i(glGetUniformLocation(geometryPassShader.id, "texture_albedo"), 0);
@@ -1260,6 +1315,11 @@ void init_canvas()
 
     canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
     canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
+
+    //cursor (should be replaced in a different canvas later)
+    int temp;
+    temp = canvas_addImage(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 16, 16, textureHandler_getTexture(TEXTURE_ATLAS_UI));
+    canvas_setImageUV(vaszon, temp, 0.0f, 0.9f, 0.1f, 0.1f);
 }
 
 void end_canvas()

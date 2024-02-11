@@ -42,6 +42,7 @@ chunk unload :
 struct chunkGenerationUpdate{
 	int chunkX, chunkY, chunkZ;
 	int type;
+	int isUrgent;//if true, the generated chunkMeshUpdate will be added to the front of the pendingMeshUpdates list
 };
 typedef struct chunkGenerationUpdate chunkGenerationUpdate;
 
@@ -84,9 +85,13 @@ void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playe
 void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex);//erledigt an update from pendingUpdates (azert kell a mutex, hogy a chunk generalas kozben ne legyen lezarva, csupan amikor hozzaadja a pendingMeshUpdates-hoz)
 void chunkManager_updateMesh(chunkManager* cm);
 
+void chunkManager_reloadChunk(chunkManager* cm, pthread_mutex_t* pmutex, int chunkX, int chunkY, int chunkZ);
+
 int chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection);//a shader csak átmenetileg van átadva
 void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* projection);
 
 void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjection);
+
+void chunkManager_changeBlock(chunkManager* cm, int chunkX, int chunkY, int chunkZ, int x, int y, int z, int type);
 
 #endif
