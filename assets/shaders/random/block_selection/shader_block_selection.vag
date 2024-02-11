@@ -1,0 +1,11 @@
+#version 330 core
+layout (location=0) in vec3 aPos;
+
+uniform vec3 pos;
+uniform vec3 size;
+uniform mat4 pv;
+
+void main()
+{
+	gl_Position=pv*vec4(pos+size*aPos, 1);
+}

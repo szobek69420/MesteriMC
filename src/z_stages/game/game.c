@@ -30,6 +30,8 @@
 #include "../../mesh/kuba/kuba.h"
 #include "../../mesh/player_mesh/player_mesh.h"
 
+#include "../../renderer/block_selection/block_selection.h"
+
 #include "../../ui/font_handler/font_handler.h"
 #include "../../ui/text/text_renderer.h"
 #include "../../ui/canvas/canvas.h"
@@ -186,6 +188,8 @@ void game(void* w, int* currentStage)
 
     textureHandler_importTextures(TEXTURE_IN_GAME);
 
+    blockSelection_init();
+
     glfwMakeContextCurrent(NULL);
 
     //threading
@@ -260,6 +264,8 @@ void game(void* w, int* currentStage)
     end_renderer();
 
     end_cube();
+
+    blockSelection_close();
 
     int chunksGenerated, chunksDestroyed;
     chunk_getGenerationInfo(&chunksGenerated, &chunksDestroyed);
@@ -525,19 +531,11 @@ void* loop_render(void* arg)
         }
 
         //raycast
-        glDisable(GL_DEPTH_TEST);
-        do{
-            mat4 model = mat4_create(1.0f);
-            model = mat4_translate(model, (vec3) { CHUNK_WIDTH* raycastChunkX + raycastBlockX + 0.5f, CHUNK_HEIGHT* raycastChunkY + raycastBlockY + 0.5f, CHUNK_WIDTH* raycastChunkZ + raycastBlockZ + 0.5f });
-            model = mat4_scale(model, vec3_create(0.5f));
-            glUniformMatrix4fv(glGetUniformLocation(forwardPassShader.id, "model"), 1, GL_FALSE, model.data);
-            glUniform3f(glGetUniformLocation(forwardPassShader.id, "lightColor"), 1, 1, 1);
-            // render Cube
-            glBindVertexArray(cubeVAO);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-            glBindVertexArray(0);
+        do {
+            vec3 sPos = (vec3){ CHUNK_WIDTH * raycastChunkX + raycastBlockX + 0.5f, CHUNK_HEIGHT * raycastChunkY + raycastBlockY + 0.5f, CHUNK_WIDTH * raycastChunkZ + raycastBlockZ + 0.5f };
+            vec3 sSize = vec3_create2(1.005f, 1.005f, 1.005f);
+            blockSelection_render(sPos, sSize, &pv);
         } while (0);
-        glEnable(GL_DEPTH_TEST);
 
         //walter
         glUseProgram(waterShader.id);
