@@ -8,6 +8,8 @@ static unsigned int atlas_albedo=0;
 static unsigned int atlas_specular=0;//https://github.com/rre36/lab-pbr/wiki/Specular-Texture-Details (mi csak az r komponenst haszn�ljuk)
 static unsigned int atlas_normal=0;//rgba(normal.x, normal.y, normal.z, height)
 
+static unsigned int atlas_ui = 0;
+
 static unsigned int water_normal=0;
 static unsigned int water_dudv=0;
 
@@ -41,6 +43,11 @@ int textureHandler_importTextures(int stage)
 
         atlas_normal = textureHandler_loadImage("../assets/textures/atlas_normal.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
         if (atlas_normal == 0)
+            problem++;
+
+
+        atlas_ui = textureHandler_loadImage("../assets/textures/atlas_ui.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
+        if (atlas_ui == 0)
             problem++;
 
 
@@ -87,6 +94,8 @@ void textureHandler_destroyTextures(int stage)
         glDeleteTextures(1, &atlas_specular);
         glDeleteTextures(1, &atlas_normal);
 
+        glDeleteTextures(1, &atlas_ui);
+
         glDeleteTextures(1, &water_dudv);
         glDeleteTextures(1, &water_normal);
 
@@ -95,6 +104,8 @@ void textureHandler_destroyTextures(int stage)
         atlas_albedo = 0;
         atlas_specular = 0;
         atlas_normal = 0;
+
+        atlas_ui = 0;
 
         water_dudv = 0;
         water_normal = 0;
@@ -124,6 +135,9 @@ unsigned int textureHandler_getTexture(int texture)
 
     case TEXTURE_ATLAS_NORMAL:
         return atlas_normal;
+
+    case TEXTURE_ATLAS_UI:
+        return atlas_ui;
 
     case TEXTURE_WATER_NORMAL:
         return water_normal;

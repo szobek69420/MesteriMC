@@ -169,6 +169,8 @@ void game(void* w, int* currentStage)
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 
+    textureHandler_importTextures(TEXTURE_IN_GAME);
+
     event_queue_init();
     input_init();
 
@@ -185,8 +187,6 @@ void game(void* w, int* currentStage)
     init_renderer();
 
     init_cube();//egyszer majd ki kene szedni
-
-    textureHandler_importTextures(TEXTURE_IN_GAME);
 
     blockSelection_init();
 
@@ -849,6 +849,19 @@ void* loop_physics(void* arg)
             {
                 chunkManager_changeBlock(&cm, raycastChunkX, raycastChunkY, raycastChunkZ, raycastBlockX, raycastBlockY, raycastBlockZ, BLOCK_AIR);
                 chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ);
+
+                if (raycastBlockX == 0)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX - 1, raycastChunkY, raycastChunkZ);
+                else if (raycastBlockX == CHUNK_WIDTH - 1)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX + 1, raycastChunkY, raycastChunkZ);
+                if (raycastBlockY == 0)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY - 1, raycastChunkZ);
+                else if (raycastBlockY == CHUNK_HEIGHT - 1)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY + 1, raycastChunkZ);
+                if (raycastBlockZ == 0)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ - 1);
+                else if (raycastBlockZ == CHUNK_WIDTH - 1)
+                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ + 1);
             }
         }
         if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_RIGHT))
@@ -1302,6 +1315,11 @@ void init_canvas()
 
     canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
     canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
+
+    //cursor (should be replaced in a different canvas later)
+    int temp;
+    temp = canvas_addImage(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 16, 16, textureHandler_getTexture(TEXTURE_ATLAS_UI));
+    canvas_setImageUV(vaszon, temp, 0.0f, 0.9f, 0.1f, 0.1f);
 }
 
 void end_canvas()

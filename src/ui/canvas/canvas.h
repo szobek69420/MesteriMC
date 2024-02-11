@@ -50,5 +50,6 @@ void canvas_setButtonText(canvas* c, int id, const char* text, int fontSize, flo
 int canvas_addImage(canvas* c, int hAlign, int vAlign, int x, int y, float width, float height, unsigned int textureId);
 void canvas_setImageTint(canvas* c, int id, float r, float g, float b);
 void canvas_setImageTexture(canvas* c, int id, unsigned int textureId);
+void canvas_setImageUV(canvas* c, int id, float uvX, float uvY, float uvWidth, float uvHeight);
 
 #endif
