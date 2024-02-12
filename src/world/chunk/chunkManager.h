@@ -65,13 +65,13 @@ struct chunkManager {
 	int seed;
 	int renderDistance;
 
-	lista_of(chunk) loadedChunks;//list of chunks
+	seqtor_of(chunk) loadedChunks;//list of chunks
 	lista_of(chunkGenerationUpdate) pendingUpdates;//list of chunk updates
 	lista_of(chunkMeshUpdate) pendingMeshUpdates;//list of chunk mesh updates
 
-	lista_of(chunkLowRes) loadedChunksLOD;
-	lista_of(chunkGenerationUpdate) pendingUpdatesLOD;
-	lista_of(chunkMeshUpdate) pendingMeshUpdatesLOD;
+	seqtor_of(chunkLowRes) loadedChunksLOD;
+	seqtor_of(chunkGenerationUpdate) pendingUpdatesLOD;
+	seqtor_of(chunkMeshUpdate) pendingMeshUpdatesLOD;
 
 	seqtor_of(changedBlocksInChunk) changedBlocks;//a kulso vektor chunkonkent osztja fel
 
@@ -85,7 +85,7 @@ typedef struct chunkManager chunkManager;
 chunkManager chunkManager_create(int seed, int renderDistance, physicsSystem* ps);
 void chunkManager_destroy(chunkManager* cm);
 
-void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ);//adds an Eintrag to the pendingUpdates if needed
+int chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ);//adds an Eintrag to the pendingUpdates if needed
 
 void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex);//erledigt an update from pendingUpdates (azert kell a mutex, hogy a chunk generalas kozben ne legyen lezarva, csupan amikor hozzaadja a pendingMeshUpdates-hoz)
 void chunkManager_updateMesh(chunkManager* cm);

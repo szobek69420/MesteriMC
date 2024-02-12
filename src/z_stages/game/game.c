@@ -51,11 +51,11 @@
 
 
 #define CLIP_NEAR 0.1f
-#define CLIP_FAR 200.0f
+#define CLIP_FAR 250.0f
 
 #define PHYSICS_UPDATE 0.02f
 #define PHYSICS_STEPS_PER_UPDATE 100
-#define GENERATION_UPDATE 0.005f
+#define GENERATION_UPDATE 0.001f
 #define CHUNK_UPDATES_PER_GENERATION_UPDATE 2
 
 //global variable
@@ -182,7 +182,7 @@ void game(void* w, int* currentStage)
 
     ps = physicsSystem_create();
 
-    cm = chunkManager_create(69, 5, &ps);
+    cm = chunkManager_create(69, 7, &ps);
     chunk_resetGenerationInfo();
     init_renderer();
 
@@ -738,6 +738,9 @@ void* loop_generation(void* arg)
     float lastChunkUpdateUpdate = -1; int chunkUpdates = 0;
     camera cum_generation;
 
+    int lastPlayerChunkX=0, lastPlayerChunkY=0, lastPlayerChunkZ=0;
+    int shouldSearch=1;//true if there has been a chunk load/unload last update or the playerchunk has changed
+
     while (69)
     {
         float currentTime = glfwGetTime();
@@ -762,9 +765,15 @@ void* loop_generation(void* arg)
 
         int chunkX, chunkY, chunkZ;
         chunk_getChunkFromPos(vec3_create2(cum_generation.position.x + CHUNK_WIDTH * 0.5f, cum_generation.position.y + CHUNK_HEIGHT * 0.5f, cum_generation.position.z + CHUNK_WIDTH * 0.5f), &chunkX, &chunkY, &chunkZ);
-        pthread_mutex_lock(&mutex_cm);
-        chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
-        pthread_mutex_unlock(&mutex_cm);
+        if (lastPlayerChunkX != chunkX || lastPlayerChunkY != chunkY || lastPlayerChunkZ != chunkZ)
+            shouldSearch = 69;
+        lastPlayerChunkX = chunkX; lastPlayerChunkY = chunkY; lastPlayerChunkZ = chunkZ;
+        if (shouldSearch!=0)
+        {
+            pthread_mutex_lock(&mutex_cm);
+            shouldSearch = chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
+            pthread_mutex_unlock(&mutex_cm);
+        }
 
         for (int i = 0; i < CHUNK_UPDATES_PER_GENERATION_UPDATE; i++)
         {
@@ -1038,9 +1047,9 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_dudv"), 1);
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_depth_geometry"), 2);
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_depth_shadow"), 3);
-    glUniform1f(glGetUniformLocation(waterShader.id, "fogStart"), 150);
-    glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), 160);
-    glUniform1f(glGetUniformLocation(waterShader.id, "fogHelper"), 1.0f / (160 - 150));
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogStart"), 200);
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), 210);
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogHelper"), 1.0f / (210 - 200));
     glUniform1f(glGetUniformLocation(waterShader.id, "projectionNear"), CLIP_NEAR);
     glUniform1f(glGetUniformLocation(waterShader.id, "projectionFar"), CLIP_FAR);
     glUniform1f(glGetUniformLocation(waterShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
@@ -1084,12 +1093,12 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_ssao"), 4);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 150);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 160);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f / (160 - 150));
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStart"), 90);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowEnd"), 100);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowHelper"), 1.0f / (100 - 90));
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 200);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 210);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f / (210 - 200));
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStart"), 140);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowEnd"), 150);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowHelper"), 1.0f / (150 - 140));
 
     forwardPassShader = shader_import(
         "../assets/shaders/renderer/forward/shader_forward.vag",

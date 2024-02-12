@@ -15,7 +15,9 @@
 #include "z_stages/stages.h"
 #include "window/window.h"
 
+
 #include <stdlib.h>
+#include <time.h>
 
 //prototypes
 GLFWwindow* init_window(const char* name, int width, int height);
@@ -23,6 +25,7 @@ GLFWwindow* init_window(const char* name, int width, int height);
 int main()
 {
     //_CrtSetBreakAlloc(5213101);
+
 
     GLFWwindow* window=NULL;
     int currentStage = STAGE_INITIALIZE;
