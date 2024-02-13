@@ -36,6 +36,7 @@ chunkManager chunkManager_create(int seed, int renderDistance, physicsSystem* ps
 	lista_init(cm.pendingUpdates);
 	lista_init(cm.pendingMeshUpdates);
 	seqtor_init(cm.loadedChunks,1);
+	seqtor_init(cm.isChunkCulled, 1);
 
 	seqtor_init(cm.changedBlocks, 1);
 	
@@ -51,6 +52,8 @@ void chunkManager_destroy(chunkManager* cm)
 		chunk_destroy(cm, &seqtor_at(cm->loadedChunks, i));
 	}
 	seqtor_destroy(cm->loadedChunks);
+
+	seqtor_destroy(cm->isChunkCulled);
 
 	lista_clear(cm->pendingUpdates);
 	while (cm->pendingMeshUpdates.size>0)
@@ -250,18 +253,18 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 					else
 						lista_push_back(cm->pendingMeshUpdates, cmu);
 
+
 					seqtor_at(cm->loadedChunks, i) = seqtor_at(cm->loadedChunks, seqtor_size(cm->loadedChunks) - 1);//a vegere rakom az eltavolitando elemet
 					seqtor_remove_at(cm->loadedChunks, seqtor_size(cm->loadedChunks) - 1);
+
+					seqtor_at(cm->isChunkCulled, i) = seqtor_at(cm->isChunkCulled, seqtor_size(cm->isChunkCulled) - 1);//a vegere rakom az eltavolitando elemet
+					seqtor_remove_at(cm->isChunkCulled, seqtor_size(cm->isChunkCulled) - 1);
 					break;
 				}
 			}
 			pthread_mutex_unlock(pmutex);
 			break;
 
-
-		case CHUNKMANAGER_RELOAD_CHUNK:
-			//unload and load
-			break;
 	}
 }
 
@@ -284,6 +287,7 @@ void chunkManager_updateMesh(chunkManager* cm)
 	case CHUNKMANAGER_LOAD_CHUNK:
 		chunk_loadMeshInGPU(&cmu.chomk, cmu.meshNormal, cmu.meshWalter);
 		seqtor_push_back(cm->loadedChunks, cmu.chomk);
+		seqtor_push_back(cm->isChunkCulled, 0);
 
 		if (cmu.meshNormal.indexCount != 0)
 		{
@@ -315,82 +319,11 @@ static float chunkBounds[24] = {
 	CHUNK_WIDTH,CHUNK_HEIGHT,CHUNK_WIDTH
 };
 
-int chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
+void chunkManager_calculateFrustumCull(chunkManager* cm, mat4* pv)
 {
-	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
 	char isInFrustum;
 	float basedX, basedY, basedZ;
 	vec4 temp;
-	mat4 pv = mat4_multiply(*projection, camera_getViewMatrix(cum));
-
-	//shader_setMat4(shit->id, "view", camera_getViewMatrix(cum));
-	//shader_setMat4(shit->id, "projection", *projection);
-
-	char frustumX[3] = { 0,0,0 };//volt-e olyan bounding point, ami x<-1 vagy -1<=x<=1 vagy x>1
-	char frustumY[3] = { 0,0,0 };//volt-e olyan bounding point, ami y<-1 vagy -1<=y<=1 vagy y>1
-	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
-	char isPointInFrustum = 0;
-
-	int drawn = 0;
-	for(int i=0;i<seqtor_size(cm->loadedChunks);i++)
-	{
-		if (seqtor_at(cm->loadedChunks, i).isThereNormalMesh)
-		{
-			basedX = seqtor_at(cm->loadedChunks, i).chunkX * CHUNK_WIDTH;
-			basedY = seqtor_at(cm->loadedChunks, i).chunkY * CHUNK_HEIGHT;
-			basedZ = seqtor_at(cm->loadedChunks, i).chunkZ * CHUNK_WIDTH;
-
-			frustumX[0] = 0;	frustumX[1] = 0;	frustumX[2] = 0;
-			frustumY[0] = 0;	frustumY[1] = 0;	frustumY[2] = 0;
-			frustumZ[0] = 0;	frustumZ[1] = 0;	frustumZ[2] = 0;
-
-			for (int j = 0; j < 24; )
-			{
-				temp.x = basedX + chunkBounds[j++];
-				temp.y = basedY + chunkBounds[j++];
-				temp.z = basedZ + chunkBounds[j++];
-				temp.w = 1;
-				temp = vec4_multiplyWithMatrix(pv, temp);
-				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
-				
-				//frustum cull
-				isPointInFrustum = chunkManager_checkIfInFrustum(&temp, frustumX, frustumY, frustumZ);
-
-				if (isPointInFrustum)
-				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, seqtor_at(cm->loadedChunks, i).model.data);
-					chunk_drawTerrain(&(seqtor_at(cm->loadedChunks, i)));
-					drawn++;
-					break;
-				}
-			}
-
-			if (!isPointInFrustum)//ha nincs pont benne a kamera frustumban
-			{
-				if (((frustumX[0] && frustumX[2]) || frustumX[1]) &&
-					((frustumY[0] && frustumY[2]) || frustumY[1]) &&
-					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
-				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, seqtor_at(cm->loadedChunks, i).model.data);
-					chunk_drawTerrain(&(seqtor_at(cm->loadedChunks, i)));
-					drawn++;
-				}
-			}
-		}
-	}
-	return drawn;
-}
-
-void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
-{
-	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
-	char isInFrustum;
-	float basedX, basedY, basedZ;
-	vec4 temp;
-	mat4 pv = mat4_multiply(*projection, camera_getViewMatrix(cum));
-
-	//shader_setMat4(shit->id, "view", camera_getViewMatrix(cum));
-	//shader_setMat4(shit->id, "projection", *projection);
 
 	char frustumX[3] = { 0,0,0 };//volt-e olyan bounding point, ami x<-1 vagy -1<=x<=1 vagy x>1
 	char frustumY[3] = { 0,0,0 };//volt-e olyan bounding point, ami y<-1 vagy -1<=y<=1 vagy y>1
@@ -399,6 +332,7 @@ void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* 
 
 	for (int i = 0; i < seqtor_size(cm->loadedChunks); i++)
 	{
+		seqtor_at(cm->isChunkCulled, i) = 69;
 		if (seqtor_at(cm->loadedChunks, i).isThereNormalMesh)
 		{
 			basedX = seqtor_at(cm->loadedChunks, i).chunkX * CHUNK_WIDTH;
@@ -415,7 +349,7 @@ void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* 
 				temp.y = basedY + chunkBounds[j++];
 				temp.z = basedZ + chunkBounds[j++];
 				temp.w = 1;
-				temp = vec4_multiplyWithMatrix(pv, temp);
+				temp = vec4_multiplyWithMatrix(*pv, temp);
 				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
 
 				//frustum cull
@@ -423,8 +357,7 @@ void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* 
 
 				if (isPointInFrustum)
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, seqtor_at(cm->loadedChunks, i).model.data);
-					chunk_drawWalter(&(seqtor_at(cm->loadedChunks, i)));
+					seqtor_at(cm->isChunkCulled, i) = 0;
 					break;
 				}
 			}
@@ -435,10 +368,43 @@ void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* 
 					((frustumY[0] && frustumY[2]) || frustumY[1]) &&
 					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, seqtor_at(cm->loadedChunks, i).model.data);
-					chunk_drawWalter(&(seqtor_at(cm->loadedChunks, i)));
+					seqtor_at(cm->isChunkCulled, i) = 0;
 				}
 			}
+		}
+	}
+}
+
+int chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
+{
+	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
+	mat4 pv = mat4_multiply(*projection, camera_getViewMatrix(cum));
+
+
+	int drawn = 0;
+	for(int i=0;i<seqtor_size(cm->loadedChunks);i++)
+	{
+		if (seqtor_at(cm->isChunkCulled, i) == 0 && seqtor_at(cm->loadedChunks, i).isThereNormalMesh)
+		{
+			glUniformMatrix4fv(modelLocation, 1, GL_FALSE, seqtor_at(cm->loadedChunks, i).model.data);
+			chunk_drawTerrain(&(seqtor_at(cm->loadedChunks, i)));
+			drawn++;
+		}
+	}
+	return drawn;
+}
+
+void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
+{
+	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
+	mat4 pv = mat4_multiply(*projection, camera_getViewMatrix(cum));
+
+	for (int i = 0; i < seqtor_size(cm->loadedChunks); i++)
+	{
+		if (seqtor_at(cm->isChunkCulled, i) == 0 && seqtor_at(cm->loadedChunks, i).isThereNormalMesh)
+		{
+			glUniformMatrix4fv(modelLocation, 1, GL_FALSE, seqtor_at(cm->loadedChunks, i).model.data);
+			chunk_drawWalter(&(seqtor_at(cm->loadedChunks, i)));
 		}
 	}
 }

@@ -88,6 +88,7 @@ int chunkUpdatesInLastSecond = 0;
 
 camera cum;
 pthread_mutex_t mutex_cum;
+float currentFov = 90;
 
 playerMesh pm;
 pthread_mutex_t mutex_pm;
@@ -178,7 +179,8 @@ void game(void* w, int* currentStage)
     fontHandler_init();
     init_canvas();
 
-    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
+    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 40, 0.2);
+    camera_setProjection(&cum, currentFov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
 
     ps = physicsSystem_create();
 
@@ -324,11 +326,10 @@ void* loop_render(void* arg)
 
         //update chunk mesh data in gpu
         pthread_mutex_lock(&mutex_cm);
-        chunkManager_updateMesh(&cm);
-        chunkManager_updateMesh(&cm);
-        chunkManager_updateMesh(&cm);
-        chunkManager_updateMesh(&cm);
-        chunkManager_updateMesh(&cm);
+        for (int i = 0; i < 10; i++)
+        {
+            chunkManager_updateMesh(&cm);
+        }
 
         loadedChunks = cm.loadedChunks.size;
         pthread_mutex_unlock(&mutex_cm);
@@ -336,7 +337,7 @@ void* loop_render(void* arg)
         //render------------------------------------------
         //matrices
         mat4 view = camera_getViewMatrix(&cum_render);
-        mat4 projection = mat4_perspective(cum_render.fov, windowAspectXY, CLIP_NEAR, CLIP_FAR);
+        mat4 projection = cum_render.projection_matrix;
         mat4 pv = mat4_multiply(projection, view);
         mat4 projectionInverse = mat4_inverse(projection);
         mat3 viewNormal = mat3_createFromMat(view);
@@ -744,8 +745,8 @@ void* loop_generation(void* arg)
     while (69)
     {
         float currentTime = glfwGetTime();
-        while (currentTime - lastFrame < GENERATION_UPDATE)
-            currentTime = glfwGetTime();
+        //while (currentTime - lastFrame < GENERATION_UPDATE)
+            //currentTime = glfwGetTime();
         deltaTime = currentTime - lastFrame;
         lastFrame = currentTime;
 
@@ -946,6 +947,15 @@ void* loop_physics(void* arg)
         raycastBlockZ = (int)(rh.position.z - CHUNK_WIDTH * raycastChunkZ);
         //printf("%.2f %.2f %.2f | %d %d %d\n", rh.position.x, rh.position.y, rh.position.z, CHUNK_WIDTH* raycastChunkX + raycastBlockX, CHUNK_HEIGHT* raycastChunkY + raycastBlockY, CHUNK_WIDTH* raycastChunkZ + raycastBlockZ);
         
+        //update frustum culling
+        pthread_mutex_lock(&mutex_cum);
+        mat4 pv = mat4_multiply(cum.projection_matrix, cum.view_matrix);
+        pthread_mutex_unlock(&mutex_cum);
+
+        pthread_mutex_lock(&mutex_cm);
+        chunkManager_calculateFrustumCull(&cm, &pv);
+        pthread_mutex_unlock(&mutex_cm);
+
         //player animation
         pthread_mutex_lock(&mutex_pm);
         pm.position = (vec3){ cum.position.x, cum.position.y - 1.6f, cum.position.z };
@@ -996,6 +1006,10 @@ void handle_event(event e)
         window_setWidth(e.data.window_resize.width);
         window_setHeight(e.data.window_resize.height);
         pthread_mutex_unlock(&mutex_window);
+
+        pthread_mutex_lock(&mutex_cum);
+        camera_setProjection(&cum, currentFov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
+        pthread_mutex_unlock(&mutex_cum);
         //azert nem itt allitom at a text_renderer meretet, mert ez nem az opengl szal
         break;
     default:

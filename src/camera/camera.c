@@ -8,19 +8,32 @@
 
 static void _camera_update_vectors(camera* cam);
 
-camera camera_create(vec3 position, vec3 world_up, float yaw, float pitch, float fov, float move_speed, float mouse_sensitivity)
+camera camera_create(vec3 position, vec3 world_up, float move_speed, float mouse_sensitivity)
 {
     camera cam;
     cam.position = position;
     cam.world_up = world_up;
-    cam.yaw = yaw;
-    cam.pitch = pitch;
-    cam.fov = fov;
+    cam.yaw = 0;
+    cam.pitch = 0;
+    cam.fov = 60;
+    cam.aspectXY = 1;
+    cam.near_plane = 0.1;
+    cam.far_plane = 300;
     cam.move_speed = move_speed;
     cam.mouse_sensitivity = mouse_sensitivity;
     _camera_update_vectors(&cam);
     return cam;
 }
+
+void camera_setProjection(camera* cam, float fov, float aspectXY, float near_plane, float far_plane)
+{
+    cam->fov = fov;
+    cam->near_plane = near_plane;
+    cam->far_plane = far_plane;
+    cam->aspectXY = aspectXY;
+    cam->projection_matrix = mat4_perspective(cam->fov, cam->aspectXY, cam->near_plane, cam->far_plane);
+}
+
 void camera_update(camera* cam, float delta_time)
 {
     //keyboard (it is no longer updated here)

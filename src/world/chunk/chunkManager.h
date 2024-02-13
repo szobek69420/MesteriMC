@@ -66,6 +66,7 @@ struct chunkManager {
 	int renderDistance;
 
 	seqtor_of(chunk) loadedChunks;//list of chunks
+	seqtor_of(char) isChunkCulled;//as long as the loadedChunks, to each chunk gehört a corresponding wert of frustum culling
 	lista_of(chunkGenerationUpdate) pendingUpdates;//list of chunk updates
 	lista_of(chunkMeshUpdate) pendingMeshUpdates;//list of chunk mesh updates
 
@@ -91,6 +92,8 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex);//erledigt a
 void chunkManager_updateMesh(chunkManager* cm);
 
 void chunkManager_reloadChunk(chunkManager* cm, pthread_mutex_t* pmutex, int chunkX, int chunkY, int chunkZ);
+
+void chunkManager_calculateFrustumCull(chunkManager* cm, mat4* pv);
 
 int chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection);//a shader csak átmenetileg van átadva
 void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* projection);
