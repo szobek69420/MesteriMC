@@ -1,8 +1,10 @@
 #ifndef CHUNK_H
 #define CHUNK_H
 
+#ifndef CHUNK_WIDTH
 #define CHUNK_WIDTH 32
 #define CHUNK_HEIGHT 32
+#endif
 
 #include "../../mesh/mesh.h"
 #include "../../glm2/mat4.h"

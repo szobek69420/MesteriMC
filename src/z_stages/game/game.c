@@ -51,11 +51,11 @@
 
 
 #define CLIP_NEAR 0.1f
-#define CLIP_FAR 200.0f
+#define CLIP_FAR 250.0f
 
 #define PHYSICS_UPDATE 0.02f
 #define PHYSICS_STEPS_PER_UPDATE 100
-#define GENERATION_UPDATE 0.005f
+#define GENERATION_UPDATE 0.001f
 #define CHUNK_UPDATES_PER_GENERATION_UPDATE 2
 
 //global variable
@@ -81,6 +81,7 @@ raycastHit rh;
 int raycastChunkX, raycastChunkY, raycastChunkZ;
 int raycastBlockX, raycastBlockY, raycastBlockZ;
 int raycastFound = 0;
+vec3 lastRaycastHit;
 
 chunkManager cm;
 pthread_mutex_t mutex_cm;
@@ -88,6 +89,7 @@ int chunkUpdatesInLastSecond = 0;
 
 camera cum;
 pthread_mutex_t mutex_cum;
+float currentFov = 90;
 
 playerMesh pm;
 pthread_mutex_t mutex_pm;
@@ -115,6 +117,9 @@ int vaszon_render_distance;
 int vaszon_chunk_updates;
 int vaszon_chunks_loaded;
 int vaszon_chunks_rendered;
+int vaszon_physics_simulated_colliders;
+int vaszon_physics_loaded_groups;
+int vaszon_physics_raycast_hit;
 
 unsigned int rectangleVAO;//a deferred resz hasznalja a kepernyo atrajzolasahoz
 unsigned int rectangleVBO;
@@ -178,11 +183,12 @@ void game(void* w, int* currentStage)
     fontHandler_init();
     init_canvas();
 
-    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 0, 0, 90, 40, 0.2);
+    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 40, 0.2);
+    camera_setProjection(&cum, currentFov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
 
     ps = physicsSystem_create();
 
-    cm = chunkManager_create(69, 5, &ps);
+    cm = chunkManager_create(69, 7, &ps);
     chunk_resetGenerationInfo();
     init_renderer();
 
@@ -324,11 +330,10 @@ void* loop_render(void* arg)
 
         //update chunk mesh data in gpu
         pthread_mutex_lock(&mutex_cm);
-        chunkManager_updateMesh(&cm);
-        chunkManager_updateMesh(&cm);
-        chunkManager_updateMesh(&cm);
-        chunkManager_updateMesh(&cm);
-        chunkManager_updateMesh(&cm);
+        for (int i = 0; i < 10; i++)
+        {
+            chunkManager_updateMesh(&cm);
+        }
 
         loadedChunks = cm.loadedChunks.size;
         pthread_mutex_unlock(&mutex_cm);
@@ -336,7 +341,7 @@ void* loop_render(void* arg)
         //render------------------------------------------
         //matrices
         mat4 view = camera_getViewMatrix(&cum_render);
-        mat4 projection = mat4_perspective(cum_render.fov, windowAspectXY, CLIP_NEAR, CLIP_FAR);
+        mat4 projection = cum_render.projection_matrix;
         mat4 pv = mat4_multiply(projection, view);
         mat4 projectionInverse = mat4_inverse(projection);
         mat3 viewNormal = mat3_createFromMat(view);
@@ -706,6 +711,18 @@ void* loop_render(void* arg)
         sprintf(buffer, "rendered chunks: %d", renderedChunks);
         canvas_setTextText(vaszon, vaszon_chunks_rendered, buffer);
 
+        sprintf(buffer, "simulated colliders: %d", ps.simulatedColliders.size);
+        canvas_setTextText(vaszon, vaszon_physics_simulated_colliders, buffer);
+
+        sprintf(buffer, "collider groups: %d", ps.colliderGroups.size);
+        canvas_setTextText(vaszon, vaszon_physics_loaded_groups, buffer);
+
+        if (raycastFound != 0)
+            sprintf(buffer, "raycast hit: %.2f, %.2f, %.2f", lastRaycastHit.x, lastRaycastHit.y, lastRaycastHit.z);
+        else
+            sprintf(buffer, "raycast hit: nein");
+        canvas_setTextText(vaszon, vaszon_physics_raycast_hit, buffer);
+
 
         double mouseX=0, mouseY=0;
         input_get_mouse_position(&mouseX, &mouseY);
@@ -738,11 +755,14 @@ void* loop_generation(void* arg)
     float lastChunkUpdateUpdate = -1; int chunkUpdates = 0;
     camera cum_generation;
 
+    int lastPlayerChunkX=0, lastPlayerChunkY=0, lastPlayerChunkZ=0;
+    int shouldSearch=1;//true if there has been a chunk load/unload last update or the playerchunk has changed
+
     while (69)
     {
         float currentTime = glfwGetTime();
-        while (currentTime - lastFrame < GENERATION_UPDATE)
-            currentTime = glfwGetTime();
+        //while (currentTime - lastFrame < GENERATION_UPDATE)
+            //currentTime = glfwGetTime();
         deltaTime = currentTime - lastFrame;
         lastFrame = currentTime;
 
@@ -762,9 +782,15 @@ void* loop_generation(void* arg)
 
         int chunkX, chunkY, chunkZ;
         chunk_getChunkFromPos(vec3_create2(cum_generation.position.x + CHUNK_WIDTH * 0.5f, cum_generation.position.y + CHUNK_HEIGHT * 0.5f, cum_generation.position.z + CHUNK_WIDTH * 0.5f), &chunkX, &chunkY, &chunkZ);
-        pthread_mutex_lock(&mutex_cm);
-        chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
-        pthread_mutex_unlock(&mutex_cm);
+        if (lastPlayerChunkX != chunkX || lastPlayerChunkY != chunkY || lastPlayerChunkZ != chunkZ)
+            shouldSearch = 69;
+        lastPlayerChunkX = chunkX; lastPlayerChunkY = chunkY; lastPlayerChunkZ = chunkZ;
+        if (shouldSearch!=0)
+        {
+            pthread_mutex_lock(&mutex_cm);
+            shouldSearch = chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
+            pthread_mutex_unlock(&mutex_cm);
+        }
 
         for (int i = 0; i < CHUNK_UPDATES_PER_GENERATION_UPDATE; i++)
         {
@@ -926,6 +952,7 @@ void* loop_physics(void* arg)
         {
             physicsSystem_update(&ps, PHYSICS_UPDATE/PHYSICS_STEPS_PER_UPDATE);
         }
+        lastRaycastHit = rh.position;
         rh.position = (vec3){ 0,100000,0 };
         raycastFound=physicsSystem_raycast(&ps, cum.position, cum.front, 6, 0.01f, &rh);
 
@@ -937,6 +964,15 @@ void* loop_physics(void* arg)
         raycastBlockZ = (int)(rh.position.z - CHUNK_WIDTH * raycastChunkZ);
         //printf("%.2f %.2f %.2f | %d %d %d\n", rh.position.x, rh.position.y, rh.position.z, CHUNK_WIDTH* raycastChunkX + raycastBlockX, CHUNK_HEIGHT* raycastChunkY + raycastBlockY, CHUNK_WIDTH* raycastChunkZ + raycastBlockZ);
         
+        //update frustum culling
+        pthread_mutex_lock(&mutex_cum);
+        mat4 pv = mat4_multiply(cum.projection_matrix, cum.view_matrix);
+        pthread_mutex_unlock(&mutex_cum);
+
+        pthread_mutex_lock(&mutex_cm);
+        chunkManager_calculateFrustumCull(&cm, &pv);
+        pthread_mutex_unlock(&mutex_cm);
+
         //player animation
         pthread_mutex_lock(&mutex_pm);
         pm.position = (vec3){ cum.position.x, cum.position.y - 1.6f, cum.position.z };
@@ -987,6 +1023,10 @@ void handle_event(event e)
         window_setWidth(e.data.window_resize.width);
         window_setHeight(e.data.window_resize.height);
         pthread_mutex_unlock(&mutex_window);
+
+        pthread_mutex_lock(&mutex_cum);
+        camera_setProjection(&cum, currentFov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
+        pthread_mutex_unlock(&mutex_cum);
         //azert nem itt allitom at a text_renderer meretet, mert ez nem az opengl szal
         break;
     default:
@@ -1038,9 +1078,9 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_dudv"), 1);
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_depth_geometry"), 2);
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_depth_shadow"), 3);
-    glUniform1f(glGetUniformLocation(waterShader.id, "fogStart"), 150);
-    glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), 160);
-    glUniform1f(glGetUniformLocation(waterShader.id, "fogHelper"), 1.0f / (160 - 150));
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogStart"), 200);
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), 210);
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogHelper"), 1.0f / (210 - 200));
     glUniform1f(glGetUniformLocation(waterShader.id, "projectionNear"), CLIP_NEAR);
     glUniform1f(glGetUniformLocation(waterShader.id, "projectionFar"), CLIP_FAR);
     glUniform1f(glGetUniformLocation(waterShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
@@ -1084,12 +1124,12 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_ssao"), 4);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 150);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 160);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f / (160 - 150));
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStart"), 90);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowEnd"), 100);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowHelper"), 1.0f / (100 - 90));
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 200);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 210);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f / (210 - 200));
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStart"), 140);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowEnd"), 150);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowHelper"), 1.0f / (150 - 140));
 
     forwardPassShader = shader_import(
         "../assets/shaders/renderer/forward/shader_forward.vag",
@@ -1309,12 +1349,17 @@ void init_canvas()
     vaszon_chunks_loaded = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 155, 0, 0, 0, 24);
     vaszon_chunks_rendered = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 180, 0, 0, 0, 24);
 
-    //right side
+    //bototm left
     const char* vendor = glGetString(GL_VENDOR);
     const char* renderer = glGetString(GL_RENDERER);
 
-    canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
-    canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
+    canvas_addText(vaszon, vendor, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 35, 0, 0, 0, 24);
+    canvas_addText(vaszon, renderer, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 10, 0, 0, 0, 24);
+
+    //right side
+    vaszon_physics_loaded_groups = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
+    vaszon_physics_simulated_colliders = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
+    vaszon_physics_raycast_hit = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 60, 0, 0, 0, 24);
 
     //cursor (should be replaced in a different canvas later)
     int temp;

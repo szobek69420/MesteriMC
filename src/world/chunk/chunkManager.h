@@ -13,6 +13,7 @@
 
 #include "../../mesh/mesh.h"
 #include "chunk.h"
+#include "chunk_low_res.h"
 #include "../blocks/blocks.h"
 
 #include "../../physics/physics_system/physics_system.h"
@@ -64,9 +65,14 @@ struct chunkManager {
 	int seed;
 	int renderDistance;
 
-	lista_of(chunk) loadedChunks;//list of chunks
+	seqtor_of(chunk) loadedChunks;//list of chunks
+	seqtor_of(char) isChunkCulled;//as long as the loadedChunks, to each chunk gehört a corresponding wert of frustum culling
 	lista_of(chunkGenerationUpdate) pendingUpdates;//list of chunk updates
 	lista_of(chunkMeshUpdate) pendingMeshUpdates;//list of chunk mesh updates
+
+	seqtor_of(chunkLowRes) loadedChunksLOD;
+	seqtor_of(chunkGenerationUpdate) pendingUpdatesLOD;
+	seqtor_of(chunkMeshUpdate) pendingMeshUpdatesLOD;
 
 	seqtor_of(changedBlocksInChunk) changedBlocks;//a kulso vektor chunkonkent osztja fel
 
@@ -80,12 +86,14 @@ typedef struct chunkManager chunkManager;
 chunkManager chunkManager_create(int seed, int renderDistance, physicsSystem* ps);
 void chunkManager_destroy(chunkManager* cm);
 
-void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ);//adds an Eintrag to the pendingUpdates if needed
+int chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ);//adds an Eintrag to the pendingUpdates if needed
 
 void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex);//erledigt an update from pendingUpdates (azert kell a mutex, hogy a chunk generalas kozben ne legyen lezarva, csupan amikor hozzaadja a pendingMeshUpdates-hoz)
 void chunkManager_updateMesh(chunkManager* cm);
 
 void chunkManager_reloadChunk(chunkManager* cm, pthread_mutex_t* pmutex, int chunkX, int chunkY, int chunkZ);
+
+void chunkManager_calculateFrustumCull(chunkManager* cm, mat4* pv);
 
 int chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection);//a shader csak átmenetileg van átadva
 void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* projection);

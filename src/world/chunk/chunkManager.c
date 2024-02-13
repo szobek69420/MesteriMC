@@ -1,5 +1,5 @@
-#include "chunkManager.h"
 #include "chunk.h"
+#include "chunkManager.h"
 #include "../terrain/FastNoiseLite.h"
 #include "../../utils/list.h"
 #include "../../utils/lista.h"
@@ -35,7 +35,8 @@ chunkManager chunkManager_create(int seed, int renderDistance, physicsSystem* ps
 
 	lista_init(cm.pendingUpdates);
 	lista_init(cm.pendingMeshUpdates);
-	lista_init(cm.loadedChunks);
+	seqtor_init(cm.loadedChunks,1);
+	seqtor_init(cm.isChunkCulled, 1);
 
 	seqtor_init(cm.changedBlocks, 1);
 	
@@ -44,18 +45,15 @@ chunkManager chunkManager_create(int seed, int renderDistance, physicsSystem* ps
 
 void chunkManager_destroy(chunkManager* cm)
 {
-	chunk chomk;
-	chunkGenerationUpdate chomkUp;
 	chunkMeshUpdate chomkDown;
 
-	while (cm->loadedChunks.size>0)
+	for(int i=0;i<seqtor_size(cm->loadedChunks);i++)
 	{
-		lista_at(cm->loadedChunks, 0, &chomk);
-
-		lista_remove_at(cm->loadedChunks, 0);
-
-		chunk_destroy(cm, &chomk);
+		chunk_destroy(cm, &seqtor_at(cm->loadedChunks, i));
 	}
+	seqtor_destroy(cm->loadedChunks);
+
+	seqtor_destroy(cm->isChunkCulled);
 
 	lista_clear(cm->pendingUpdates);
 	while (cm->pendingMeshUpdates.size>0)
@@ -94,14 +92,10 @@ void chunkManager_destroy(chunkManager* cm)
 
 int chunkManager_isChunkLoaded(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 {
-	lista_element_of(chunk)* iterator = cm->loadedChunks.head;
-
-	while (iterator!=NULL)
+	for(int i=0;i<seqtor_size(cm->loadedChunks);i++)
 	{
-		if (iterator->data.chunkX == chunkX && iterator->data.chunkY ==chunkY && iterator->data.chunkZ == chunkZ)
+		if (seqtor_at(cm->loadedChunks,i).chunkX == chunkX && seqtor_at(cm->loadedChunks, i).chunkY ==chunkY && seqtor_at(cm->loadedChunks, i).chunkZ == chunkZ)
 			return 69;
-
-		iterator=iterator->next;
 	}
 
 	return 0;
@@ -150,10 +144,9 @@ int chunkManager_isChunkRegistered(chunkManager* cm, int chunkX, int chunkY, int
 }
 
 
-void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ)
+int chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ)//return 0 if no update has been found
 {
-	lista_element_of(chunk)* iterator;
-
+	int updateFound = 0;
 	//load
 	for (int i = 1; i <= cm->renderDistance; i++)
 	{
@@ -178,6 +171,7 @@ void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playe
 						ceu.isUrgent = 0;
 
 						lista_push_back(cm->pendingUpdates, ceu);
+						updateFound = 1;
 						goto exit_load;
 					}
 				}
@@ -188,44 +182,38 @@ void chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playe
 exit_load:
 
 	//unload
-	iterator = cm->loadedChunks.head;
-	while (iterator != NULL)
+	for(int i=0;i<seqtor_size(cm->loadedChunks);i++)
 	{
-		if (abs(iterator->data.chunkX - playerChunkX) > cm->renderDistance
+		if (abs(seqtor_at(cm->loadedChunks, i).chunkX - playerChunkX) > cm->renderDistance
 			||
-			abs(iterator->data.chunkY - playerChunkY) > cm->renderDistance
+			abs(seqtor_at(cm->loadedChunks, i).chunkY - playerChunkY) > cm->renderDistance
 			||
-			abs(iterator->data.chunkZ - playerChunkZ) > cm->renderDistance)
+			abs(seqtor_at(cm->loadedChunks, i).chunkZ - playerChunkZ) > cm->renderDistance)
 		{
-			if (chunkManager_isChunkPending(cm, iterator->data.chunkX, iterator->data.chunkY, iterator->data.chunkZ)==0)
+			if (chunkManager_isChunkPending(cm, seqtor_at(cm->loadedChunks, i).chunkX, seqtor_at(cm->loadedChunks, i).chunkY, seqtor_at(cm->loadedChunks, i).chunkZ)==0)
 			{
 				chunkGenerationUpdate ceu;
-				ceu.chunkX = iterator->data.chunkX;
-				ceu.chunkY = iterator->data.chunkY;
-				ceu.chunkZ = iterator->data.chunkZ;
+				ceu.chunkX = seqtor_at(cm->loadedChunks, i).chunkX;
+				ceu.chunkY = seqtor_at(cm->loadedChunks, i).chunkY;
+				ceu.chunkZ = seqtor_at(cm->loadedChunks, i).chunkZ;
 				ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
 				ceu.isUrgent = 0;
 
 				lista_push_back(cm->pendingUpdates, ceu);
-
+				updateFound = 1;
 				break;
 			}
 		}
-
-		iterator = iterator->next;
 	}
 
 
 exit_unload:
 
-	return;
+	return updateFound;
 }
 
 void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 {
-	lista_element_of(chunk)* iterator;
-	int index;
-	chunk chomk;
 	chunkMeshUpdate cmu;
 
 	pthread_mutex_lock(pmutex);
@@ -254,34 +242,29 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 
 		case CHUNKMANAGER_UNLOAD_CHUNK:
 			pthread_mutex_lock(pmutex);
-			iterator = cm->loadedChunks.head;
-			index = 0;
-			while (iterator != NULL)
+			for(int i=0;i<seqtor_size(cm->loadedChunks);i++)
 			{
-				chomk = iterator->data;
-				if (chomk.chunkX == ceu.chunkX && chomk.chunkY == ceu.chunkY && chomk.chunkZ == ceu.chunkZ)
+				if (seqtor_at(cm->loadedChunks,i).chunkX == ceu.chunkX && seqtor_at(cm->loadedChunks, i).chunkY == ceu.chunkY && seqtor_at(cm->loadedChunks, i).chunkZ == ceu.chunkZ)
 				{
-					cmu.chomk = chomk;
+					cmu.chomk = seqtor_at(cm->loadedChunks, i);
 					cmu.type = CHUNKMANAGER_UNLOAD_CHUNK;
 					if (ceu.isUrgent != 0)
 						lista_push(cm->pendingMeshUpdates, 0, cmu);
 					else
 						lista_push_back(cm->pendingMeshUpdates, cmu);
 
-					lista_remove_at(cm->loadedChunks, index);
+
+					seqtor_at(cm->loadedChunks, i) = seqtor_at(cm->loadedChunks, seqtor_size(cm->loadedChunks) - 1);//a vegere rakom az eltavolitando elemet
+					seqtor_remove_at(cm->loadedChunks, seqtor_size(cm->loadedChunks) - 1);
+
+					seqtor_at(cm->isChunkCulled, i) = seqtor_at(cm->isChunkCulled, seqtor_size(cm->isChunkCulled) - 1);//a vegere rakom az eltavolitando elemet
+					seqtor_remove_at(cm->isChunkCulled, seqtor_size(cm->isChunkCulled) - 1);
 					break;
 				}
-
-				iterator = iterator->next;
-				index++;
 			}
 			pthread_mutex_unlock(pmutex);
 			break;
 
-
-		case CHUNKMANAGER_RELOAD_CHUNK:
-			//unload and load
-			break;
 	}
 }
 
@@ -303,7 +286,8 @@ void chunkManager_updateMesh(chunkManager* cm)
 	{
 	case CHUNKMANAGER_LOAD_CHUNK:
 		chunk_loadMeshInGPU(&cmu.chomk, cmu.meshNormal, cmu.meshWalter);
-		lista_push_back(cm->loadedChunks, cmu.chomk);
+		seqtor_push_back(cm->loadedChunks, cmu.chomk);
+		seqtor_push_back(cm->isChunkCulled, 0);
 
 		if (cmu.meshNormal.indexCount != 0)
 		{
@@ -335,53 +319,45 @@ static float chunkBounds[24] = {
 	CHUNK_WIDTH,CHUNK_HEIGHT,CHUNK_WIDTH
 };
 
-int chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
+void chunkManager_calculateFrustumCull(chunkManager* cm, mat4* pv)
 {
-	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
 	char isInFrustum;
 	float basedX, basedY, basedZ;
 	vec4 temp;
-	mat4 pv = mat4_multiply(*projection, camera_getViewMatrix(cum));
-
-	//shader_setMat4(shit->id, "view", camera_getViewMatrix(cum));
-	//shader_setMat4(shit->id, "projection", *projection);
 
 	char frustumX[3] = { 0,0,0 };//volt-e olyan bounding point, ami x<-1 vagy -1<=x<=1 vagy x>1
 	char frustumY[3] = { 0,0,0 };//volt-e olyan bounding point, ami y<-1 vagy -1<=y<=1 vagy y>1
 	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
 	char isPointInFrustum = 0;
 
-	int drawn = 0;
-	lista_element_of(chunk)* it = cm->loadedChunks.head;
-	while (it != NULL)
+	for (int i = 0; i < seqtor_size(cm->loadedChunks); i++)
 	{
-		if (it->data.isThereNormalMesh)
+		seqtor_at(cm->isChunkCulled, i) = 69;
+		if (seqtor_at(cm->loadedChunks, i).isThereNormalMesh)
 		{
-			basedX = it->data.chunkX * CHUNK_WIDTH;
-			basedY = it->data.chunkY * CHUNK_HEIGHT;
-			basedZ = it->data.chunkZ * CHUNK_WIDTH;
+			basedX = seqtor_at(cm->loadedChunks, i).chunkX * CHUNK_WIDTH;
+			basedY = seqtor_at(cm->loadedChunks, i).chunkY * CHUNK_HEIGHT;
+			basedZ = seqtor_at(cm->loadedChunks, i).chunkZ * CHUNK_WIDTH;
 
 			frustumX[0] = 0;	frustumX[1] = 0;	frustumX[2] = 0;
 			frustumY[0] = 0;	frustumY[1] = 0;	frustumY[2] = 0;
 			frustumZ[0] = 0;	frustumZ[1] = 0;	frustumZ[2] = 0;
 
-			for (int i = 0; i < 24; )
+			for (int j = 0; j < 24; )
 			{
-				temp.x = basedX + chunkBounds[i++];
-				temp.y = basedY + chunkBounds[i++];
-				temp.z = basedZ + chunkBounds[i++];
+				temp.x = basedX + chunkBounds[j++];
+				temp.y = basedY + chunkBounds[j++];
+				temp.z = basedZ + chunkBounds[j++];
 				temp.w = 1;
-				temp = vec4_multiplyWithMatrix(pv, temp);
+				temp = vec4_multiplyWithMatrix(*pv, temp);
 				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
-				
+
 				//frustum cull
 				isPointInFrustum = chunkManager_checkIfInFrustum(&temp, frustumX, frustumY, frustumZ);
 
 				if (isPointInFrustum)
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
-					chunk_drawTerrain(&it->data);
-					drawn++;
+					seqtor_at(cm->isChunkCulled, i) = 0;
 					break;
 				}
 			}
@@ -392,79 +368,44 @@ int chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* 
 					((frustumY[0] && frustumY[2]) || frustumY[1]) &&
 					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
-					chunk_drawTerrain(&it->data);
-					drawn++;
+					seqtor_at(cm->isChunkCulled, i) = 0;
 				}
 			}
 		}
-		it=it->next;
 	}
+}
 
+int chunkManager_drawTerrain(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
+{
+	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
+	mat4 pv = mat4_multiply(*projection, camera_getViewMatrix(cum));
+
+
+	int drawn = 0;
+	for(int i=0;i<seqtor_size(cm->loadedChunks);i++)
+	{
+		if (seqtor_at(cm->isChunkCulled, i) == 0 && seqtor_at(cm->loadedChunks, i).isThereNormalMesh)
+		{
+			glUniformMatrix4fv(modelLocation, 1, GL_FALSE, seqtor_at(cm->loadedChunks, i).model.data);
+			chunk_drawTerrain(&(seqtor_at(cm->loadedChunks, i)));
+			drawn++;
+		}
+	}
 	return drawn;
 }
 
 void chunkManager_drawWalter(chunkManager* cm, shader* shit, camera* cum, mat4* projection)
 {
 	GLuint modelLocation = glGetUniformLocation(shit->id, "model");
-	char isInFrustum;
-	float basedX, basedY, basedZ;
-	vec4 temp;
 	mat4 pv = mat4_multiply(*projection, camera_getViewMatrix(cum));
 
-	//shader_setMat4(shit->id, "view", camera_getViewMatrix(cum));
-	//shader_setMat4(shit->id, "projection", *projection);
-
-	char frustumX[3] = { 0,0,0 };//volt-e olyan bounding point, ami x<-1 vagy -1<=x<=1 vagy x>1
-	char frustumY[3] = { 0,0,0 };//volt-e olyan bounding point, ami y<-1 vagy -1<=y<=1 vagy y>1
-	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
-	char isPointInFrustum = 0;
-
-	lista_element_of(chunk) * it = cm->loadedChunks.head;
-	while (it != NULL)
+	for (int i = 0; i < seqtor_size(cm->loadedChunks); i++)
 	{
-		if (it->data.isThereNormalMesh)
+		if (seqtor_at(cm->isChunkCulled, i) == 0 && seqtor_at(cm->loadedChunks, i).isThereNormalMesh)
 		{
-			basedX = it->data.chunkX * CHUNK_WIDTH;
-			basedY = it->data.chunkY * CHUNK_HEIGHT;
-			basedZ = it->data.chunkZ * CHUNK_WIDTH;
-
-			frustumX[0] = 0;	frustumX[1] = 0;	frustumX[2] = 0;
-			frustumY[0] = 0;	frustumY[1] = 0;	frustumY[2] = 0;
-			frustumZ[0] = 0;	frustumZ[1] = 0;	frustumZ[2] = 0;
-
-			for (int i = 0; i < 24; )
-			{
-				temp.x = basedX + chunkBounds[i++];
-				temp.y = basedY + chunkBounds[i++];
-				temp.z = basedZ + chunkBounds[i++];
-				temp.w = 1;
-				temp = vec4_multiplyWithMatrix(pv, temp);
-				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
-
-				//frustum cull
-				isPointInFrustum = chunkManager_checkIfInFrustum(&temp, frustumX, frustumY, frustumZ);
-
-				if (isPointInFrustum)
-				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
-					chunk_drawWalter(&it->data);
-					break;
-				}
-			}
-
-			if (!isPointInFrustum)//ha nincs pont benne a kamera frustumban
-			{
-				if (((frustumX[0] && frustumX[2]) || frustumX[1]) &&
-					((frustumY[0] && frustumY[2]) || frustumY[1]) &&
-					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
-				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
-					chunk_drawWalter(&it->data);
-				}
-			}
+			glUniformMatrix4fv(modelLocation, 1, GL_FALSE, seqtor_at(cm->loadedChunks, i).model.data);
+			chunk_drawWalter(&(seqtor_at(cm->loadedChunks, i)));
 		}
-		it=it->next;
 	}
 }
 
@@ -484,20 +425,19 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 	char frustumZ[3] = { 0,0,0 };//volt-e olyan bounding point, ami z<0 vagy 0<=z<=1 vagy z>1
 	char isPointInFrustum = 0;
 	
-	lista_element_of(chunk)* it = cm->loadedChunks.head;
-	while (it != NULL)
+	for(int i=0;i<seqtor_size(cm->loadedChunks);i++)
 	{
-		if (it->data.isThereNormalMesh)
+		if (seqtor_at(cm->loadedChunks, i).isThereNormalMesh)
 		{
-			basedX = it->data.chunkX * CHUNK_WIDTH;
-			basedY = it->data.chunkY * CHUNK_HEIGHT;
-			basedZ = it->data.chunkZ * CHUNK_WIDTH;
+			basedX = seqtor_at(cm->loadedChunks, i).chunkX * CHUNK_WIDTH;
+			basedY = seqtor_at(cm->loadedChunks, i).chunkY * CHUNK_HEIGHT;
+			basedZ = seqtor_at(cm->loadedChunks, i).chunkZ * CHUNK_WIDTH;
 
-			for (int i = 0; i < 24; )
+			for (int j = 0; j < 24; )
 			{
-				temp.x = basedX + chunkBounds[i++];
-				temp.y = basedY + chunkBounds[i++];
-				temp.z = basedZ + chunkBounds[i++];
+				temp.x = basedX + chunkBounds[j++];
+				temp.y = basedY + chunkBounds[j++];
+				temp.z = basedZ + chunkBounds[j++];
 				temp.w = 1;
 				temp = vec4_multiplyWithMatrix(*viewProjection, temp);
 				temp.x /= temp.w; temp.y /= temp.w; temp.z /= temp.w;//perspective division
@@ -507,8 +447,8 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 
 				if (isPointInFrustum)
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
-					chunk_drawTerrain(&it->data);
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, seqtor_at(cm->loadedChunks, i).model.data);
+					chunk_drawTerrain(&(seqtor_at(cm->loadedChunks, i)));
 					break;
 				}
 			}
@@ -519,12 +459,11 @@ void chunkManager_drawShadow(chunkManager* cm, shader* shit, mat4* viewProjectio
 					((frustumY[0] && frustumY[2]) || frustumY[1]) &&
 					((frustumZ[0] && frustumZ[2]) || frustumZ[1]))
 				{
-					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, it->data.model.data);
-					chunk_drawTerrain(&it->data);
+					glUniformMatrix4fv(modelLocation, 1, GL_FALSE, seqtor_at(cm->loadedChunks, i).model.data);
+					chunk_drawTerrain(&(seqtor_at(cm->loadedChunks, i)));
 				}
 			}
 		}
-		it=it->next;
 	}
 }
 
