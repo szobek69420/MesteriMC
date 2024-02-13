@@ -81,6 +81,7 @@ raycastHit rh;
 int raycastChunkX, raycastChunkY, raycastChunkZ;
 int raycastBlockX, raycastBlockY, raycastBlockZ;
 int raycastFound = 0;
+vec3 lastRaycastHit;
 
 chunkManager cm;
 pthread_mutex_t mutex_cm;
@@ -116,6 +117,9 @@ int vaszon_render_distance;
 int vaszon_chunk_updates;
 int vaszon_chunks_loaded;
 int vaszon_chunks_rendered;
+int vaszon_physics_simulated_colliders;
+int vaszon_physics_loaded_groups;
+int vaszon_physics_raycast_hit;
 
 unsigned int rectangleVAO;//a deferred resz hasznalja a kepernyo atrajzolasahoz
 unsigned int rectangleVBO;
@@ -707,6 +711,18 @@ void* loop_render(void* arg)
         sprintf(buffer, "rendered chunks: %d", renderedChunks);
         canvas_setTextText(vaszon, vaszon_chunks_rendered, buffer);
 
+        sprintf(buffer, "simulated colliders: %d", ps.simulatedColliders.size);
+        canvas_setTextText(vaszon, vaszon_physics_simulated_colliders, buffer);
+
+        sprintf(buffer, "collider groups: %d", ps.colliderGroups.size);
+        canvas_setTextText(vaszon, vaszon_physics_loaded_groups, buffer);
+
+        if (raycastFound != 0)
+            sprintf(buffer, "raycast hit: %.2f, %.2f, %.2f", lastRaycastHit.x, lastRaycastHit.y, lastRaycastHit.z);
+        else
+            sprintf(buffer, "raycast hit: nein");
+        canvas_setTextText(vaszon, vaszon_physics_raycast_hit, buffer);
+
 
         double mouseX=0, mouseY=0;
         input_get_mouse_position(&mouseX, &mouseY);
@@ -936,6 +952,7 @@ void* loop_physics(void* arg)
         {
             physicsSystem_update(&ps, PHYSICS_UPDATE/PHYSICS_STEPS_PER_UPDATE);
         }
+        lastRaycastHit = rh.position;
         rh.position = (vec3){ 0,100000,0 };
         raycastFound=physicsSystem_raycast(&ps, cum.position, cum.front, 6, 0.01f, &rh);
 
@@ -1332,12 +1349,17 @@ void init_canvas()
     vaszon_chunks_loaded = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 155, 0, 0, 0, 24);
     vaszon_chunks_rendered = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 180, 0, 0, 0, 24);
 
-    //right side
+    //bototm left
     const char* vendor = glGetString(GL_VENDOR);
     const char* renderer = glGetString(GL_RENDERER);
 
-    canvas_addText(vaszon, vendor, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
-    canvas_addText(vaszon, renderer, CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
+    canvas_addText(vaszon, vendor, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 35, 0, 0, 0, 24);
+    canvas_addText(vaszon, renderer, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 10, 0, 0, 0, 24);
+
+    //right side
+    vaszon_physics_loaded_groups = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
+    vaszon_physics_simulated_colliders = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
+    vaszon_physics_raycast_hit = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 60, 0, 0, 0, 24);
 
     //cursor (should be replaced in a different canvas later)
     int temp;
