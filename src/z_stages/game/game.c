@@ -43,6 +43,7 @@
 #include "../../glm2/mat3.h"
 
 #include "../../physics/collider/collider.h"
+#include "../../physics/collider_group/collider_group.h"
 #include "../../physics/physics_system/physics_system.h"
 
 #include "../../utils/list.h"
@@ -73,6 +74,12 @@ int shouldPoll, shouldSwap, exitStatus;
 enum {
     EXIT_STATUS_REMAIN, EXIT_STATUS_CLOSE_PROGRAM, EXIT_STATUS_RETURN_TO_MENU
 };
+
+enum gameState{
+    GAME_INGAME, GAME_PAUSED
+};
+int currentGameState;//is the game paused or in game or idk
+pthread_mutex_t mutex_gameState;
 
 pthread_mutex_t mutex_window;//for window calls (like window_getHeight())
 
@@ -108,7 +115,10 @@ shader finalPassShader;
 shader fxaaShader;
 shader skyboxShader; mesh skyboxMesh;
 
-canvas* vaszon;
+canvas* vaszonPause;
+pthread_mutex_t mutex_vaszonPause;
+
+canvas* vaszon;//debug screen
 pthread_mutex_t mutex_vaszon;
 int vaszon_fps;
 int vaszon_pos;
@@ -139,6 +149,8 @@ flare lensFlare;
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
 
+void changeGameState(int gs);
+
 void* loop_render(void* arg);
 void* loop_generation(void* arg);
 void* loop_physics(void* arg);
@@ -154,6 +166,8 @@ void init_cube();
 void end_cube();
 
 double lerp(double a, double b, double f);
+
+void quitGame(void* nichts);
 
 //glfw callbacks
 void window_size_callback(GLFWwindow* window, int width, int height);
@@ -171,6 +185,7 @@ void game(void* w, int* currentStage)
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetScrollCallback(window, scroll_callback);
+    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 
@@ -212,6 +227,8 @@ void game(void* w, int* currentStage)
     pthread_mutex_init(&mutex_pm, NULL);
     pthread_mutex_init(&mutex_cum, NULL);
     pthread_mutex_init(&mutex_vaszon, NULL);
+    pthread_mutex_init(&mutex_vaszonPause, NULL);
+    pthread_mutex_init(&mutex_gameState, NULL);
 
 
     pthread_create(&thread_physics, NULL, loop_physics, NULL);
@@ -232,6 +249,8 @@ void game(void* w, int* currentStage)
         //check if it should quit
         int shouldExit2 = 0;
         pthread_mutex_lock(&mutex_exit);
+        if (glfwWindowShouldClose(window))
+            exitStatus = EXIT_STATUS_CLOSE_PROGRAM;
         shouldExit2 = exitStatus;
         pthread_mutex_unlock(&mutex_exit);
         if (shouldExit2!=EXIT_STATUS_REMAIN)
@@ -258,6 +277,8 @@ void game(void* w, int* currentStage)
     pthread_mutex_destroy(&mutex_pm);
     pthread_mutex_destroy(&mutex_cum);
     pthread_mutex_destroy(&mutex_vaszon);
+    pthread_mutex_destroy(&mutex_vaszonPause);
+    pthread_mutex_destroy(&mutex_gameState);
 
 
     glfwMakeContextCurrent(window);
@@ -681,54 +702,69 @@ void* loop_render(void* arg)
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         //render 2d stuff (only text yet)
-        pthread_mutex_lock(&mutex_vaszon);
-
         if (shouldChangeSize)
         {
+            pthread_mutex_lock(&mutex_vaszon);
             canvas_setSize(vaszon, windowWidth, windowHeight);
+            pthread_mutex_unlock(&mutex_vaszon);
+
+            pthread_mutex_lock(&mutex_vaszonPause);
+            canvas_setSize(vaszonPause, windowWidth, windowHeight);
+            pthread_mutex_unlock(&mutex_vaszonPause);
         }
 
         static char buffer[50];
 
-        sprintf(buffer, "fps: %d", (int)(3.5f * framesInLastInterval));
-        canvas_setTextText(vaszon, vaszon_fps, buffer);
-
-        sprintf(buffer, "position: %d %d %d", (int)cum_render.position.x, (int)cum_render.position.y, (int)cum_render.position.z);
-        canvas_setTextText(vaszon, vaszon_pos, buffer);
-
-        sprintf(buffer, "rotation: %.f %.f", cum_render.pitch, cum_render.yaw);
-        canvas_setTextText(vaszon, vaszon_rot, buffer);
-
-        sprintf(buffer, "render distance: %d", cm.renderDistance);
-        canvas_setTextText(vaszon, vaszon_render_distance, buffer);
-
-        sprintf(buffer, "chunk updates: %d/s", chunkUpdatesInLastSecond);
-        canvas_setTextText(vaszon, vaszon_chunk_updates, buffer);
-
-        sprintf(buffer, "loaded chunks: %d", loadedChunks);
-        canvas_setTextText(vaszon, vaszon_chunks_loaded, buffer);
-
-        sprintf(buffer, "rendered chunks: %d", renderedChunks);
-        canvas_setTextText(vaszon, vaszon_chunks_rendered, buffer);
-
-        sprintf(buffer, "simulated colliders: %d", ps.simulatedColliders.size);
-        canvas_setTextText(vaszon, vaszon_physics_simulated_colliders, buffer);
-
-        sprintf(buffer, "collider groups: %d", ps.colliderGroups.size);
-        canvas_setTextText(vaszon, vaszon_physics_loaded_groups, buffer);
-
-        if (raycastFound != 0)
-            sprintf(buffer, "raycast hit: %.2f, %.2f, %.2f", lastRaycastHit.x, lastRaycastHit.y, lastRaycastHit.z);
-        else
-            sprintf(buffer, "raycast hit: nein");
-        canvas_setTextText(vaszon, vaszon_physics_raycast_hit, buffer);
-
-
-        double mouseX=0, mouseY=0;
+        double mouseX = 0, mouseY = 0;
         input_get_mouse_position(&mouseX, &mouseY);
-        canvas_render(vaszon, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
 
-        pthread_mutex_unlock(&mutex_vaszon);
+        switch (currentGameState)
+        {
+            case GAME_INGAME:
+                pthread_mutex_lock(&mutex_vaszon);
+                sprintf(buffer, "fps: %d", (int)(3.5f * framesInLastInterval));
+                canvas_setTextText(vaszon, vaszon_fps, buffer);
+
+                sprintf(buffer, "position: %d %d %d", (int)cum_render.position.x, (int)cum_render.position.y, (int)cum_render.position.z);
+                canvas_setTextText(vaszon, vaszon_pos, buffer);
+
+                sprintf(buffer, "rotation: %.f %.f", cum_render.pitch, cum_render.yaw);
+                canvas_setTextText(vaszon, vaszon_rot, buffer);
+
+                sprintf(buffer, "render distance: %d", cm.renderDistance);
+                canvas_setTextText(vaszon, vaszon_render_distance, buffer);
+
+                sprintf(buffer, "chunk updates: %d/s", chunkUpdatesInLastSecond);
+                canvas_setTextText(vaszon, vaszon_chunk_updates, buffer);
+
+                sprintf(buffer, "loaded chunks: %d", loadedChunks);
+                canvas_setTextText(vaszon, vaszon_chunks_loaded, buffer);
+
+                sprintf(buffer, "rendered chunks: %d", renderedChunks);
+                canvas_setTextText(vaszon, vaszon_chunks_rendered, buffer);
+
+                sprintf(buffer, "simulated colliders: %d", ps.simulatedColliders.size);
+                canvas_setTextText(vaszon, vaszon_physics_simulated_colliders, buffer);
+
+                sprintf(buffer, "collider groups: %d", ps.colliderGroups.size);
+                canvas_setTextText(vaszon, vaszon_physics_loaded_groups, buffer);
+
+                if (raycastFound != 0)
+                    sprintf(buffer, "raycast hit: %.2f, %.2f, %.2f", lastRaycastHit.x, lastRaycastHit.y, lastRaycastHit.z);
+                else
+                    sprintf(buffer, "raycast hit: nein");
+                canvas_setTextText(vaszon, vaszon_physics_raycast_hit, buffer);
+
+                canvas_render(vaszon, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
+                pthread_mutex_unlock(&mutex_vaszon);
+                break;
+
+            case GAME_PAUSED:
+                pthread_mutex_lock(&mutex_vaszonPause);
+                canvas_render(vaszonPause, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
+                pthread_mutex_unlock(&mutex_vaszonPause);
+                break;
+        }
 
         glfwSwapBuffers(window);
 
@@ -761,8 +797,8 @@ void* loop_generation(void* arg)
     while (69)
     {
         float currentTime = glfwGetTime();
-        //while (currentTime - lastFrame < GENERATION_UPDATE)
-            //currentTime = glfwGetTime();
+        while (currentTime - lastFrame < GENERATION_UPDATE)
+            currentTime = glfwGetTime();
         deltaTime = currentTime - lastFrame;
         lastFrame = currentTime;
 
@@ -834,7 +870,7 @@ void* loop_physics(void* arg)
         }
         lastFrame = currentTime;
 
-       
+
         //input
         input_update();
         event e;
@@ -843,146 +879,161 @@ void* loop_physics(void* arg)
 
         double mouseX = 0, mouseY = 0;
         input_get_mouse_position(&mouseX, &mouseY);
-        canvas_checkMouseInput(vaszon, mouseX, mouseY, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
-
-        //player part
-        pthread_mutex_lock(&mutex_cum);
-        previousCumPosition = cum.position;
-        cum.position = vec3_sum(playerCollider->position, (vec3) { 0, 0.69f, 0 });
         
-        //keyboard
-        vec3 velocity = (vec3){ 0,0,0 };
-        vec3 forward = vec3_normalize(vec3_create2(cum.front.x, 0, cum.front.z));
-        if (input_is_key_down(GLFW_KEY_W))
-            velocity = vec3_sum(velocity, vec3_scale(forward, cum.move_speed));
-        if (input_is_key_down(GLFW_KEY_S))
-            velocity = vec3_sum(velocity, vec3_scale(forward, -cum.move_speed));
-        if (input_is_key_down(GLFW_KEY_A))
-            velocity = vec3_sum(velocity, vec3_scale(cum.right, -cum.move_speed));
-        if (input_is_key_down(GLFW_KEY_D))
-            velocity = vec3_sum(velocity, vec3_scale(cum.right, cum.move_speed));
-        if (input_is_key_down(GLFW_KEY_LEFT_SHIFT))
-            velocity = vec3_sum(velocity, (vec3) { 0, -cum.move_speed, 0 });
-        if (input_is_key_down(GLFW_KEY_SPACE))
-            velocity = vec3_sum(velocity, (vec3) { 0, cum.move_speed, 0 });
-
-        playerCollider->velocity = velocity;
-
-        //mouse buttons
-        if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT))
+        switch (currentGameState)
         {
-            if (raycastFound != 0)
-            {
-                chunkManager_changeBlock(&cm, raycastChunkX, raycastChunkY, raycastChunkZ, raycastBlockX, raycastBlockY, raycastBlockZ, BLOCK_AIR);
-                chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ);
+        case GAME_INGAME:
+            canvas_checkMouseInput(vaszon, mouseX, mouseY, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
+            break;
 
-                if (raycastBlockX == 0)
-                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX - 1, raycastChunkY, raycastChunkZ);
-                else if (raycastBlockX == CHUNK_WIDTH - 1)
-                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX + 1, raycastChunkY, raycastChunkZ);
-                if (raycastBlockY == 0)
-                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY - 1, raycastChunkZ);
-                else if (raycastBlockY == CHUNK_HEIGHT - 1)
-                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY + 1, raycastChunkZ);
-                if (raycastBlockZ == 0)
-                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ - 1);
-                else if (raycastBlockZ == CHUNK_WIDTH - 1)
-                    chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ + 1);
-            }
+        case GAME_PAUSED:
+            canvas_checkMouseInput(vaszonPause, mouseX, mouseY, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
+            break;
         }
-        if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_RIGHT))
+
+        switch (currentGameState)
         {
-            if (raycastFound != 0)
-            {
-                int tempRaycastChunk[3] = { raycastChunkX, raycastChunkY, raycastChunkZ };
-                int tempRaycastBlock[3] = { raycastBlockX, raycastBlockY, raycastBlockZ };
-                int tempChunkBounds[3] = { CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_WIDTH };
-                for (int i = 0; i < 3; i++)
+            case GAME_INGAME:
+                //player part
+                pthread_mutex_lock(&mutex_cum);
+                previousCumPosition = cum.position;
+                cum.position = vec3_sum(playerCollider->position, (vec3) { 0, 0.69f, 0 });
+
+                //keyboard
+                vec3 velocity = (vec3){ 0,0,0 };
+                vec3 forward = vec3_normalize(vec3_create2(cum.front.x, 0, cum.front.z));
+                if (input_is_key_down(GLFW_KEY_W))
+                    velocity = vec3_sum(velocity, vec3_scale(forward, cum.move_speed));
+                if (input_is_key_down(GLFW_KEY_S))
+                    velocity = vec3_sum(velocity, vec3_scale(forward, -cum.move_speed));
+                if (input_is_key_down(GLFW_KEY_A))
+                    velocity = vec3_sum(velocity, vec3_scale(cum.right, -cum.move_speed));
+                if (input_is_key_down(GLFW_KEY_D))
+                    velocity = vec3_sum(velocity, vec3_scale(cum.right, cum.move_speed));
+                if (input_is_key_down(GLFW_KEY_LEFT_SHIFT))
+                    velocity = vec3_sum(velocity, (vec3) { 0, -cum.move_speed, 0 });
+                if (input_is_key_down(GLFW_KEY_SPACE))
+                    velocity = vec3_sum(velocity, (vec3) { 0, cum.move_speed, 0 });
+
+                playerCollider->velocity = velocity;
+
+                //mouse buttons
+                if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT))
                 {
-                    if ((&rh.normal.x)[i] > 0.01f) 
+                    if (raycastFound != 0)
                     {
-                        tempRaycastBlock[i]++;
-                        if (tempRaycastBlock[i] == tempChunkBounds[i])
-                        {
-                            tempRaycastBlock[i] = 0;
-                            tempRaycastChunk[i]++;
-                        }
-                    }
-                    else if ((&rh.normal.x)[i] < -0.01f)
-                    {
-                        tempRaycastBlock[i]--;
-                        if (tempRaycastBlock[i] == -1)
-                        {
-                            tempRaycastBlock[i] = tempChunkBounds[i]-1;
-                            tempRaycastChunk[i]--;
-                        }
+                        chunkManager_changeBlock(&cm, raycastChunkX, raycastChunkY, raycastChunkZ, raycastBlockX, raycastBlockY, raycastBlockZ, BLOCK_AIR);
+                        chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ);
+
+                        if (raycastBlockX == 0)
+                            chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX - 1, raycastChunkY, raycastChunkZ);
+                        else if (raycastBlockX == CHUNK_WIDTH - 1)
+                            chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX + 1, raycastChunkY, raycastChunkZ);
+                        if (raycastBlockY == 0)
+                            chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY - 1, raycastChunkZ);
+                        else if (raycastBlockY == CHUNK_HEIGHT - 1)
+                            chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY + 1, raycastChunkZ);
+                        if (raycastBlockZ == 0)
+                            chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ - 1);
+                        else if (raycastBlockZ == CHUNK_WIDTH - 1)
+                            chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ + 1);
                     }
                 }
-                chunkManager_changeBlock(&cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2], tempRaycastBlock[0], tempRaycastBlock[1], tempRaycastBlock[2], BLOCK_SUS);
-                chunkManager_reloadChunk(&cm, &mutex_cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2]);
-            }
+                if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_RIGHT))
+                {
+                    if (raycastFound != 0)
+                    {
+                        int tempRaycastChunk[3] = { raycastChunkX, raycastChunkY, raycastChunkZ };
+                        int tempRaycastBlock[3] = { raycastBlockX, raycastBlockY, raycastBlockZ };
+                        int tempChunkBounds[3] = { CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_WIDTH };
+                        for (int i = 0; i < 3; i++)
+                        {
+                            if ((&rh.normal.x)[i] > 0.01f)
+                            {
+                                tempRaycastBlock[i]++;
+                                if (tempRaycastBlock[i] == tempChunkBounds[i])
+                                {
+                                    tempRaycastBlock[i] = 0;
+                                    tempRaycastChunk[i]++;
+                                }
+                            }
+                            else if ((&rh.normal.x)[i] < -0.01f)
+                            {
+                                tempRaycastBlock[i]--;
+                                if (tempRaycastBlock[i] == -1)
+                                {
+                                    tempRaycastBlock[i] = tempChunkBounds[i] - 1;
+                                    tempRaycastChunk[i]--;
+                                }
+                            }
+                        }
+                        chunkManager_changeBlock(&cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2], tempRaycastBlock[0], tempRaycastBlock[1], tempRaycastBlock[2], BLOCK_SUS);
+                        chunkManager_reloadChunk(&cm, &mutex_cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2]);
+                    }
+                }
+
+                //mouse movement
+                double dx, dy;
+                input_get_mouse_delta(&dx, &dy);
+                dx *= cum.mouse_sensitivity;
+                dy *= cum.mouse_sensitivity;
+                cum.yaw -= dx;
+                if (cum.yaw > 180.0f)
+                    cum.yaw -= 360.0f;
+                if (cum.yaw < -180.0f)
+                    cum.yaw += 360.0f;
+
+                cum.pitch -= dy;
+                if (cum.pitch > 89.0f)
+                    cum.pitch = 89.0f;
+                if (cum.pitch < -89.0f)
+                    cum.pitch = -89.0f;
+
+                camera_updateVectors(&cum);
+                pthread_mutex_unlock(&mutex_cum);
+                //player part done
+
+
+                //physics update
+                double time = glfwGetTime();
+                physicsSystem_resetCollisions(&ps);
+                for (int i = 0; i < PHYSICS_STEPS_PER_UPDATE; i++)
+                {
+                    physicsSystem_update(&ps, PHYSICS_UPDATE / PHYSICS_STEPS_PER_UPDATE);
+                }
+                lastRaycastHit = rh.position;
+                rh.position = (vec3){ 0,100000,0 };
+                raycastFound = physicsSystem_raycast(&ps, cum.position, cum.front, 6, 0.01f, &rh);
+
+                rh.position = vec3_sum(rh.position, vec3_scale(rh.normal, -0.02f));
+                rh.position = vec3_sum(rh.position, vec3_scale(cum.front, 0.02f));
+                chunk_getChunkFromPos(rh.position, &raycastChunkX, &raycastChunkY, &raycastChunkZ);
+                raycastBlockX = (int)(rh.position.x - CHUNK_WIDTH * raycastChunkX);
+                raycastBlockY = (int)(rh.position.y - CHUNK_HEIGHT * raycastChunkY);
+                raycastBlockZ = (int)(rh.position.z - CHUNK_WIDTH * raycastChunkZ);
+                //printf("%.2f %.2f %.2f | %d %d %d\n", rh.position.x, rh.position.y, rh.position.z, CHUNK_WIDTH* raycastChunkX + raycastBlockX, CHUNK_HEIGHT* raycastChunkY + raycastBlockY, CHUNK_WIDTH* raycastChunkZ + raycastBlockZ);
+
+                //update frustum culling
+                pthread_mutex_lock(&mutex_cum);
+                mat4 pv = mat4_multiply(cum.projection_matrix, cum.view_matrix);
+                pthread_mutex_unlock(&mutex_cum);
+
+                pthread_mutex_lock(&mutex_cm);
+                chunkManager_calculateFrustumCull(&cm, &pv);
+                pthread_mutex_unlock(&mutex_cm);
+
+                //player animation
+                pthread_mutex_lock(&mutex_pm);
+                pm.position = (vec3){ cum.position.x, cum.position.y - 1.6f, cum.position.z };
+                pm.rotX = cum.pitch;
+                pm.rotY = cum.yaw;
+                pm.rotHeadX = cum.pitch;
+                playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) { previousCumPosition.x - cum.position.x, 0, previousCumPosition.z - cum.position.z }) > 0.00001f) ? PLAYER_MESH_ANIMATION_WALK : PLAYER_MESH_ANIMATION_IDLE, PHYSICS_UPDATE);
+                playerMesh_calculateOuterModelMatrix(&pm);
+                playerMesh_calculateInnerModelMatrices(&pm);
+                pthread_mutex_unlock(&mutex_pm);
+                break;
         }
-
-        //mouse movement
-        double dx, dy;
-        input_get_mouse_delta(&dx, &dy);
-        dx *= cum.mouse_sensitivity;
-        dy *= cum.mouse_sensitivity;
-        cum.yaw -= dx;
-        if (cum.yaw > 180.0f)
-            cum.yaw -= 360.0f;
-        if (cum.yaw < -180.0f)
-            cum.yaw += 360.0f;
-
-        cum.pitch -= dy;
-        if (cum.pitch > 89.0f)
-            cum.pitch = 89.0f;
-        if (cum.pitch < -89.0f)
-            cum.pitch = -89.0f;
-
-        camera_updateVectors(&cum);
-        pthread_mutex_unlock(&mutex_cum);
-        //player part done
-
-
-        //physics update
-        double time = glfwGetTime();
-        physicsSystem_resetCollisions(&ps);
-        for (int i = 0; i < PHYSICS_STEPS_PER_UPDATE; i++)
-        {
-            physicsSystem_update(&ps, PHYSICS_UPDATE/PHYSICS_STEPS_PER_UPDATE);
-        }
-        lastRaycastHit = rh.position;
-        rh.position = (vec3){ 0,100000,0 };
-        raycastFound=physicsSystem_raycast(&ps, cum.position, cum.front, 6, 0.01f, &rh);
-
-        rh.position=vec3_sum(rh.position, vec3_scale(rh.normal, -0.02f));
-        rh.position = vec3_sum(rh.position, vec3_scale(cum.front, 0.02f));
-        chunk_getChunkFromPos(rh.position, &raycastChunkX, &raycastChunkY, &raycastChunkZ);
-        raycastBlockX = (int)(rh.position.x - CHUNK_WIDTH * raycastChunkX);
-        raycastBlockY = (int)(rh.position.y - CHUNK_HEIGHT * raycastChunkY);
-        raycastBlockZ = (int)(rh.position.z - CHUNK_WIDTH * raycastChunkZ);
-        //printf("%.2f %.2f %.2f | %d %d %d\n", rh.position.x, rh.position.y, rh.position.z, CHUNK_WIDTH* raycastChunkX + raycastBlockX, CHUNK_HEIGHT* raycastChunkY + raycastBlockY, CHUNK_WIDTH* raycastChunkZ + raycastBlockZ);
-        
-        //update frustum culling
-        pthread_mutex_lock(&mutex_cum);
-        mat4 pv = mat4_multiply(cum.projection_matrix, cum.view_matrix);
-        pthread_mutex_unlock(&mutex_cum);
-
-        pthread_mutex_lock(&mutex_cm);
-        chunkManager_calculateFrustumCull(&cm, &pv);
-        pthread_mutex_unlock(&mutex_cm);
-
-        //player animation
-        pthread_mutex_lock(&mutex_pm);
-        pm.position = (vec3){ cum.position.x, cum.position.y - 1.6f, cum.position.z };
-        pm.rotX = cum.pitch;
-        pm.rotY = cum.yaw;
-        pm.rotHeadX = cum.pitch;
-        playerMesh_animate(&pm, (vec3_sqrMagnitude((vec3) { previousCumPosition.x - cum.position.x, 0, previousCumPosition.z - cum.position.z }) > 0.00001f) ? PLAYER_MESH_ANIMATION_WALK : PLAYER_MESH_ANIMATION_IDLE, PHYSICS_UPDATE);
-        playerMesh_calculateOuterModelMatrix(&pm);
-        playerMesh_calculateInnerModelMatrices(&pm);
-        pthread_mutex_unlock(&mutex_pm);
 
 
         pthread_mutex_lock(&mutex_input);
@@ -1003,7 +1054,7 @@ void* loop_physics(void* arg)
             shouldPoll2 = shouldPoll;
             pthread_mutex_unlock(&mutex_input);
 
-            if (shouldExit2!=EXIT_STATUS_REMAIN || !shouldPoll2)
+            if (shouldExit2 != EXIT_STATUS_REMAIN || !shouldPoll2)
                 break;
         }
         if (shouldExit2)
@@ -1033,12 +1084,58 @@ void handle_event(event e)
         input_handle_event(e);
         if (e.type == KEY_PRESSED && e.data.key_pressed.key_code == GLFW_KEY_ESCAPE)
         {
-            pthread_mutex_lock(&mutex_exit);
-            exitStatus = EXIT_STATUS_RETURN_TO_MENU;
-            pthread_mutex_unlock(&mutex_exit);
+            switch (currentGameState)
+            {
+            case GAME_INGAME:
+                changeGameState(GAME_PAUSED);
+                break;
+
+            case GAME_PAUSED:
+                changeGameState(GAME_INGAME);
+                break;
+            }
         }
         break;
     }
+}
+
+void changeGameState(int gs)
+{
+    pthread_mutex_lock(&mutex_gameState);
+    if (gs == currentGameState)
+    {
+        pthread_mutex_unlock(&mutex_gameState);
+        return;
+    }
+
+    switch (currentGameState)
+    {
+    case GAME_INGAME:
+        switch (gs)
+        {
+        case GAME_PAUSED:
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            break;
+        }
+        break;
+    case GAME_PAUSED:
+        switch (gs)
+        {
+        case GAME_INGAME:
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            break;
+        }
+        break;
+    }
+    currentGameState = gs;
+    pthread_mutex_unlock(&mutex_gameState);
+}
+
+void quitGame(void* nichts)
+{
+    pthread_mutex_lock(&mutex_exit);
+    exitStatus = EXIT_STATUS_RETURN_TO_MENU;
+    pthread_mutex_unlock(&mutex_exit);
 }
 
 
@@ -1337,6 +1434,17 @@ void end_renderer()
 
 void init_canvas()
 {
+    //pause screen
+    vaszonPause = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
+    
+    int mogus = canvas_addButton(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 300, 50);
+    canvas_setButtonText(vaszonPause, mogus, "continue", 24, 1, 1, 1);
+    canvas_setButtonBorder(vaszonPause, mogus, 5, 20);
+    canvas_setButtonFillColour(vaszonPause, mogus, 0.5, 0.5, 0.5);
+    canvas_setButtonBorderColour(vaszonPause, mogus, 0.3, 0.3, 0.3);
+    canvas_setButtonClicked(vaszonPause, mogus, changeGameState, (void*)GAME_INGAME);
+
+    //debug screen
     vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
 
     //left side
@@ -1369,6 +1477,7 @@ void init_canvas()
 
 void end_canvas()
 {
+    canvas_destroy(vaszonPause);
     canvas_destroy(vaszon);
 }
 

@@ -19,6 +19,9 @@
 #include "../../event/event_queue.h"
 #include "../../input/input.h"
 
+#ifdef sleep(DURATION_IN_SEX)
+#undef sleep(DURATION_IN_SEX)
+#endif
 #ifdef _WIN32
 #include <Windows.h>
 #define sleep(DURATION_IN_SEX) do{ \
