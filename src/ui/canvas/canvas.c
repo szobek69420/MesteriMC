@@ -113,7 +113,8 @@ canvas* canvas_create(int width, int height, const char* fontSauce)
 	c->width = width;
 	c->height = height;
 
-	c->f = fontHandler_loadFont(fontSauce,CANVAS_FONT_SIZE);
+	if(fontSauce!=NULL)
+		c->f = fontHandler_loadFont(fontSauce, CANVAS_FONT_SIZE);
 
 	c->tr = textRenderer_create(width, height);
 
@@ -359,7 +360,7 @@ void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseDown, in
 				if (fabsf(cc->cs.value - cc->cs.prevValue) > 0.01f)
 				{
 					cc->cs.dragged(cc->cs.value);
-					cc->cs.value = cc->cs.prevValue;
+					cc->cs.prevValue = cc->cs.value;
 				}
 			}
 			else
