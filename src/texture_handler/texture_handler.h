@@ -21,6 +21,7 @@
 
 #define TEXTURE_MENU_BACKGROUND 69420666
 #define TEXTURE_MENU_TITLE 69420667
+#define TEXTURE_MENU_TITLE_SETTINGS 69420668
 
 int textureHandler_importTextures(int stage);//visszateresi ertek 0, ha sikerult
 void textureHandler_destroyTextures(int stage);

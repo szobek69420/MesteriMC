@@ -16,6 +16,8 @@
 #include "z_stages/stages.h"
 #include "window/window.h"
 
+#include "settings/settings.h"
+
 
 #include <stdlib.h>
 #include <time.h>
@@ -36,6 +38,7 @@ int main()
         switch (currentStage)
         {
         case STAGE_INITIALIZE:
+            settings_load();
             window_setWidth(1300);
             window_setHeight(800);
             window = init_window("Mesteri MC", window_getWidth(), window_getHeight());
