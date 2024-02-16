@@ -16,7 +16,7 @@
 
 #include "../../window/window.h"
 
-#define CANVAS_FONT_SIZE 48
+#define CANVAS_FONT_SIZE 72
 
 #define CANVAS_COMPONENT_TEXT 0
 #define CANVAS_COMPONENT_BUTTON 1
@@ -113,7 +113,8 @@ canvas* canvas_create(int width, int height, const char* fontSauce)
 	c->width = width;
 	c->height = height;
 
-	c->f = fontHandler_loadFont(fontSauce,CANVAS_FONT_SIZE);
+	if(fontSauce!=NULL)
+		c->f = fontHandler_loadFont(fontSauce, CANVAS_FONT_SIZE);
 
 	c->tr = textRenderer_create(width, height);
 
@@ -254,11 +255,7 @@ void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed)
 			buttonRenderer_setBorderColour(c->br, cc->cs.borderR, cc->cs.borderG, cc->cs.borderB);
 			buttonRenderer_render(c->br, cc->originX, cc->originY, cc->width, cc->height, cc->cs.borderWidth, cc->cs.borderRadius);
 			//knob
-			float knobX = cc->cs.wholeNumbers
-				? 
-				(((int)cc->cs.value - cc->cs.min) / (cc->cs.max - cc->cs.min)) * cc->width + cc->originX - 0.5f * cc->cs.knobWidth
-				:
-				((cc->cs.value - cc->cs.min) / (cc->cs.max - cc->cs.min)) * cc->width + cc->originX - 0.5f*cc->cs.knobWidth;
+			float knobX = ((cc->cs.value - cc->cs.min) / (cc->cs.max - cc->cs.min)) * cc->width + cc->originX - 0.5f * cc->cs.knobWidth;
 			float knobY = 0.5f * cc->height - 0.5f * cc->cs.knobHeight + cc->originY;
 
 			buttonRenderer_setBackgroundTransparency(c->br, cc->cs.knobTransparentBackground);
@@ -341,7 +338,18 @@ void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseDown, in
 					if (value > 1)
 						value = 1;
 					value = value * (cc->cs.max - cc->cs.min) + cc->cs.min;
-					cc->cs.value = value;
+					if(cc->cs.wholeNumbers)
+						cc->cs.value = lroundf(value);
+					else
+						cc->cs.value = value;
+
+
+					if (fabsf(cc->cs.value - cc->cs.prevValue) > 0.01f)
+					{
+						cc->cs.dragged(cc->cs.value);
+						cc->cs.prevValue = cc->cs.value;
+					}
+
 
 					cc->inDrag = 69;
 				}
@@ -354,12 +362,15 @@ void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseDown, in
 				if (value > 1)
 					value = 1;
 				value = value * (cc->cs.max - cc->cs.min) + cc->cs.min;
-				cc->cs.value = value;
+				if (cc->cs.wholeNumbers)
+					cc->cs.value = lroundf(value);
+				else
+					cc->cs.value = value;
 
 				if (fabsf(cc->cs.value - cc->cs.prevValue) > 0.01f)
 				{
 					cc->cs.dragged(cc->cs.value);
-					cc->cs.value = cc->cs.prevValue;
+					cc->cs.prevValue = cc->cs.value;
 				}
 			}
 			else

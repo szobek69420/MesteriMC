@@ -5,12 +5,17 @@
 #include <GLFW/glfw3.h>
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
 
 #include "../stages.h"
 
 #include "../../texture_handler/texture_handler.h"
 
 #include "../../window/window.h"
+
+#include "../../settings/settings.h"
 
 #include "../../ui/canvas/canvas.h"
 #include "../../ui/font_handler/font_handler.h"
@@ -40,9 +45,23 @@ while(glfwGetTime()-____time<DURATION) ; \
 GLFWwindow* w;
 int* currentStage;
 
-canvas* vaszon;
+enum {
+    MENU_MAIN, MENU_SETTINGS
+};
+int menuState;
+
 font f;
+
+canvas* vaszonBackground;
 int background;
+
+canvas* vaszon;
+
+canvas* vaszonSettings;
+int sliderRenderDistance, textRenderDistance;
+int sliderResolution, textResolution;
+int buttonShadows;
+int sliderShadowResolution, textShadowResolution;
 
 //glfw callbacks
 void window_size_callback2(GLFWwindow* window, int width, int height);
@@ -53,8 +72,12 @@ void scroll_callback2(GLFWwindow* window, double xoffset, double yoffset);
 
 //button callbacks
 void startButton(void* currentStage);
-void settingsButton(void* param);
+void settingsButton(void* destination);
 void quitButton(void* currentStage);
+void sliderRenderDistanceFunction(float value);
+void sliderResolutionFunction(float value);
+void buttonShadowFunction(void* param);
+void sliderShadowResolutionFunction(float value);
 
 //other function prototypes
 void init();
@@ -67,6 +90,7 @@ void mainMenu(void* window, int* _currentStage)
 {
     w = (GLFWwindow*)window;
     currentStage = _currentStage;
+    menuState = MENU_MAIN;
     init();
 
     while (*currentStage == STAGE_MAIN_MENU)
@@ -81,8 +105,20 @@ void mainMenu(void* window, int* _currentStage)
         double x, y;
         glfwGetCursorPos(w, &x, &y);
 
-        canvas_checkMouseInput(vaszon, x, y, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
-        canvas_render(vaszon, x, y, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
+        switch (menuState)
+        {
+        case MENU_MAIN:
+            canvas_checkMouseInput(vaszon, x, y, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
+            canvas_render(vaszonBackground, 0, 0, 0);
+            canvas_render(vaszon, x, y, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
+            break;
+
+        case MENU_SETTINGS:
+            canvas_checkMouseInput(vaszonSettings, x, y, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
+            canvas_render(vaszonBackground, 0, 0, 0);
+            canvas_render(vaszonSettings, x, y, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
+            break;
+        }
 
         glfwSwapBuffers(w);
 
@@ -112,14 +148,19 @@ void init()
     textureHandler_importTextures(TEXTURE_MAIN_MENU);
 
     fontHandler_init();
-    vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
-
-    //filling canvas
-    background = canvas_addImage(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 0, 0, textureHandler_getTexture(TEXTURE_MENU_BACKGROUND));
-    background_resize();
-    canvas_addImage(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_TOP, 0, 100, 700, 100, textureHandler_getTexture(TEXTURE_MENU_TITLE));
 
     int temp;
+    char buffer[50];
+    //background canvas
+    vaszonBackground = canvas_create(window_getWidth(), window_getHeight(), NULL);
+    background = canvas_addImage(vaszonBackground, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 0, 0, textureHandler_getTexture(TEXTURE_MENU_BACKGROUND));
+    background_resize();
+
+    //main canvas
+    vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
+
+    canvas_addImage(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_TOP, 0, 100, 700, 100, textureHandler_getTexture(TEXTURE_MENU_TITLE));
+
     temp = canvas_addButton(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 400, 60);
     canvas_setButtonText(vaszon, temp, "mom's spaghetti", 24, 1, 1, 1);
     canvas_setButtonBorder(vaszon, temp, 5, 20);
@@ -132,7 +173,7 @@ void init()
     canvas_setButtonBorder(vaszon, temp, 5, 20);
     canvas_setButtonFillColour(vaszon, temp, 0.5, 0.5, 0.5);
     canvas_setButtonBorderColour(vaszon, temp, 0.3, 0.3, 0.3);
-    canvas_setButtonClicked(vaszon, temp, settingsButton, NULL);
+    canvas_setButtonClicked(vaszon, temp, settingsButton, MENU_SETTINGS);
 
     temp = canvas_addButton(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, -140, 400, 60);
     canvas_setButtonText(vaszon, temp, "step back to reality", 24, 1, 1, 1);
@@ -140,13 +181,78 @@ void init()
     canvas_setButtonFillColour(vaszon, temp, 0.5, 0.5, 0.5);
     canvas_setButtonBorderColour(vaszon, temp, 0.3, 0.3, 0.3);
     canvas_setButtonClicked(vaszon, temp, quitButton, currentStage);
+
+    //settings canvas
+    vaszonSettings = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
+
+    canvas_addImage(vaszonSettings, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_TOP, 0, 100, 550, 100, textureHandler_getTexture(TEXTURE_MENU_TITLE_SETTINGS));
+
+    temp = canvas_addButton(vaszonSettings, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, 0, 100, 300, 60);
+    canvas_setButtonText(vaszonSettings, temp, "return to main", 24, 1, 1, 1);
+    canvas_setButtonBorder(vaszonSettings, temp, 5, 20);
+    canvas_setButtonFillColour(vaszonSettings, temp, 0.5, 0.5, 0.5);
+    canvas_setButtonBorderColour(vaszonSettings, temp, 0.3, 0.3, 0.3);
+    canvas_setButtonClicked(vaszonSettings, temp, settingsButton, MENU_MAIN);
+
+
+    sliderRenderDistance = canvas_addSlider(vaszonSettings, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, -220, 40, 400, 50, 10, 50, 69);
+    canvas_setSliderBounds(vaszonSettings, sliderRenderDistance, 2, 10);
+    canvas_setSliderValue(vaszonSettings, sliderRenderDistance, settings_getInt(SETTINGS_RENDER_DISTANCE));
+    canvas_setSliderBackgroundBorder(vaszonSettings, sliderRenderDistance, 5, 5);
+    canvas_setSliderBackgroundBorderColour(vaszonSettings, sliderRenderDistance, 0.5f, 0.5f, 0.5f);
+    canvas_setSliderBackgroundFillColour(vaszonSettings, sliderRenderDistance, 0, 0, 0);
+    canvas_setSliderKnobFillColour(vaszonSettings, sliderRenderDistance, 1, 1, 1);
+    canvas_setSliderKnobBorder(vaszonSettings, sliderRenderDistance, 0, 0);
+    canvas_setSliderCallback(vaszonSettings, sliderRenderDistance, sliderRenderDistanceFunction);
+    
+    sprintf(buffer, "render distance: %d", settings_getInt(SETTINGS_RENDER_DISTANCE));
+    textRenderDistance = canvas_addText(vaszonSettings, buffer, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, -220, 40, 1, 0.85f, 0, 24);
+
+
+    sliderResolution = canvas_addSlider(vaszonSettings, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 220, 40, 400, 50, 10, 50, 69);
+    canvas_setSliderBounds(vaszonSettings, sliderResolution, 0, 3);
+    canvas_setSliderValue(vaszonSettings, sliderResolution, settings_getInt(SETTINGS_RENDERER_RESOLUTION));
+    canvas_setSliderBackgroundBorder(vaszonSettings, sliderResolution, 5, 5);
+    canvas_setSliderBackgroundBorderColour(vaszonSettings, sliderResolution, 0.5f, 0.5f, 0.5f);
+    canvas_setSliderBackgroundFillColour(vaszonSettings, sliderResolution, 0, 0, 0);
+    canvas_setSliderKnobFillColour(vaszonSettings, sliderResolution, 1, 1, 1);
+    canvas_setSliderKnobBorder(vaszonSettings, sliderResolution, 0, 0);
+    canvas_setSliderCallback(vaszonSettings, sliderResolution, sliderResolutionFunction);
+
+    textResolution = canvas_addText(vaszonSettings, "amogus", CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 220, 40, 1, 0.85f, 0, 24);
+    sliderResolutionFunction(settings_getInt(SETTINGS_RENDERER_RESOLUTION));
+
+
+    buttonShadows = canvas_addButton(vaszonSettings, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, -220, -40, 400, 50);
+    if (settings_getInt(SETTINGS_SHADOWS) == 0) canvas_setButtonText(vaszonSettings, buttonShadows, "shadows: off", 24, 1, 0.85f, 0);
+    else canvas_setButtonText(vaszonSettings, buttonShadows, "shadows: on", 24, 1, 0.85f, 0);
+    canvas_setButtonBorder(vaszonSettings, buttonShadows, 5, 5);
+    canvas_setButtonFillColour(vaszonSettings, buttonShadows, 0, 0, 0);
+    canvas_setButtonBorderColour(vaszonSettings, buttonShadows, 0.5, 0.5, 0.5);
+    canvas_setButtonClicked(vaszonSettings, buttonShadows, buttonShadowFunction, NULL);
+
+
+    sliderShadowResolution = canvas_addSlider(vaszonSettings, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 220, -40, 400, 50, 10, 50, 69);
+    canvas_setSliderBounds(vaszonSettings, sliderShadowResolution, 0, 3);
+    canvas_setSliderValue(vaszonSettings, sliderShadowResolution, settings_getInt(SETTINGS_SHADOW_RESOLUTION));
+    canvas_setSliderBackgroundBorder(vaszonSettings, sliderShadowResolution, 5, 5);
+    canvas_setSliderBackgroundBorderColour(vaszonSettings, sliderShadowResolution, 0.5f, 0.5f, 0.5f);
+    canvas_setSliderBackgroundFillColour(vaszonSettings, sliderShadowResolution, 0, 0, 0);
+    canvas_setSliderKnobFillColour(vaszonSettings, sliderShadowResolution, 1, 1, 1);
+    canvas_setSliderKnobBorder(vaszonSettings, sliderShadowResolution, 0, 0);
+    canvas_setSliderCallback(vaszonSettings, sliderShadowResolution, sliderShadowResolutionFunction);
+
+    textShadowResolution = canvas_addText(vaszonSettings, "amogus", CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 220, -40, 1, 0.85f, 0, 24);
+    sliderShadowResolutionFunction(settings_getInt(SETTINGS_SHADOW_RESOLUTION));
 }
 
 void end()
 {
     fontHandler_close();
     fontHandler_destroyFont(&f);
+    canvas_destroy(vaszonBackground);
     canvas_destroy(vaszon);
+    canvas_destroy(vaszonSettings);
     textureHandler_destroyTextures(TEXTURE_MAIN_MENU);
 }
 
@@ -162,11 +268,11 @@ void background_resize()
 
     if (bgAspectXY > window_getAspect())
     {
-        canvas_setComponentSize(vaszon, background, window_getHeight() * bgAspectXY, window_getHeight());
+        canvas_setComponentSize(vaszonBackground, background, window_getHeight() * bgAspectXY, window_getHeight());
     }
     else
     {
-        canvas_setComponentSize(vaszon, background, window_getWidth(), window_getWidth() / bgAspectXY);
+        canvas_setComponentSize(vaszonBackground, background, window_getWidth(), window_getWidth() / bgAspectXY);
     }
 }
 
@@ -178,7 +284,9 @@ void handle_event2(event e)
         window_setWidth(e.data.window_resize.width);
         window_setHeight(e.data.window_resize.height);
         glViewport(0, 0, window_getWidth(), window_getHeight());
+        canvas_setSize(vaszonBackground, window_getWidth(), window_getHeight());
         canvas_setSize(vaszon, window_getWidth(), window_getHeight());
+        canvas_setSize(vaszonSettings, window_getWidth(), window_getHeight());
         background_resize();
         break;
     default:
@@ -224,12 +332,63 @@ void startButton(void* currentStage)
     (*(int*)currentStage) = STAGE_IN_GAME;
 }
 
-void settingsButton(void* param)
+void settingsButton(void* destination)
 {
-    printf("settings\n");
+    switch ((int)destination)
+    {
+    case MENU_MAIN:
+        settings_save();
+        menuState = MENU_MAIN;
+        break;
+
+    case MENU_SETTINGS:
+        menuState = MENU_SETTINGS;
+        break;
+    }
 }
 
 void quitButton(void* currentStage)
 {
     (*(int*)currentStage) = STAGE_QUIT;
+}
+
+void sliderRenderDistanceFunction(float value)
+{
+    settings_setInt(SETTINGS_RENDER_DISTANCE, lroundf(value));
+
+    static char buffer[30];
+    sprintf(buffer, "render distance: %d", lroundf(value));
+    canvas_setTextText(vaszonSettings, textRenderDistance, buffer);
+}
+
+void sliderResolutionFunction(float value)
+{
+    settings_setInt(SETTINGS_RENDERER_RESOLUTION, lroundf(value));
+
+    static char buffer[30];
+    sprintf(buffer, "renderer res.: %dx%d", settings_getInt(SETTINGS_RENDERER_WIDTH), settings_getInt(SETTINGS_RENDERER_HEIGHT));
+    canvas_setTextText(vaszonSettings, textResolution, buffer);
+}
+
+void buttonShadowFunction(void* param)
+{
+    if (settings_getInt(SETTINGS_SHADOWS) == 0)
+    {
+        settings_setInt(SETTINGS_SHADOWS, 1);
+        canvas_setButtonText(vaszonSettings, buttonShadows, "shadows: on", 24, 1, 0.85f, 0);
+    }
+    else
+    {
+        settings_setInt(SETTINGS_SHADOWS, 0);
+        canvas_setButtonText(vaszonSettings, buttonShadows,  "shadows: off", 24, 1, 0.85f, 0);
+    }
+}
+
+void sliderShadowResolutionFunction(float value)
+{
+    settings_setInt(SETTINGS_SHADOW_RESOLUTION, lroundf(value));
+
+    static char buffer[30];
+    sprintf(buffer, "shadow res.: %dx%d", settings_getInt(SETTINGS_SHADOW_RESOLUTION_PIXELS), settings_getInt(SETTINGS_SHADOW_RESOLUTION_PIXELS));
+    canvas_setTextText(vaszonSettings, textShadowResolution, buffer);
 }

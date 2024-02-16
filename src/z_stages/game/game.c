@@ -191,6 +191,8 @@ void game(void* w, int* currentStage)
     currentCursorMode = GLFW_CURSOR_DISABLED;
     targetCursorMode = GLFW_CURSOR_DISABLED;
 
+    currentGameState = GAME_INGAME;
+
 
     textureHandler_importTextures(TEXTURE_IN_GAME);
 

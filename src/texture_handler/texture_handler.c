@@ -20,6 +20,7 @@ static unsigned int sky_gradient = 0;
 //menu
 static unsigned int menu_title = 0;
 static unsigned int menu_background = 0;
+static unsigned int menu_title_settings = 0;
 
 
 
@@ -79,6 +80,10 @@ int textureHandler_importTextures(int stage)
         menu_title = textureHandler_loadImage("../assets/textures/main_menu/main_title.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
         if (menu_title == 0)
             problem++;
+
+        menu_title_settings = textureHandler_loadImage("../assets/textures/settings/settings_title.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
+        if (menu_title_settings == 0)
+            problem++;
         break;
     }
 
@@ -116,9 +121,11 @@ void textureHandler_destroyTextures(int stage)
     case TEXTURE_MAIN_MENU:
         glDeleteTextures(1, &menu_background);
         glDeleteTextures(1, &menu_title);
+        glDeleteTextures(1, &menu_title_settings);
 
         menu_background = 0;
         menu_title = 0;
+        menu_title_settings = 0;
         break;
     }
 }
@@ -153,6 +160,9 @@ unsigned int textureHandler_getTexture(int texture)
 
     case TEXTURE_MENU_TITLE:
         return menu_title;
+
+    case TEXTURE_MENU_TITLE_SETTINGS:
+        return menu_title_settings;
 
     default:
         return 0;
