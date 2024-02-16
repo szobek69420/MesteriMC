@@ -74,6 +74,7 @@ int shouldPoll, shouldSwap, exitStatus;
 enum {
     EXIT_STATUS_REMAIN, EXIT_STATUS_CLOSE_PROGRAM, EXIT_STATUS_RETURN_TO_MENU
 };
+int currentCursorMode, targetCursorMode;//glfwSetInputMode should only be called from the main thread, so these serve as a buffer until the main thread gets to change the input mode
 
 enum gameState{
     GAME_INGAME, GAME_PAUSED
@@ -187,6 +188,8 @@ void game(void* w, int* currentStage)
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    currentCursorMode = GLFW_CURSOR_DISABLED;
+    targetCursorMode = GLFW_CURSOR_DISABLED;
 
 
     textureHandler_importTextures(TEXTURE_IN_GAME);
@@ -243,6 +246,11 @@ void game(void* w, int* currentStage)
         {
             glfwPollEvents();
             shouldPoll = 0;
+        }
+        if (currentCursorMode != targetCursorMode)
+        {
+            currentCursorMode = targetCursorMode;
+            glfwSetInputMode(window, GLFW_CURSOR, targetCursorMode);
         }
         pthread_mutex_unlock(&mutex_input);
 
@@ -1114,7 +1122,9 @@ void changeGameState(int gs)
         switch (gs)
         {
         case GAME_PAUSED:
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            pthread_mutex_lock(&mutex_input);
+            targetCursorMode = GLFW_CURSOR_NORMAL;
+            pthread_mutex_unlock(&mutex_input);
             break;
         }
         break;
@@ -1122,7 +1132,9 @@ void changeGameState(int gs)
         switch (gs)
         {
         case GAME_INGAME:
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            pthread_mutex_lock(&mutex_input);
+            targetCursorMode = GLFW_CURSOR_DISABLED;
+            pthread_mutex_unlock(&mutex_input);
             break;
         }
         break;
