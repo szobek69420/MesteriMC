@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "../font_handler/font_handler.h"
 #include "../text/text_renderer.h"
@@ -20,6 +21,7 @@
 #define CANVAS_COMPONENT_TEXT 0
 #define CANVAS_COMPONENT_BUTTON 1
 #define CANVAS_COMPONENT_IMAGE 2
+#define CANVAS_COMPONENT_SLIDER 3
 
 static int componentIDCounter = 0;//increases by one if a component has been added to the canvas
 
@@ -46,8 +48,29 @@ struct canvasImage {
 	unsigned int textureId;
 	float uvX, uvY, uvWidth, uvHeight;
 	float tintR, tintG, tintB;
+	void (*clicked)(void*);
+	void* clickedParam;
 };
 typedef struct canvasImage canvasImage;
+
+struct canvasSlider {
+	float value, prevValue, min, max;
+	int wholeNumbers;
+
+	float borderR, borderG, borderB;
+	float fillR, fillG, fillB;
+	float borderWidth, borderRadius;
+	int transparentBackground;
+
+	float knobWidth, knobHeight;
+	float knobBorderR, knobBorderG, knobBorderB;
+	float knobFillR, knobFillG, knobFillB;
+	float knobBorderWidth, knobBorderRadius;
+	int knobTransparentBackground;
+
+	void (*dragged)(float);
+};
+typedef struct canvasSlider canvasSlider;
 
 struct canvasComponent {
 	int id;
@@ -56,11 +79,13 @@ struct canvasComponent {
 	int x, y;//the position of the (0,0) point depends on the alignment (for example for a combo of CANVAS_ALIGN_LEFT and CANVAS_ALIGN_BOTTOM it is the bottom left corner of the screen, but for CANVAS_ALIGN_RIGHT and CANVAS_ALIGN_TOP it is the top right corner of the screen)
 	float originX, originY;//(0,0) is the bottom left corner (for example CANVAS_ALIGN_LEFT and CANVAS_ALIGN_TOP for (x,y)=(10,0) equals an (originX,originY)=(10,canvas_height-component_height)
 	float width, height;
+	int inDrag;//ha az eger elhagyna a komponens teruletet, de nem eresztene fel a gombot a felhasznalo, akkor az meg drag legyen
 
 	union componentData {
 		canvasText ct;
 		canvasButton cb;
 		canvasImage ci;
+		canvasSlider cs;
 	};
 };
 typedef struct canvasComponent canvasComponent;
@@ -170,18 +195,15 @@ void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed)
 
 		case CANVAS_COMPONENT_BUTTON:
 			buttonRenderer_setBackgroundTransparency(c->br, cc->cb.transparentBackground);
-			if (isInBounds)
+			if (cc->inDrag)
 			{
-				if (mousePressed)
-				{
-					buttonRenderer_setFillColour(c->br, 0.5f * cc->cb.fillR, 0.5f * cc->cb.fillG, 0.5f * cc->cb.fillB);
-					buttonRenderer_setBorderColour(c->br, 0.5f * cc->cb.borderR, 0.5f * cc->cb.borderG, 0.5f * cc->cb.borderB);
-				}
-				else
-				{
-					buttonRenderer_setFillColour(c->br, 0.8f * cc->cb.fillR, 0.8f * cc->cb.fillG, 0.8f * cc->cb.fillB);
-					buttonRenderer_setBorderColour(c->br, 0.8f*cc->cb.borderR, 0.8f*cc->cb.borderG, 0.8f*cc->cb.borderB);
-				}
+				buttonRenderer_setFillColour(c->br, 0.5f * cc->cb.fillR, 0.5f * cc->cb.fillG, 0.5f * cc->cb.fillB);
+				buttonRenderer_setBorderColour(c->br, 0.5f * cc->cb.borderR, 0.5f * cc->cb.borderG, 0.5f * cc->cb.borderB);
+			}
+			else if (isInBounds&&cc->cb.clicked!=NULL)
+			{
+				buttonRenderer_setFillColour(c->br, 0.8f * cc->cb.fillR, 0.8f * cc->cb.fillG, 0.8f * cc->cb.fillB);
+				buttonRenderer_setBorderColour(c->br, 0.8f * cc->cb.borderR, 0.8f * cc->cb.borderG, 0.8f * cc->cb.borderB);
 			}
 			else
 			{
@@ -205,7 +227,12 @@ void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed)
 		case CANVAS_COMPONENT_IMAGE:
 			if (cc->ci.textureId != 0)
 			{
-				imageRenderer_setTint(c->ir, cc->ci.tintR, cc->ci.tintG, cc->ci.tintB);
+				if(cc->inDrag)
+					imageRenderer_setTint(c->ir, 0.5f * cc->ci.tintR, 0.5f * cc->ci.tintG, 0.5f * cc->ci.tintB);
+				else if (isInBounds && cc->ci.clicked != NULL)
+					imageRenderer_setTint(c->ir, 0.8f * cc->ci.tintR, 0.8f * cc->ci.tintG, 0.8f * cc->ci.tintB);
+				else
+					imageRenderer_setTint(c->ir, cc->ci.tintR, cc->ci.tintG, cc->ci.tintB);
 				imageRenderer_render(
 					c->ir,
 					cc->ci.textureId,
@@ -219,27 +246,125 @@ void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed)
 					cc->ci.uvHeight);
 			}
 			break;
+
+		case CANVAS_COMPONENT_SLIDER:
+			//background
+			buttonRenderer_setBackgroundTransparency(c->br, cc->cs.transparentBackground);
+			buttonRenderer_setFillColour(c->br, cc->cs.fillR, cc->cs.fillG, cc->cs.fillB);
+			buttonRenderer_setBorderColour(c->br, cc->cs.borderR, cc->cs.borderG, cc->cs.borderB);
+			buttonRenderer_render(c->br, cc->originX, cc->originY, cc->width, cc->height, cc->cs.borderWidth, cc->cs.borderRadius);
+			//knob
+			float knobX = cc->cs.wholeNumbers
+				? 
+				(((int)cc->cs.value - cc->cs.min) / (cc->cs.max - cc->cs.min)) * cc->width + cc->originX - 0.5f * cc->cs.knobWidth
+				:
+				((cc->cs.value - cc->cs.min) / (cc->cs.max - cc->cs.min)) * cc->width + cc->originX - 0.5f*cc->cs.knobWidth;
+			float knobY = 0.5f * cc->height - 0.5f * cc->cs.knobHeight + cc->originY;
+
+			buttonRenderer_setBackgroundTransparency(c->br, cc->cs.knobTransparentBackground);
+			if (cc->inDrag)
+			{
+				buttonRenderer_setFillColour(c->br, 0.8f * cc->cs.knobFillR, 0.8f * cc->cs.knobFillG, 0.8f * cc->cs.knobFillB);
+				buttonRenderer_setBorderColour(c->br, 0.8f * cc->cs.knobBorderR, 0.8f * cc->cs.knobBorderG, 0.8f * cc->cs.knobBorderB);
+			}
+			else
+			{
+				buttonRenderer_setFillColour(c->br, cc->cs.knobFillR, cc->cs.knobFillG, cc->cs.knobFillB);
+				buttonRenderer_setBorderColour(c->br, cc->cs.knobBorderR, cc->cs.knobBorderG, cc->cs.knobBorderB);
+			}
+			buttonRenderer_render(c->br, knobX, knobY, cc->cs.knobWidth, cc->cs.knobHeight, cc->cs.knobBorderWidth, cc->cs.knobBorderRadius);
+			break;
 		}
 	}
 }
 
-void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseClicked)
+void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseDown, int mousePressed, int mouseClicked)
 {
 	mouseY = window_getHeight() - mouseY;
 	canvasComponent* cc;
-	for (int i = 0; i < seqtor_size(c->components); i++)
+	int clickCallbackExecuted = 0;
+	int inBounds = 0;
+	for (int i = seqtor_size(c->components)-1; i >=0; i--)
 	{
 		cc = &seqtor_at(c->components, i);
 
+		inBounds = 69;
 		if (cc->originX > mouseX || cc->originX + cc->width<mouseX || cc->originY>mouseY || cc->originY + cc->height < mouseY)
-			continue;
+			inBounds = 0;
+
 
 		switch (cc->componentType)
 		{
 
 		case CANVAS_COMPONENT_BUTTON:
-			if (mouseClicked&&cc->cb.clicked != NULL)
-				cc->cb.clicked(cc->cb.clickedParam);
+			if (mouseClicked)
+			{
+				if (cc->inDrag && inBounds&& cc->cb.clicked != NULL && clickCallbackExecuted == 0)
+				{
+					cc->cb.clicked(cc->cb.clickedParam);
+					clickCallbackExecuted = 69;
+				}
+				cc->inDrag = 0;
+			}
+			if (mousePressed)
+			{
+				if (inBounds && cc->cb.clicked != NULL)
+					cc->inDrag = 69;
+			}
+			break;
+
+		case CANVAS_COMPONENT_IMAGE:
+			if (mouseClicked)
+			{
+				if (cc->inDrag && inBounds && cc->ci.clicked != NULL && clickCallbackExecuted == 0)
+				{
+					cc->ci.clicked(cc->ci.clickedParam);
+					clickCallbackExecuted = 69;
+				}
+				cc->inDrag = 0;
+			}
+			if (mousePressed)
+			{
+				if (inBounds && cc->ci.clicked != NULL)
+					cc->inDrag = 69;
+			}
+			break;
+
+		case CANVAS_COMPONENT_SLIDER:
+			if (mousePressed&&cc->cs.dragged!=NULL)
+			{
+				if (inBounds)
+				{
+					float value = (mouseX - cc->originX) / cc->width;
+					if (value < 0)
+						value = 0;
+					if (value > 1)
+						value = 1;
+					value = value * (cc->cs.max - cc->cs.min) + cc->cs.min;
+					cc->cs.value = value;
+
+					cc->inDrag = 69;
+				}
+			}
+			else if (mouseDown && cc->inDrag)
+			{
+				float value = (mouseX - cc->originX) / cc->width;
+				if (value < 0)
+					value = 0;
+				if (value > 1)
+					value = 1;
+				value = value * (cc->cs.max - cc->cs.min) + cc->cs.min;
+				cc->cs.value = value;
+
+				if (fabsf(cc->cs.value - cc->cs.prevValue) > 0.01f)
+				{
+					cc->cs.dragged(cc->cs.value);
+					cc->cs.value = cc->cs.prevValue;
+				}
+			}
+			else
+				cc->inDrag = 0;
+
 			break;
 
 		default:
@@ -383,6 +508,8 @@ int canvas_addText(canvas* c, const char* text, int hAlign, int vAlign, int x, i
 	cc.hAlign = hAlign;
 	cc.vAlign = vAlign;
 
+	cc.inDrag = 0;
+
 	cc.ct.text = malloc((strlen(text) + 1) * sizeof(char));
 	strcpy(cc.ct.text, text);
 
@@ -458,6 +585,7 @@ int canvas_addButton(canvas* c, int hAlign, int vAlign, int x, int y, float widt
 	cc.vAlign = vAlign;
 	cc.width = width;
 	cc.height = height;
+	cc.inDrag = 0;
 
 	cc.cb.ct.text = NULL;
 	cc.cb.ct.r = 0;		cc.cb.ct.g = 0;		cc.cb.ct.b = 0;
@@ -569,10 +697,14 @@ int canvas_addImage(canvas* c, int hAlign, int vAlign, int x, int y, float width
 	cc.vAlign = vAlign;
 	cc.width = width;
 	cc.height = height;
+	cc.inDrag = 0;
 
 	cc.ci.textureId = textureId;
 	cc.ci.tintR = 1;	cc.ci.tintG = 1;	cc.ci.tintB = 1;
 	cc.ci.uvX = 0;	cc.ci.uvY = 0;	cc.ci.uvWidth = 1;	cc.ci.uvHeight = 1;
+
+	cc.ci.clicked = NULL;
+	cc.ci.clickedParam = NULL;
 
 	seqtor_push_back(c->components, cc);
 
@@ -614,5 +746,193 @@ void canvas_setImageUV(canvas* c, int id, float uvX, float uvY, float uvWidth, f
 	cc->ci.uvY = uvY;
 	cc->ci.uvWidth = uvWidth;
 	cc->ci.uvHeight = uvHeight;
+}
+
+void canvas_setImageClicked(canvas* c, int id, void (*onClick)(void*), void* param)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_IMAGE)
+		return;
+
+	cc->ci.clicked = onClick;
+	cc->ci.clickedParam = param;
+}
+
+//SLIDER----------------------------------------------------------------------------------------------
+
+int canvas_addSlider(canvas* c, int hAlign, int vAlign, int x, int y, float width, float height, float knobWidth, float knobHeight, int wholeNumbers)
+{
+	canvasComponent cc;
+	cc.componentType = CANVAS_COMPONENT_SLIDER;
+	cc.id = componentIDCounter++;
+	cc.x = x;
+	cc.y = y;
+	cc.hAlign = hAlign;
+	cc.vAlign = vAlign;
+	cc.width = width;
+	cc.height = height;
+	cc.inDrag = 0;
+
+	cc.cs.min = 0;
+	cc.cs.max = 1;
+	cc.cs.value = 0.5f;
+	cc.cs.prevValue = 0.5f;
+	cc.cs.wholeNumbers = wholeNumbers;
+
+
+	cc.cs.dragged = NULL;
+
+	cc.cs.fillR = 1;		cc.cs.fillG = 1;		cc.cs.fillB = 1;
+	cc.cs.borderR = 0.8f;	cc.cs.borderG = 0.8f;	cc.cs.borderB = 0.8f;
+	cc.cs.borderWidth = 10;	cc.cs.borderRadius = 20;
+	cc.cs.transparentBackground = 0;
+
+	cc.cs.knobWidth = knobWidth;
+	cc.cs.knobHeight = knobHeight;
+	cc.cs.knobFillR = 1;	cc.cs.knobFillG = 1;	cc.cs.knobFillB = 1;
+	cc.cs.knobBorderR = 0.8f;	cc.cs.knobBorderG = 0.8f;	cc.cs.knobBorderB = 0.8f;
+	cc.cs.knobBorderWidth = 10;	cc.cs.knobBorderRadius = 20;
+	cc.cs.knobTransparentBackground = 0;
+
+	seqtor_push_back(c->components, cc);
+
+	canvas_calculatePosition(c, &seqtor_back(c->components));
+
+	return cc.id;
+}
+
+void canvas_setSliderCallback(canvas* c, int id, void(*dragged)(float))
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.dragged = dragged;
+}
+
+void canvas_setSliderValue(canvas* c, int id, float value)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.prevValue = value;
+	cc->cs.value=value;
+}
+
+void canvas_setSliderBounds(canvas* c, int id, float minValue, float maxValue)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.min = minValue;
+	cc->cs.max = maxValue;
+}
+
+void canvas_setSliderWholeNumbers(canvas* c, int id, int wholeNumbers)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.wholeNumbers = wholeNumbers;
+}
+
+void canvas_setSliderBackgroundTransparency(canvas* c, int id, int transparentBackground)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.transparentBackground = transparentBackground;
+}
+
+void canvas_setSliderBackgroundBorder(canvas* c, int id, float borderWidth, float borderRadius)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.borderRadius = borderRadius;
+	cc->cs.borderWidth = borderWidth;
+}
+
+void canvas_setSliderBackgroundFillColour(canvas* c, int id, float r, float g, float b)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.fillR = r;	cc->cs.fillG = g;	cc->cs.fillB = b;
+}
+
+void canvas_setSliderBackgroundBorderColour(canvas* c, int id, float r, float g, float b)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.borderR = r;		cc->cs.borderG = g;		cc->cs.borderB = b;
+}
+
+void canvas_setSliderKnobTransparency(canvas* c, int id, int knobTransparentBackground)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.knobTransparentBackground = knobTransparentBackground;
+}
+
+void canvas_setSliderKnobBorder(canvas* c, int id, float borderWidth, float borderRadius)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.knobBorderRadius = borderRadius;
+	cc->cs.knobBorderWidth = borderWidth;
+}
+
+void canvas_setSliderKnobFillColour(canvas* c, int id, float r, float g, float b)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.knobFillR = r;	cc->cs.knobFillG = g;	cc->cs.knobFillB = b;
+}
+
+void canvas_setSliderKnobBorderColour(canvas* c, int id, float r, float g, float b)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.knobBorderR = r;		cc->cs.knobBorderG = g;		cc->cs.knobBorderB = b;
+}
+
+void canvas_setKnobWidth(canvas* c, int id, float knobWidth, float knobHeight)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_SLIDER)
+		return;
+
+	cc->cs.knobWidth=knobWidth;		cc->cs.knobHeight=knobHeight;
 }
 

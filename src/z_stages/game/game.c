@@ -891,11 +891,11 @@ void* loop_physics(void* arg)
         switch (currentGameState)
         {
         case GAME_INGAME:
-            canvas_checkMouseInput(vaszon, mouseX, mouseY, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
+            canvas_checkMouseInput(vaszon, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT),  input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
             break;
 
         case GAME_PAUSED:
-            canvas_checkMouseInput(vaszonPause, mouseX, mouseY, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
+            canvas_checkMouseInput(vaszonPause, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
             break;
         }
 

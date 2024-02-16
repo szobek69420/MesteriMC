@@ -81,7 +81,7 @@ void mainMenu(void* window, int* _currentStage)
         double x, y;
         glfwGetCursorPos(w, &x, &y);
 
-        canvas_checkMouseInput(vaszon, x, y, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
+        canvas_checkMouseInput(vaszon, x, y, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
         canvas_render(vaszon, x, y, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
 
         glfwSwapBuffers(w);
