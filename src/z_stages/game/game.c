@@ -1456,6 +1456,15 @@ void init_canvas()
     canvas_setButtonBorderColour(vaszonPause, mogus, 0.3, 0.3, 0.3);
     canvas_setButtonClicked(vaszonPause, mogus, changeGameState, (void*)GAME_INGAME);
 
+    mogus = canvas_addButton(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, -70, 300, 50);
+    canvas_setButtonText(vaszonPause, mogus, "main menu", 24, 1, 1, 1);
+    canvas_setButtonBorder(vaszonPause, mogus, 5, 20);
+    canvas_setButtonFillColour(vaszonPause, mogus, 0.5, 0.5, 0.5);
+    canvas_setButtonBorderColour(vaszonPause, mogus, 0.3, 0.3, 0.3);
+    canvas_setButtonClicked(vaszonPause, mogus, quitGame, NULL);
+
+    mogus = canvas_addText(vaszonPause, "bing chillin'", CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 200, 1, 1, 1, 48);
+
     //debug screen
     vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
 

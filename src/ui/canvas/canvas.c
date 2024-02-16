@@ -13,6 +13,8 @@
 
 #include "../../utils/seqtor.h"
 
+#include "../../window/window.h"
+
 #define CANVAS_FONT_SIZE 48
 
 #define CANVAS_COMPONENT_TEXT 0
@@ -145,6 +147,7 @@ void canvas_setSize(canvas* c, int width, int height)
 
 void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed)
 {
+	mouseY = window_getHeight() - mouseY;//mert a glfw (0,0) koordinataja a bal felso sarokban van, mig a canvase a bal alsoban
 	canvasComponent* cc;
 	int isInBounds;
 	for (int i = 0; i < seqtor_size(c->components); i++)
@@ -222,6 +225,7 @@ void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed)
 
 void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseClicked)
 {
+	mouseY = window_getHeight() - mouseY;
 	canvasComponent* cc;
 	for (int i = 0; i < seqtor_size(c->components); i++)
 	{
