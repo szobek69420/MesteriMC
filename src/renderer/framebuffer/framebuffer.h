@@ -1,9 +1,9 @@
 #ifndef FRAMEBUFFER_H
 #define FRAMEBUFFER_H
 
-#define RENDERER_SHADOW_RESOLUTION 4000
-#define RENDERER_WIDTH 1920
-#define RENDERER_HEIGHT 1080
+#define RENDERER_SHADOW_RESOLUTION renderer_getShadowResolution()
+#define RENDERER_WIDTH renderer_getWidth()
+#define RENDERER_HEIGHT renderer_getHeight()
 
 //ha ez valtozik, akkor a final pass shadernek is kell
 #define RENDERER_KAWASAKI_FBO_COUNT 4
@@ -63,6 +63,10 @@ typedef struct renderer {
 	bloomFBO bloomBuffers[RENDERER_KAWASAKI_FBO_COUNT];//tobb kell, mert Kawasaki blur lesz (az elso csak a filterre van, feles felbontassal, a tobbi a kawasaki, ahol az elso feles felbontasu, es a tobbi felbontasa mindig az ot megelozo fele)
 	screenFBO screenBuffer;
 } renderer;
+
+int renderer_getWidth();
+int renderer_getHeight();
+int renderer_getShadowResolution();
 
 renderer renderer_create(int width, int height);
 void renderer_destroy(renderer cucc);

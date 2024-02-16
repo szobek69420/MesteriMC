@@ -19,6 +19,9 @@
 #include "../../event/event_queue.h"
 #include "../../input/input.h"
 
+#ifdef sleep(DURATION_IN_SEX)
+#undef sleep(DURATION_IN_SEX)
+#endif
 #ifdef _WIN32
 #include <Windows.h>
 #define sleep(DURATION_IN_SEX) do{ \
@@ -77,9 +80,8 @@ void mainMenu(void* window, int* _currentStage)
 
         double x, y;
         glfwGetCursorPos(w, &x, &y);
-        y = window_getHeight() - y;
 
-        canvas_checkMouseInput(vaszon, x, y, input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
+        canvas_checkMouseInput(vaszon, x, y, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
         canvas_render(vaszon, x, y, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
 
         glfwSwapBuffers(w);

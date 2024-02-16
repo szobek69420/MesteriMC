@@ -24,20 +24,23 @@ void canvas_destroy(canvas* c);
 
 void canvas_setSize(canvas* c, int width, int height);
 
-void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed);
-void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseClicked);
+void canvas_render(canvas* c, int glfwMouseX, int glfwMouseY, int mousePressed);
+void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseDown, int mousePressed,  int mouseClicked);
 
 void canvas_removeComponent(canvas* c, int id);
 void canvas_setComponentPosition(canvas* c, int id, int x, int y);
 void canvas_setComponentAlignment(canvas* c, int id, int hAlign, int vAlign);
 void canvas_setComponentSize(canvas* c, int id, float width, float height);
 
-int canvas_addText(canvas* c, const char* text, int hAlign, int vAlign, int x, int y, float r, float g, float b, int fontSize);
 
+//text
+int canvas_addText(canvas* c, const char* text, int hAlign, int vAlign, int x, int y, float r, float g, float b, int fontSize);
 void canvas_setTextText(canvas* c, int id, const char* text);
 void canvas_setTextColour(canvas* c, int id, float r, float g, float b);
 void canvas_setTextFontSize(canvas* c, int id, int fontSize);
 
+
+//button
 int canvas_addButton(canvas* c, int hAlign, int vAlign, int x, int y, float width, float height);
 void canvas_setButtonFillColour(canvas* c, int id, float r, float g, float b);
 void canvas_setButtonBorderColour(canvas* c, int id, float r, float g, float b);
@@ -47,9 +50,30 @@ void canvas_setButtonClicked(canvas* c, int id, void (*onClick)(void*), void* pa
 void canvas_setButtonText(canvas* c, int id, const char* text, int fontSize, float r, float g, float b);
 
 
+//image
 int canvas_addImage(canvas* c, int hAlign, int vAlign, int x, int y, float width, float height, unsigned int textureId);
 void canvas_setImageTint(canvas* c, int id, float r, float g, float b);
 void canvas_setImageTexture(canvas* c, int id, unsigned int textureId);
 void canvas_setImageUV(canvas* c, int id, float uvX, float uvY, float uvWidth, float uvHeight);
+void canvas_setImageClicked(canvas* c, int id, void (*onClick)(void*), void* param);
+
+
+//slider
+int canvas_addSlider(canvas* c, int hAlign, int vAlign, int x, int y, float width, float height, float knobWidth, float knobHeight, int wholeNumbers);
+void canvas_setSliderCallback(canvas* c, int id, void(*dragged)(float));
+void canvas_setSliderValue(canvas* c, int id, float value);
+void canvas_setSliderBounds(canvas* c, int id, float minValue, float maxValue);
+void canvas_setSliderWholeNumbers(canvas* c, int id, int wholeNumbers);
+
+void canvas_setSliderBackgroundTransparency(canvas* c, int id, int transparentBackground);
+void canvas_setSliderBackgroundBorder(canvas* c, int id, float borderWidth, float borderRadius);
+void canvas_setSliderBackgroundFillColour(canvas* c, int id, float r, float g, float b);
+void canvas_setSliderBackgroundBorderColour(canvas* c, int id, float r, float g, float b);
+
+void canvas_setSliderKnobTransparency(canvas* c, int id, int knobTransparentBackground);
+void canvas_setSliderKnobBorder(canvas* c, int id, float borderWidth, float borderRadius);
+void canvas_setSliderKnobFillColour(canvas* c, int id, float r, float g, float b);
+void canvas_setSliderKnobBorderColour(canvas* c, int id, float r, float g, float b);
+void canvas_setKnobWidth(canvas* c, int id, float knobWidth, float knobHeight);
 
 #endif

@@ -21,6 +21,12 @@ void renderer_destroyBloomFBO(bloomFBO bloomBuffer);
 screenFBO renderer_createScreenFBO(int width, int height);
 void renderer_destroyScreenFBO(screenFBO screenBuffer);
 
+static int width = 1920, height = 1080;
+static int shadowResolution = 4000;
+int renderer_getWidth() { return width; }
+int renderer_getHeight() { return height; }
+int renderer_getShadowResolution() { return shadowResolution; }
+
 renderer renderer_create(int width, int height)
 {
     renderer rendor;

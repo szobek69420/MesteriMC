@@ -122,7 +122,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 			continue;
 		if (tempY < -1 || tempY>1)
 			continue;
-		if (tempZ < -1 || tempY>1)
+		if (tempZ < -1 || tempZ>1)
 			continue;
 
 		if (tempX == 0)
@@ -232,6 +232,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				}
 			}
 		}
+		
 	}
 
 	//adding the contents of the current and neightbouring chunks
@@ -275,7 +276,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		for (int i = 0; i < plusY->size; i++)
 		{
 			if (seqtor_at(*plusY, i).y == 0)
-				chomk.blocks[CHUNK_HEIGHT+1][seqtor_at(*plusY, i).z + 1][seqtor_at(*plusY, i).z + 1] = seqtor_at(*plusY, i).type;
+				chomk.blocks[CHUNK_HEIGHT+1][seqtor_at(*plusY, i).x + 1][seqtor_at(*plusY, i).z + 1] = seqtor_at(*plusY, i).type;
 		}
 	}
 	if (minusY != NULL)
@@ -283,7 +284,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		for (int i = 0; i < minusY->size; i++)
 		{
 			if (seqtor_at(*minusY, i).y == CHUNK_HEIGHT-1)
-				chomk.blocks[0][seqtor_at(*minusY, i).z + 1][seqtor_at(*minusY, i).z + 1] = seqtor_at(*minusY, i).type;
+				chomk.blocks[0][seqtor_at(*minusY, i).x + 1][seqtor_at(*minusY, i).z + 1] = seqtor_at(*minusY, i).type;
 		}
 	}
 
