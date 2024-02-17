@@ -17,6 +17,8 @@ static unsigned int skybox = 0;
 static unsigned int sun = 0;
 static unsigned int sky_gradient = 0;
 
+static unsigned int menu_title_pause = 0;
+
 //menu
 static unsigned int menu_title = 0;
 static unsigned int menu_background = 0;
@@ -61,6 +63,10 @@ int textureHandler_importTextures(int stage)
         if (water_dudv == 0)
             problem++;
 
+        menu_title_pause = textureHandler_loadImage("../assets/textures/ui/pause/pause_title.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
+        if (menu_title_pause == 0)
+            problem++;
+
 
 
         sky_gradient = textureHandler_loadImage("../assets/textures/sky/sky_gradient.png", GL_RGBA, GL_RGBA, GL_LINEAR, 0);
@@ -73,15 +79,15 @@ int textureHandler_importTextures(int stage)
         break;
 
     case TEXTURE_MAIN_MENU:
-        menu_background = textureHandler_loadImage("../assets/textures/main_menu/main_bg.png", GL_RGB, GL_RGBA, GL_NEAREST, 69);
+        menu_background = textureHandler_loadImage("../assets/textures/ui/main_menu/main_bg.png", GL_RGB, GL_RGBA, GL_NEAREST, 69);
         if (menu_background == 0)
             problem++;
 
-        menu_title = textureHandler_loadImage("../assets/textures/main_menu/main_title.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
+        menu_title = textureHandler_loadImage("../assets/textures/ui/main_menu/main_title.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
         if (menu_title == 0)
             problem++;
 
-        menu_title_settings = textureHandler_loadImage("../assets/textures/settings/settings_title.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
+        menu_title_settings = textureHandler_loadImage("../assets/textures/ui/settings/settings_title.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
         if (menu_title_settings == 0)
             problem++;
         break;
@@ -106,6 +112,8 @@ void textureHandler_destroyTextures(int stage)
 
         glDeleteTextures(1, &sky_gradient);
 
+        glDeleteTextures(1, &menu_title_pause);
+
         atlas_albedo = 0;
         atlas_specular = 0;
         atlas_normal = 0;
@@ -116,6 +124,8 @@ void textureHandler_destroyTextures(int stage)
         water_normal = 0;
 
         sky_gradient = 0;
+
+        menu_title_pause = 0;
         break;
 
     case TEXTURE_MAIN_MENU:
@@ -163,6 +173,9 @@ unsigned int textureHandler_getTexture(int texture)
 
     case TEXTURE_MENU_TITLE_SETTINGS:
         return menu_title_settings;
+
+    case TEXTURE_MENU_TITLE_PAUSE:
+        return menu_title_pause;
 
     default:
         return 0;

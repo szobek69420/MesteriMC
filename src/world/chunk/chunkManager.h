@@ -74,6 +74,8 @@ struct chunkManager {
 	seqtor_of(chunkGenerationUpdate) pendingUpdatesLOD;
 	seqtor_of(chunkMeshUpdate) pendingMeshUpdatesLOD;
 
+	char* chunkUpdateHelper;
+
 	seqtor_of(changedBlocksInChunk) changedBlocks;//a kulso vektor chunkonkent osztja fel
 
 	fnl_state noise, noise2;//terrain generation

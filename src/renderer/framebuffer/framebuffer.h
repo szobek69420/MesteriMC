@@ -67,6 +67,9 @@ typedef struct renderer {
 int renderer_getWidth();
 int renderer_getHeight();
 int renderer_getShadowResolution();
+void renderer_setWidth(int _width);
+void renderer_setHeight(int _height);
+void renderer_setShadowResolution(int _res);
 
 renderer renderer_create(int width, int height);
 void renderer_destroy(renderer cucc);

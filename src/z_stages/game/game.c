@@ -50,6 +50,8 @@
 #include "../../utils/vector.h"
 #include "../../utils/lista.h"
 
+#include "../../settings/settings.h"
+
 
 #define CLIP_NEAR 0.1f
 #define CLIP_FAR 250.0f
@@ -193,9 +195,8 @@ void game(void* w, int* currentStage)
 
     currentGameState = GAME_INGAME;
 
-
     textureHandler_importTextures(TEXTURE_IN_GAME);
-
+    
     event_queue_init();
     input_init();
 
@@ -208,7 +209,7 @@ void game(void* w, int* currentStage)
 
     ps = physicsSystem_create();
 
-    cm = chunkManager_create(69, 7, &ps);
+    cm = chunkManager_create(69, settings_getInt(SETTINGS_RENDER_DISTANCE), &ps);
     chunk_resetGenerationInfo();
     init_renderer();
 
@@ -325,7 +326,7 @@ void* loop_render(void* arg)
     int framesInLastInterval = 0;
 
     int loadedChunks = 0;
-
+    
     camera cum_render;
     while (69)
     {
@@ -386,33 +387,35 @@ void* loop_render(void* arg)
             )
         );
         mat4 shadowLightMatrix = mat4_multiply(shadowViewProjection, mat4_inverse(view));//from the camera's view space to the suns projection space
-
+        
         //shadow
-        glViewport(0, 0, RENDERER_SHADOW_RESOLUTION, RENDERER_SHADOW_RESOLUTION);
-        glBindFramebuffer(GL_FRAMEBUFFER, rendor.shadowBuffer.id);
+        if (settings_getInt(SETTINGS_SHADOWS) != 0)
+        {
+            glViewport(0, 0, RENDERER_SHADOW_RESOLUTION, RENDERER_SHADOW_RESOLUTION);
+            glBindFramebuffer(GL_FRAMEBUFFER, rendor.shadowBuffer.id);
 
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LESS);
-        glDepthMask(GL_TRUE);
-        glClear(GL_DEPTH_BUFFER_BIT);
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(GL_LESS);
+            glDepthMask(GL_TRUE);
+            glClear(GL_DEPTH_BUFFER_BIT);
 
-        glDisable(GL_CULL_FACE);
-        //glFrontFace(GL_CW);
+            glDisable(GL_CULL_FACE);
+            //glFrontFace(GL_CW);
 
-        glUseProgram(shadowChunkShader.id);
-        pthread_mutex_lock(&mutex_cm);
-        chunkManager_drawShadow(&cm, &shadowChunkShader, &shadowViewProjection);
-        pthread_mutex_unlock(&mutex_cm);
+            glUseProgram(shadowChunkShader.id);
+            pthread_mutex_lock(&mutex_cm);
+            chunkManager_drawShadow(&cm, &shadowChunkShader, &shadowViewProjection);
+            pthread_mutex_unlock(&mutex_cm);
 
-        glUseProgram(shadowPlayerShader.id);
-        glUniformMatrix4fv(glGetUniformLocation(shadowPlayerShader.id, "lightMatrix"), 1, GL_FALSE, shadowViewProjection.data);
-        pthread_mutex_lock(&mutex_pm);
-        playerMesh_render(&pm, &shadowPlayerShader);
-        pthread_mutex_unlock(&mutex_pm);
+            glUseProgram(shadowPlayerShader.id);
+            glUniformMatrix4fv(glGetUniformLocation(shadowPlayerShader.id, "lightMatrix"), 1, GL_FALSE, shadowViewProjection.data);
+            pthread_mutex_lock(&mutex_pm);
+            playerMesh_render(&pm, &shadowPlayerShader);
+            pthread_mutex_unlock(&mutex_pm);
 
-        glEnable(GL_CULL_FACE);
-        glFrontFace(GL_CCW);
-
+            glEnable(GL_CULL_FACE);
+        }
+        
 
         //prepare gbuffer fbo
         glViewport(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT);
@@ -422,6 +425,7 @@ void* loop_render(void* arg)
 
         //geometry pass ------------------------------------------------------------------------------------------
         glUseProgram(geometryPassShader.id);
+        glEnable(GL_DEPTH_TEST);
 
         glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "view"), 1, GL_FALSE, view.data);
         glUniformMatrix4fv(glGetUniformLocation(geometryPassShader.id, "projection"), 1, GL_FALSE, projection.data);
@@ -439,45 +443,13 @@ void* loop_render(void* arg)
         pthread_mutex_lock(&mutex_cm);
         int renderedChunks = chunkManager_drawTerrain(&cm, &geometryPassShader, &cum, &projection);
         pthread_mutex_unlock(&mutex_cm);
-
+        
         //copy depth buffer
         glEnable(GL_DEPTH_TEST);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, rendor.gBuffer.id);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, rendor.endBuffer.id);
         glBlitFramebuffer(0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, 0, 0, RENDERER_WIDTH, RENDERER_HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-
-        //ssao pass ------------------------------------------------------------------------------------------
-        // generate SSAO texture
-        /*glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idColor);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glUseProgram(ssaoShader.id);
-        // Send kernel + rotation
-        for (unsigned int i = 0; i <64; ++i)
-        {
-            static char buffer[20];
-            sprintf(buffer, "samples[%d]", i);
-            glUniform3f(glGetUniformLocation(ssaoShader.id, buffer), 1, ssaoKernel[i].x, ssaoKernel[i].y, ssaoKernel[i].z);
-        }
-        glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection"), 1, GL_FALSE, projection.data);
-        glUniformMatrix4fv(glGetUniformLocation(ssaoShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
-        glUniformMatrix3fv(glGetUniformLocation(ssaoShader.id, "viewForDirectional"), 1, GL_FALSE, viewNormal.data);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.normal);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, noiseTexture);
-        glBindVertexArray(rectangleVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        // blur SSAO texture to remove noise
-        glBindFramebuffer(GL_FRAMEBUFFER, rendor.ssaoBuffer.idBlur);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glUseProgram(ssaoBlurShader.id);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBuffer);
-        glBindVertexArray(rectangleVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);*/
+        
 
         //lighting pass ------------------------------------------------------------------------------------------
         glBindFramebuffer(GL_FRAMEBUFFER, rendor.endBuffer.id);
@@ -499,15 +471,15 @@ void* loop_render(void* arg)
 
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.albedoSpec);
-
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, rendor.shadowBuffer.depthBuffer);
+        
+        if (settings_getInt(SETTINGS_SHADOWS) != 0)
+        {
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, rendor.shadowBuffer.depthBuffer);
+        }
 
         glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
-
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, rendor.ssaoBuffer.colorBufferBlur);
 
         glUseProgram(lightingPassShader.id);
         glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "view"), 1, GL_FALSE, view.data);
@@ -531,9 +503,15 @@ void* loop_render(void* arg)
         free(bufferData);
 
         //directional (sun)
-        glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
-        glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
+        if (settings_getInt(SETTINGS_SHADOWS) != 0)
+        {
+            glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
+            glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
+        }
+        else
+            glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
 
+     
         bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
         memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
         light_fillRenderer(&lightRenderer, bufferData, 1);
@@ -572,7 +550,7 @@ void* loop_render(void* arg)
             vec3 sSize = vec3_create2(1.005f, 1.005f, 1.005f);
             blockSelection_render(sPos, sSize, &pv);
         } while (0);
-
+        
         //walter
         glUseProgram(waterShader.id);
 
@@ -583,8 +561,13 @@ void* loop_render(void* arg)
 
         glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "projectionInverse"), 1, GL_FALSE, projectionInverse.data);
 
-        glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
-        glUniform1i(glGetUniformLocation(waterShader.id, "shadowOn"), 69);
+        if (settings_getInt(SETTINGS_SHADOWS)!=0)
+        {
+            glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
+            glUniform1i(glGetUniformLocation(waterShader.id, "shadowOn"), 69);
+        }
+        else
+            glUniform1i(glGetUniformLocation(waterShader.id, "shadowOn"), 0);
 
         glUniform3f(glGetUniformLocation(waterShader.id, "sun.position"), sunTzu.position.x, sunTzu.position.y, sunTzu.position.z);
         glUniform3f(glGetUniformLocation(waterShader.id, "sun.colour"), sunTzu.colour.x, sunTzu.colour.y, sunTzu.colour.z);
@@ -603,8 +586,11 @@ void* loop_render(void* arg)
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, rendor.gBuffer.depthBuffer);
 
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, rendor.shadowBuffer.depthBuffer);
+        if (settings_getInt(SETTINGS_SHADOWS) != 0)
+        {
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, rendor.shadowBuffer.depthBuffer);
+        }
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -727,7 +713,7 @@ void* loop_render(void* arg)
 
         double mouseX = 0, mouseY = 0;
         input_get_mouse_position(&mouseX, &mouseY);
-
+    
         switch (currentGameState)
         {
             case GAME_INGAME:
@@ -1156,8 +1142,11 @@ void quitGame(void* nichts)
 void init_renderer()
 {
     //rendor = renderer_create(window_getWidth(), window_getHeight());
+    renderer_setWidth(settings_getInt(SETTINGS_RENDERER_WIDTH));
+    renderer_setHeight(settings_getInt(SETTINGS_RENDERER_HEIGHT));
+    renderer_setShadowResolution(settings_getInt(SETTINGS_SHADOW_RESOLUTION_PIXELS));
     rendor = renderer_create(RENDERER_WIDTH, RENDERER_HEIGHT);
-
+    
     //shaders
     shadowChunkShader = shader_import(
         "../assets/shaders/renderer/shadow/shader_shadow_chunk.vag",
@@ -1452,20 +1441,20 @@ void init_canvas()
     vaszonPause = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
     
     int mogus = canvas_addButton(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 300, 50);
-    canvas_setButtonText(vaszonPause, mogus, "continue", 24, 1, 1, 1);
-    canvas_setButtonBorder(vaszonPause, mogus, 5, 20);
-    canvas_setButtonFillColour(vaszonPause, mogus, 0.5, 0.5, 0.5);
-    canvas_setButtonBorderColour(vaszonPause, mogus, 0.3, 0.3, 0.3);
+    canvas_setButtonText(vaszonPause, mogus, "continue", 24, 1, 0.85f, 0);
+    canvas_setButtonBorder(vaszonPause, mogus, 5, 5);
+    canvas_setButtonFillColour(vaszonPause, mogus, 0.2, 0, 1);
+    canvas_setButtonBorderColour(vaszonPause, mogus, 0.8f, 0.15f, 1.0f);
     canvas_setButtonClicked(vaszonPause, mogus, changeGameState, (void*)GAME_INGAME);
 
     mogus = canvas_addButton(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, -70, 300, 50);
-    canvas_setButtonText(vaszonPause, mogus, "main menu", 24, 1, 1, 1);
-    canvas_setButtonBorder(vaszonPause, mogus, 5, 20);
-    canvas_setButtonFillColour(vaszonPause, mogus, 0.5, 0.5, 0.5);
-    canvas_setButtonBorderColour(vaszonPause, mogus, 0.3, 0.3, 0.3);
+    canvas_setButtonText(vaszonPause, mogus, "main menu", 24, 1, 0.85f, 0);
+    canvas_setButtonBorder(vaszonPause, mogus, 5, 5);
+    canvas_setButtonFillColour(vaszonPause, mogus, 0.2, 0, 1);
+    canvas_setButtonBorderColour(vaszonPause, mogus, 0.8f, 0.15f, 1.0f);
     canvas_setButtonClicked(vaszonPause, mogus, quitGame, NULL);
 
-    mogus = canvas_addText(vaszonPause, "bing chillin'", CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 200, 1, 1, 1, 48);
+    canvas_addImage(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_TOP, 0, 100, 630, 100, textureHandler_getTexture(TEXTURE_MENU_TITLE_PAUSE));
 
     //debug screen
     vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");

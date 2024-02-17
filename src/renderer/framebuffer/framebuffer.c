@@ -27,6 +27,10 @@ int renderer_getWidth() { return width; }
 int renderer_getHeight() { return height; }
 int renderer_getShadowResolution() { return shadowResolution; }
 
+void renderer_setWidth(int _width) { width = _width; }
+void renderer_setHeight(int _height) { height = _height; }
+void renderer_setShadowResolution(int _res) { shadowResolution = _res; }
+
 renderer renderer_create(int width, int height)
 {
     renderer rendor;

@@ -39,6 +39,8 @@ chunkManager chunkManager_create(int seed, int renderDistance, physicsSystem* ps
 	seqtor_init(cm.isChunkCulled, 1);
 
 	seqtor_init(cm.changedBlocks, 1);
+
+	cm.chunkUpdateHelper = malloc((2 * renderDistance + 1) * (2 * renderDistance + 1) * (2 * renderDistance + 1) * sizeof(char));
 	
 	return cm;
 }
@@ -88,6 +90,8 @@ void chunkManager_destroy(chunkManager* cm)
 		seqtor_destroy(seqtor_at(cm->changedBlocks, i).blocks);
 	seqtor_destroy(cm->changedBlocks);//a kulso vektor kiuritese
 
+
+	free(cm->chunkUpdateHelper);
 }
 
 int chunkManager_isChunkLoaded(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
@@ -127,7 +131,6 @@ int chunkManager_isChunkPending(chunkManager* cm, int chunkX, int chunkY, int ch
 
 int chunkManager_isChunkRegistered(chunkManager* cm, int chunkX, int chunkY, int chunkZ)
 {
-	int isChunkRegistered = 0;
 	for (int i = 0; i < cm->changedBlocks.size; i++)
 	{
 		if (seqtor_at(cm->changedBlocks, i).chunkX != chunkX)
@@ -140,14 +143,82 @@ int chunkManager_isChunkRegistered(chunkManager* cm, int chunkX, int chunkY, int
 		return seqtor_at(cm->changedBlocks, i).isRegistered;
 	}
 
-	return isChunkRegistered;
+	return 0;
 }
 
 
 int chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ)//return 0 if no update has been found
 {
+	/*
+	* the chunkmanager object has a helper array of type char and size (2*renderDistance+1)^3 bytes
+	* this is exactly so many members as there should be chunks loaded with a render distance of renderDistance
+	* each member (a char variable) has the value 0 if the corresponding chunk is not loaded, otherwise 69 (or something)
+	* the indexing of the array works so:
+	* let the zero chunk coordinate be (playerChunkX; playerChunkY; playerChunkZ)-(renderDistance;renderDistance;renderDistance)
+	* in this coordinate system, to get, whether a chunk is loaded or not, we check like so:
+	* chunkUpdateHelper[chunkX*(2*renderDistance+1)^2+chunkY*(2*renderDistance+1)+chunkZ]!=0
+	* 
+	* we iterate through the loaded chunks and the pending updates, filling up the helper array
+	* we then choose the unloaded chunk closest to the player to load
+	* while we iterate through the loaded chunks, we can find a chunk that has to be unloaded
+	*/
+
 	int updateFound = 0;
-	//load
+	memset(cm->chunkUpdateHelper, 0, (2 * cm->renderDistance + 1) * (2 * cm->renderDistance + 1) * (2 * cm->renderDistance + 1) * sizeof(char));
+
+	int unload = -1;
+	int helper = 2 * cm->renderDistance+1;
+	int helper2 = helper / 2;
+	for (int i = 0; i < seqtor_size(cm->loadedChunks); i++)
+	{
+		int x, y, z;
+		x = seqtor_at(cm->loadedChunks, i).chunkX - playerChunkX + cm->renderDistance;
+		y = seqtor_at(cm->loadedChunks, i).chunkY - playerChunkY + cm->renderDistance;
+		z = seqtor_at(cm->loadedChunks, i).chunkZ - playerChunkZ + cm->renderDistance;
+
+		if (x<0 || x>=helper || y<0 || y>=helper || z<0 || z>=helper)
+		{
+			if (unload == -1)
+			{
+				if (chunkManager_isChunkPending(cm, seqtor_at(cm->loadedChunks, i).chunkX, seqtor_at(cm->loadedChunks, i).chunkY, seqtor_at(cm->loadedChunks, i).chunkZ) == 0)
+				{
+					unload = i;
+				}
+			}
+
+			continue;
+		}
+
+		cm->chunkUpdateHelper[x * helper * helper + y * helper + z] = 69;
+	}
+
+	for (lista_element_of(chunkGenerationUpdate)* it = cm->pendingUpdates.head; it != NULL; it = it->next)
+	{
+		int x, y, z;
+		x = it->data.chunkX - playerChunkX + cm->renderDistance;
+		y = it->data.chunkY - playerChunkY + cm->renderDistance;
+		z = it->data.chunkZ - playerChunkZ + cm->renderDistance;
+
+		if (x < 0 || x >= helper || y < 0 || y >= helper || z < 0 || z >= helper)
+			continue;
+
+		cm->chunkUpdateHelper[x * helper * helper + y * helper + z] = 69;
+	}
+
+	for (lista_element_of(chunkMeshUpdate)* it = cm->pendingMeshUpdates.head; it != NULL; it = it->next)
+	{
+		int x, y, z;
+		x = it->data.chomk.chunkX - playerChunkX + cm->renderDistance;
+		y = it->data.chomk.chunkY - playerChunkY + cm->renderDistance;
+		z = it->data.chomk.chunkZ - playerChunkZ + cm->renderDistance;
+
+		if (x < 0 || x >= helper || y < 0 || y >= helper || z < 0 || z >= helper)
+			continue;
+
+		cm->chunkUpdateHelper[x * helper * helper + y * helper + z] = 69;
+	}
+
+	
 	for (int i = 1; i <= cm->renderDistance; i++)
 	{
 		for (int x = -i; x <= i; x ++)
@@ -159,9 +230,7 @@ int chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int player
 					if (x != -i && x != i && y != -i && y != i && z != -i && z != i)
 						continue;
 
-					if (chunkManager_isChunkLoaded(cm, playerChunkX + x, playerChunkY + y, playerChunkZ + z) == 0
-						&&
-						chunkManager_isChunkPending(cm, playerChunkX + x, playerChunkY + y, playerChunkZ + z) == 0)
+					if (cm->chunkUpdateHelper[(x+helper2)*helper*helper+(y+helper2)*helper+(z+helper2)]==0)
 					{
 						chunkGenerationUpdate ceu;
 						ceu.chunkX = playerChunkX + x;
@@ -182,28 +251,17 @@ int chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int player
 exit_load:
 
 	//unload
-	for(int i=0;i<seqtor_size(cm->loadedChunks);i++)
+	if (unload != -1)
 	{
-		if (abs(seqtor_at(cm->loadedChunks, i).chunkX - playerChunkX) > cm->renderDistance
-			||
-			abs(seqtor_at(cm->loadedChunks, i).chunkY - playerChunkY) > cm->renderDistance
-			||
-			abs(seqtor_at(cm->loadedChunks, i).chunkZ - playerChunkZ) > cm->renderDistance)
-		{
-			if (chunkManager_isChunkPending(cm, seqtor_at(cm->loadedChunks, i).chunkX, seqtor_at(cm->loadedChunks, i).chunkY, seqtor_at(cm->loadedChunks, i).chunkZ)==0)
-			{
-				chunkGenerationUpdate ceu;
-				ceu.chunkX = seqtor_at(cm->loadedChunks, i).chunkX;
-				ceu.chunkY = seqtor_at(cm->loadedChunks, i).chunkY;
-				ceu.chunkZ = seqtor_at(cm->loadedChunks, i).chunkZ;
-				ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
-				ceu.isUrgent = 0;
+		chunkGenerationUpdate ceu;
+		ceu.chunkX = seqtor_at(cm->loadedChunks, unload).chunkX;
+		ceu.chunkY = seqtor_at(cm->loadedChunks, unload).chunkY;
+		ceu.chunkZ = seqtor_at(cm->loadedChunks, unload).chunkZ;
+		ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
+		ceu.isUrgent = 0;
 
-				lista_push_back(cm->pendingUpdates, ceu);
-				updateFound = 1;
-				break;
-			}
-		}
+		lista_push_back(cm->pendingUpdates, ceu);
+		updateFound = 1;
 	}
 
 
