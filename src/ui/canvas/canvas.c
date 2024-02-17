@@ -16,7 +16,7 @@
 
 #include "../../window/window.h"
 
-#define CANVAS_FONT_SIZE 72
+#define CANVAS_FONT_SIZE 56
 
 #define CANVAS_COMPONENT_TEXT 0
 #define CANVAS_COMPONENT_BUTTON 1
