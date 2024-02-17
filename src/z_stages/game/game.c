@@ -1454,7 +1454,7 @@ void init_canvas()
     canvas_setButtonBorderColour(vaszonPause, mogus, 0.8f, 0.15f, 1.0f);
     canvas_setButtonClicked(vaszonPause, mogus, quitGame, NULL);
 
-    canvas_addImage(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_TOP, 0, 100, 410, 100, textureHandler_getTexture(TEXTURE_MENU_TITLE_PAUSE));
+    canvas_addImage(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_TOP, 0, 100, 630, 100, textureHandler_getTexture(TEXTURE_MENU_TITLE_PAUSE));
 
     //debug screen
     vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
