@@ -162,25 +162,29 @@ void init()
     canvas_addImage(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_TOP, 0, 100, 700, 100, textureHandler_getTexture(TEXTURE_MENU_TITLE));
 
     temp = canvas_addButton(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 400, 60);
-    canvas_setButtonText(vaszon, temp, "mom's spaghetti", 24, 1, 1, 1);
-    canvas_setButtonBorder(vaszon, temp, 5, 20);
-    canvas_setButtonFillColour(vaszon, temp, 0.5, 0.5, 0.5);
-    canvas_setButtonBorderColour(vaszon, temp, 0.3, 0.3, 0.3);
+    canvas_setButtonText(vaszon, temp, "mom's spaghetti", 24, 1, 0.85f, 0);
+    canvas_setButtonBorder(vaszon, temp, 5, 5);
+    canvas_setButtonFillColour(vaszon, temp, 0.2, 0, 1);
+    canvas_setButtonBorderColour(vaszon, temp, 0.8f, 0.15f, 1.0f);
     canvas_setButtonClicked(vaszon, temp, startButton, currentStage);
 
     temp = canvas_addButton(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, -70, 400, 60);
-    canvas_setButtonText(vaszon, temp, "he keeps on adjustin'", 24, 1, 1, 1);
-    canvas_setButtonBorder(vaszon, temp, 5, 20);
-    canvas_setButtonFillColour(vaszon, temp, 0.5, 0.5, 0.5);
-    canvas_setButtonBorderColour(vaszon, temp, 0.3, 0.3, 0.3);
+    canvas_setButtonText(vaszon, temp, "he keeps on adjustin'", 24, 1, 0.85f, 0);
+    canvas_setButtonBorder(vaszon, temp, 5, 5);
+    canvas_setButtonFillColour(vaszon, temp, 0.2, 0, 1);
+    canvas_setButtonBorderColour(vaszon, temp, 0.8f, 0.15f, 1.0f);
     canvas_setButtonClicked(vaszon, temp, settingsButton, MENU_SETTINGS);
 
     temp = canvas_addButton(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, -140, 400, 60);
-    canvas_setButtonText(vaszon, temp, "step back to reality", 24, 1, 1, 1);
-    canvas_setButtonBorder(vaszon, temp, 5, 20);
-    canvas_setButtonFillColour(vaszon, temp, 0.5, 0.5, 0.5);
-    canvas_setButtonBorderColour(vaszon, temp, 0.3, 0.3, 0.3);
+    canvas_setButtonText(vaszon, temp, "step back to reality", 24, 1, 0.85f, 0);
+    canvas_setButtonBorder(vaszon, temp, 5, 5);
+    canvas_setButtonFillColour(vaszon, temp, 0.2, 0, 1);
+    canvas_setButtonBorderColour(vaszon, temp, 0.8f, 0.15f, 1.0f);
     canvas_setButtonClicked(vaszon, temp, quitButton, currentStage);
+
+    canvas_addText(vaszon, "made by:", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 10, 40, 1, 0.85f, 0, 16);
+    canvas_addText(vaszon, "Szobek Adam Mark", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 10, 25, 0, 1, 1, 16);
+    canvas_addText(vaszon, "Mandli Ors", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 10, 10, 0, 1, 1, 16);
 
     //settings canvas
     vaszonSettings = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
@@ -188,10 +192,10 @@ void init()
     canvas_addImage(vaszonSettings, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_TOP, 0, 100, 550, 100, textureHandler_getTexture(TEXTURE_MENU_TITLE_SETTINGS));
 
     temp = canvas_addButton(vaszonSettings, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, 0, 100, 300, 60);
-    canvas_setButtonText(vaszonSettings, temp, "return to main", 24, 1, 1, 1);
-    canvas_setButtonBorder(vaszonSettings, temp, 5, 20);
-    canvas_setButtonFillColour(vaszonSettings, temp, 0.5, 0.5, 0.5);
-    canvas_setButtonBorderColour(vaszonSettings, temp, 0.3, 0.3, 0.3);
+    canvas_setButtonText(vaszonSettings, temp, "return to main", 24, 1, 0.85f, 0);
+    canvas_setButtonBorder(vaszonSettings, temp, 5, 5);
+    canvas_setButtonFillColour(vaszonSettings, temp, 0.2, 0, 1);
+    canvas_setButtonBorderColour(vaszonSettings, temp, 0.8f, 0.15f, 1.0f);
     canvas_setButtonClicked(vaszonSettings, temp, settingsButton, MENU_MAIN);
 
 
@@ -199,9 +203,9 @@ void init()
     canvas_setSliderBounds(vaszonSettings, sliderRenderDistance, 2, 10);
     canvas_setSliderValue(vaszonSettings, sliderRenderDistance, settings_getInt(SETTINGS_RENDER_DISTANCE));
     canvas_setSliderBackgroundBorder(vaszonSettings, sliderRenderDistance, 5, 5);
-    canvas_setSliderBackgroundBorderColour(vaszonSettings, sliderRenderDistance, 0.5f, 0.5f, 0.5f);
-    canvas_setSliderBackgroundFillColour(vaszonSettings, sliderRenderDistance, 0, 0, 0);
-    canvas_setSliderKnobFillColour(vaszonSettings, sliderRenderDistance, 1, 1, 1);
+    canvas_setSliderBackgroundBorderColour(vaszonSettings, sliderRenderDistance, 0.8f, 0.15f, 1.0f);
+    canvas_setSliderBackgroundFillColour(vaszonSettings, sliderRenderDistance, 0.2, 0, 1);
+    canvas_setSliderKnobFillColour(vaszonSettings, sliderRenderDistance, 0.2, 1, 1);
     canvas_setSliderKnobBorder(vaszonSettings, sliderRenderDistance, 0, 0);
     canvas_setSliderCallback(vaszonSettings, sliderRenderDistance, sliderRenderDistanceFunction);
     
@@ -213,9 +217,9 @@ void init()
     canvas_setSliderBounds(vaszonSettings, sliderResolution, 0, 3);
     canvas_setSliderValue(vaszonSettings, sliderResolution, settings_getInt(SETTINGS_RENDERER_RESOLUTION));
     canvas_setSliderBackgroundBorder(vaszonSettings, sliderResolution, 5, 5);
-    canvas_setSliderBackgroundBorderColour(vaszonSettings, sliderResolution, 0.5f, 0.5f, 0.5f);
-    canvas_setSliderBackgroundFillColour(vaszonSettings, sliderResolution, 0, 0, 0);
-    canvas_setSliderKnobFillColour(vaszonSettings, sliderResolution, 1, 1, 1);
+    canvas_setSliderBackgroundBorderColour(vaszonSettings, sliderResolution, 0.8f, 0.15f, 1.0f);
+    canvas_setSliderBackgroundFillColour(vaszonSettings, sliderResolution, 0.2, 0, 1);
+    canvas_setSliderKnobFillColour(vaszonSettings, sliderResolution, 0.2, 1, 1);
     canvas_setSliderKnobBorder(vaszonSettings, sliderResolution, 0, 0);
     canvas_setSliderCallback(vaszonSettings, sliderResolution, sliderResolutionFunction);
 
@@ -227,8 +231,8 @@ void init()
     if (settings_getInt(SETTINGS_SHADOWS) == 0) canvas_setButtonText(vaszonSettings, buttonShadows, "shadows: off", 24, 1, 0.85f, 0);
     else canvas_setButtonText(vaszonSettings, buttonShadows, "shadows: on", 24, 1, 0.85f, 0);
     canvas_setButtonBorder(vaszonSettings, buttonShadows, 5, 5);
-    canvas_setButtonFillColour(vaszonSettings, buttonShadows, 0, 0, 0);
-    canvas_setButtonBorderColour(vaszonSettings, buttonShadows, 0.5, 0.5, 0.5);
+    canvas_setButtonFillColour(vaszonSettings, buttonShadows, 0.2, 0, 1);
+    canvas_setButtonBorderColour(vaszonSettings, buttonShadows, 0.8f, 0.15f, 1.0f);
     canvas_setButtonClicked(vaszonSettings, buttonShadows, buttonShadowFunction, NULL);
 
 
@@ -236,9 +240,9 @@ void init()
     canvas_setSliderBounds(vaszonSettings, sliderShadowResolution, 0, 3);
     canvas_setSliderValue(vaszonSettings, sliderShadowResolution, settings_getInt(SETTINGS_SHADOW_RESOLUTION));
     canvas_setSliderBackgroundBorder(vaszonSettings, sliderShadowResolution, 5, 5);
-    canvas_setSliderBackgroundBorderColour(vaszonSettings, sliderShadowResolution, 0.5f, 0.5f, 0.5f);
-    canvas_setSliderBackgroundFillColour(vaszonSettings, sliderShadowResolution, 0, 0, 0);
-    canvas_setSliderKnobFillColour(vaszonSettings, sliderShadowResolution, 1, 1, 1);
+    canvas_setSliderBackgroundBorderColour(vaszonSettings, sliderShadowResolution, 0.8f, 0.15f, 1.0f);
+    canvas_setSliderBackgroundFillColour(vaszonSettings, sliderShadowResolution, 0.2, 0, 1);
+    canvas_setSliderKnobFillColour(vaszonSettings, sliderShadowResolution, 0.2, 1, 1);
     canvas_setSliderKnobBorder(vaszonSettings, sliderShadowResolution, 0, 0);
     canvas_setSliderCallback(vaszonSettings, sliderShadowResolution, sliderShadowResolutionFunction);
 

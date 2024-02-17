@@ -1441,20 +1441,20 @@ void init_canvas()
     vaszonPause = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
     
     int mogus = canvas_addButton(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 300, 50);
-    canvas_setButtonText(vaszonPause, mogus, "continue", 24, 1, 1, 1);
-    canvas_setButtonBorder(vaszonPause, mogus, 5, 20);
-    canvas_setButtonFillColour(vaszonPause, mogus, 0.5, 0.5, 0.5);
-    canvas_setButtonBorderColour(vaszonPause, mogus, 0.3, 0.3, 0.3);
+    canvas_setButtonText(vaszonPause, mogus, "continue", 24, 1, 0.85f, 0);
+    canvas_setButtonBorder(vaszonPause, mogus, 5, 5);
+    canvas_setButtonFillColour(vaszonPause, mogus, 0.2, 0, 1);
+    canvas_setButtonBorderColour(vaszonPause, mogus, 0.8f, 0.15f, 1.0f);
     canvas_setButtonClicked(vaszonPause, mogus, changeGameState, (void*)GAME_INGAME);
 
     mogus = canvas_addButton(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, -70, 300, 50);
-    canvas_setButtonText(vaszonPause, mogus, "main menu", 24, 1, 1, 1);
-    canvas_setButtonBorder(vaszonPause, mogus, 5, 20);
-    canvas_setButtonFillColour(vaszonPause, mogus, 0.5, 0.5, 0.5);
-    canvas_setButtonBorderColour(vaszonPause, mogus, 0.3, 0.3, 0.3);
+    canvas_setButtonText(vaszonPause, mogus, "main menu", 24, 1, 0.85f, 0);
+    canvas_setButtonBorder(vaszonPause, mogus, 5, 5);
+    canvas_setButtonFillColour(vaszonPause, mogus, 0.2, 0, 1);
+    canvas_setButtonBorderColour(vaszonPause, mogus, 0.8f, 0.15f, 1.0f);
     canvas_setButtonClicked(vaszonPause, mogus, quitGame, NULL);
 
-    mogus = canvas_addText(vaszonPause, "bing chillin'", CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 200, 1, 1, 1, 48);
+    canvas_addImage(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_TOP, 0, 100, 410, 100, textureHandler_getTexture(TEXTURE_MENU_TITLE_PAUSE));
 
     //debug screen
     vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
