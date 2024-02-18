@@ -27,6 +27,8 @@ typedef struct blockModel {
 	int type;//blocktype
 } blockModel;
 
+const char* blocks_getBlockName(int block);
+
 //block: blokktipus, side: melyik oldal, index: az oldalon belul hanyadik csucs (4 csucs per oldal)
 void blocks_getUV(int block, int side, int index, float* uvx, float* uvy);
 

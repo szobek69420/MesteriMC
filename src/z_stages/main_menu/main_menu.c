@@ -200,7 +200,7 @@ void init()
 
 
     sliderRenderDistance = canvas_addSlider(vaszonSettings, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, -220, 40, 400, 50, 10, 50, 69);
-    canvas_setSliderBounds(vaszonSettings, sliderRenderDistance, 2, 10);
+    canvas_setSliderBounds(vaszonSettings, sliderRenderDistance, 2, 16);
     canvas_setSliderValue(vaszonSettings, sliderRenderDistance, settings_getInt(SETTINGS_RENDER_DISTANCE));
     canvas_setSliderBackgroundBorder(vaszonSettings, sliderRenderDistance, 5, 5);
     canvas_setSliderBackgroundBorderColour(vaszonSettings, sliderRenderDistance, 0.8f, 0.15f, 1.0f);

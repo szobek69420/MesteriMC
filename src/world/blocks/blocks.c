@@ -7,6 +7,42 @@ static float vertexTangent[18];
 static float vertexBitangent[18];
 static float vertexUV[162];
 
+const char* blocks_getBlockName(int block)
+{
+	switch (block)
+	{
+	case BLOCK_AIR:
+		return "air";
+
+	case BLOCK_STONE:
+		return "stone";
+
+	case BLOCK_DIRT:
+		return "dirt";
+
+	case BLOCK_GRASS:
+		return "grass";
+
+	case BLOCK_SAND:
+		return "sand";
+
+	case BLOCK_OAK_LOG:
+		return "oak log";
+
+	case BLOCK_SUS:
+		return "vuri sus";
+
+	case BLOCK_WATER:
+		return "walter";
+
+	case BLOCK_OAK_LEAVES:
+		return "oak leaves";
+
+	default:
+		return "";
+	}
+}
+
 void blocks_getVertexPosition(int side, int index, float* x, float* y, float* z)
 {
 	*x = vertexPosition[12 * side + 3 * index];

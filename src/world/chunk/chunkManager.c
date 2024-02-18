@@ -326,10 +326,10 @@ void chunkManager_update(chunkManager* cm, pthread_mutex_t* pmutex)
 	}
 }
 
-void chunkManager_updateMesh(chunkManager* cm)
+int chunkManager_updateMesh(chunkManager* cm)
 {
 	if (cm->pendingMeshUpdates.size == 0)
-		return;
+		return 0;
 
 	lista_element_of(chunkMeshUpdate)* iterator;
 	int index;
@@ -363,6 +363,8 @@ void chunkManager_updateMesh(chunkManager* cm)
 		chunk_destroy(cm, &cmu.chomk);
 		break;
 	}
+
+	return 69;
 }
 
 
