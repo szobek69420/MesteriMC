@@ -53,13 +53,16 @@
 #include "../../settings/settings.h"
 
 
-#define CLIP_NEAR 0.1f
-#define CLIP_FAR 250.0f
+float CLIP_NEAR = 0.1f;
+float CLIP_FAR = 250.0f;
 
 #define PHYSICS_UPDATE 0.02f
 #define PHYSICS_STEPS_PER_UPDATE 100
 #define GENERATION_UPDATE 0.001f
 #define CHUNK_UPDATES_PER_GENERATION_UPDATE 2
+#define CHUNK_MESH_UPDATES_PER_FRAME 20
+
+#define HOTBAR_SIZE 5
 
 //global variable
 GLFWwindow* window;
@@ -121,6 +124,11 @@ shader skyboxShader; mesh skyboxMesh;
 canvas* vaszonPause;
 pthread_mutex_t mutex_vaszonPause;
 
+canvas* vaszonIngame;
+pthread_mutex_t mutex_vaszonIngame;
+int vaszonIngame_hotbarSlotFrames[HOTBAR_SIZE];
+int vaszonIngame_selectedBlockText;
+
 canvas* vaszon;//debug screen
 pthread_mutex_t mutex_vaszon;
 int vaszon_fps;
@@ -129,16 +137,19 @@ int vaszon_rot;
 int vaszon_render_distance;
 int vaszon_chunk_updates;
 int vaszon_chunks_loaded;
+int vaszon_chunks_pending_updates;
 int vaszon_chunks_rendered;
 int vaszon_physics_simulated_colliders;
 int vaszon_physics_loaded_groups;
 int vaszon_physics_raycast_hit;
 
+int hotbarContent[HOTBAR_SIZE];
+int hotbarSlotSelected = 0;
+int selectedBlockChanged = 0;
+
 unsigned int rectangleVAO;//a deferred resz hasznalja a kepernyo atrajzolasahoz
 unsigned int rectangleVBO;
 
-vec3 ssaoKernel[64];
-unsigned int noiseTexture;
 
 vector* lights;
 light sunTzu;
@@ -195,6 +206,9 @@ void game(void* w, int* currentStage)
 
     currentGameState = GAME_INGAME;
 
+    int tempHotbarContent[HOTBAR_SIZE]={ BLOCK_SUS ,BLOCK_DIRT ,BLOCK_GRASS ,BLOCK_SUS ,BLOCK_SUS };
+    memcpy(hotbarContent, tempHotbarContent, sizeof(hotbarContent));
+
     textureHandler_importTextures(TEXTURE_IN_GAME);
     
     event_queue_init();
@@ -204,6 +218,7 @@ void game(void* w, int* currentStage)
     fontHandler_init();
     init_canvas();
 
+    CLIP_FAR = settings_getInt(SETTINGS_RENDER_DISTANCE) * CHUNK_WIDTH + 50;
     cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 40, 0.2);
     camera_setProjection(&cum, currentFov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
 
@@ -234,6 +249,7 @@ void game(void* w, int* currentStage)
     pthread_mutex_init(&mutex_cum, NULL);
     pthread_mutex_init(&mutex_vaszon, NULL);
     pthread_mutex_init(&mutex_vaszonPause, NULL);
+    pthread_mutex_init(&mutex_vaszonIngame, NULL);
     pthread_mutex_init(&mutex_gameState, NULL);
 
 
@@ -289,6 +305,7 @@ void game(void* w, int* currentStage)
     pthread_mutex_destroy(&mutex_cum);
     pthread_mutex_destroy(&mutex_vaszon);
     pthread_mutex_destroy(&mutex_vaszonPause);
+    pthread_mutex_destroy(&mutex_vaszonIngame);
     pthread_mutex_destroy(&mutex_gameState);
 
 
@@ -325,7 +342,10 @@ void* loop_render(void* arg)
     int frameCounter = 0;
     int framesInLastInterval = 0;
 
+    float selectedBlockAppearance = 0;
+
     int loadedChunks = 0;
+    int pendingMeshUpdates, pendingGenerationUpdates;
     
     camera cum_render;
     while (69)
@@ -362,7 +382,9 @@ void* loop_render(void* arg)
 
         //update chunk mesh data in gpu
         pthread_mutex_lock(&mutex_cm);
-        for (int i = 0; i < 10; i++)
+        pendingGenerationUpdates = cm.pendingUpdates.size;
+        pendingMeshUpdates = cm.pendingMeshUpdates.size;
+        for (int i = 0; i < CHUNK_MESH_UPDATES_PER_FRAME&&i<pendingMeshUpdates; i++)
         {
             chunkManager_updateMesh(&cm);
         }
@@ -707,6 +729,10 @@ void* loop_render(void* arg)
             pthread_mutex_lock(&mutex_vaszonPause);
             canvas_setSize(vaszonPause, windowWidth, windowHeight);
             pthread_mutex_unlock(&mutex_vaszonPause);
+
+            pthread_mutex_lock(&mutex_vaszonIngame);
+            canvas_setSize(vaszonIngame, windowWidth, windowHeight);
+            pthread_mutex_unlock(&mutex_vaszonIngame);
         }
 
         static char buffer[50];
@@ -733,6 +759,9 @@ void* loop_render(void* arg)
                 sprintf(buffer, "chunk updates: %d/s", chunkUpdatesInLastSecond);
                 canvas_setTextText(vaszon, vaszon_chunk_updates, buffer);
 
+                sprintf(buffer, "pending: G%d, M%d", pendingGenerationUpdates, pendingMeshUpdates);
+                canvas_setTextText(vaszon, vaszon_chunks_pending_updates, buffer);
+
                 sprintf(buffer, "loaded chunks: %d", loadedChunks);
                 canvas_setTextText(vaszon, vaszon_chunks_loaded, buffer);
 
@@ -753,6 +782,27 @@ void* loop_render(void* arg)
 
                 canvas_render(vaszon, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
                 pthread_mutex_unlock(&mutex_vaszon);
+
+                pthread_mutex_lock(&mutex_vaszonIngame);
+                
+                if (selectedBlockChanged != 0)
+                {
+                    selectedBlockChanged = 0;
+                    selectedBlockAppearance = glfwGetTime();
+                    canvas_setTextText(vaszonIngame, vaszonIngame_selectedBlockText, blocks_getBlockName(hotbarContent[hotbarSlotSelected]));
+                }
+                if(glfwGetTime()-selectedBlockAppearance>1.0f)
+                    canvas_setTextText(vaszonIngame, vaszonIngame_selectedBlockText, "");
+
+                for (int i = 0; i < HOTBAR_SIZE; i++)
+                {
+                    if (i == hotbarSlotSelected)
+                        canvas_setImageTint(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 1, 1, 1);
+                    else
+                        canvas_setImageTint(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.5f, 0.5f, 0.5f);
+                }
+                canvas_render(vaszonIngame, 0, 0, 0);
+                pthread_mutex_unlock(&mutex_vaszonIngame);
                 break;
 
             case GAME_PAUSED:
@@ -785,6 +835,7 @@ void* loop_generation(void* arg)
     float lastFrame = glfwGetTime();
     float lastCameraUpdate = -1;
     float lastChunkUpdateUpdate = -1; int chunkUpdates = 0;
+
     camera cum_generation;
 
     int lastPlayerChunkX=0, lastPlayerChunkY=0, lastPlayerChunkZ=0;
@@ -963,7 +1014,7 @@ void* loop_physics(void* arg)
                                 }
                             }
                         }
-                        chunkManager_changeBlock(&cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2], tempRaycastBlock[0], tempRaycastBlock[1], tempRaycastBlock[2], BLOCK_SUS);
+                        chunkManager_changeBlock(&cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2], tempRaycastBlock[0], tempRaycastBlock[1], tempRaycastBlock[2], hotbarContent[hotbarSlotSelected]);
                         chunkManager_reloadChunk(&cm, &mutex_cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2]);
                     }
                 }
@@ -987,6 +1038,25 @@ void* loop_physics(void* arg)
 
                 camera_updateVectors(&cum);
                 pthread_mutex_unlock(&mutex_cum);
+
+                //mouse scroll
+                double scrolldx, scrolldy;
+                input_get_mouse_scroll_delta(&scrolldx, &scrolldy);
+                if (scrolldy < -0.001)
+                {
+                    hotbarSlotSelected++;
+                    if (hotbarSlotSelected >= HOTBAR_SIZE)
+                        hotbarSlotSelected = 0;
+                    selectedBlockChanged = 69;
+                }
+                if (scrolldy > 0.001)
+                {
+                    hotbarSlotSelected--;
+                    if (hotbarSlotSelected < 0)
+                        hotbarSlotSelected = HOTBAR_SIZE-1;
+                    selectedBlockChanged = 69;
+                }
+
                 //player part done
 
 
@@ -1141,6 +1211,9 @@ void quitGame(void* nichts)
 
 void init_renderer()
 {
+    int fogEnd = settings_getInt(SETTINGS_RENDER_DISTANCE) * CHUNK_WIDTH - 10;
+    int shadowEnd = fogEnd > 150 ? 150 : fogEnd;
+
     //rendor = renderer_create(window_getWidth(), window_getHeight());
     renderer_setWidth(settings_getInt(SETTINGS_RENDERER_WIDTH));
     renderer_setHeight(settings_getInt(SETTINGS_RENDERER_HEIGHT));
@@ -1178,16 +1251,16 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_dudv"), 1);
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_depth_geometry"), 2);
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_depth_shadow"), 3);
-    glUniform1f(glGetUniformLocation(waterShader.id, "fogStart"), 200);
-    glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), 210);
-    glUniform1f(glGetUniformLocation(waterShader.id, "fogHelper"), 1.0f / (210 - 200));
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogStart"), fogEnd-10);
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), fogEnd);
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogHelper"), 1.0f / 10);
     glUniform1f(glGetUniformLocation(waterShader.id, "projectionNear"), CLIP_NEAR);
     glUniform1f(glGetUniformLocation(waterShader.id, "projectionFar"), CLIP_FAR);
     glUniform1f(glGetUniformLocation(waterShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(waterShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
-    glUniform1f(glGetUniformLocation(waterShader.id, "shadowStart"), 140);
-    glUniform1f(glGetUniformLocation(waterShader.id, "shadowEnd"), 150);
-    glUniform1f(glGetUniformLocation(waterShader.id, "shadowHelper"), 1.0f / (150 - 140));
+    glUniform1f(glGetUniformLocation(waterShader.id, "shadowStart"), shadowEnd-10);
+    glUniform1f(glGetUniformLocation(waterShader.id, "shadowEnd"), shadowEnd);
+    glUniform1f(glGetUniformLocation(waterShader.id, "shadowHelper"), 1.0f / 10);
 
     ssaoShader = shader_import(
         "../assets/shaders/renderer/ssao/shader_ssao.vag",
@@ -1224,12 +1297,12 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_ssao"), 4);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 200);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 210);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f / (210 - 200));
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStart"), 140);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowEnd"), 150);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowHelper"), 1.0f / (150 - 140));
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), fogEnd-10);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), fogEnd);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f / 10);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStart"), shadowEnd-10);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowEnd"), shadowEnd);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowHelper"), 1.0f / 10);
 
     forwardPassShader = shader_import(
         "../assets/shaders/renderer/forward/shader_forward.vag",
@@ -1308,41 +1381,6 @@ void init_renderer()
     glFrontFace(GL_CCW);
 
     //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    //ssao shit
-    // generate sample kernel
-    // ----------------------
-    for (unsigned int i = 0; i < 64; ++i)
-    {
-        ssaoKernel[i] = vec3_create2(
-            (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
-            (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
-            (rand() % 1001) / 1000.0              //random between [ 0.0 - 1.0]
-        );
-        // scale samples s.t. they're more aligned to center of kernel
-        ssaoKernel[i] = vec3_normalize(ssaoKernel[i]);
-        double scale = i / 64.0;
-        scale = lerp(0.1, 1.0, scale * scale);
-        ssaoKernel[i] = vec3_scale(ssaoKernel[i], (rand() % 1001) / 1000.0 * scale); //random between [0.0 - 1.0] * scale
-    }
-    // generate noise texture
-    // ----------------------
-    vec3 ssaoNoise[16];
-    for (unsigned int i = 0; i < 16; i++)
-    {
-        ssaoNoise[i] = vec3_create2(
-            (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
-            (rand() % 1001) / 1000.0 * 2.0 - 1.0, //random between [-1.0 - 1.0]
-            0.0f
-        ); // rotate around z-axis (in tangent space)
-    }
-    glGenTextures(1, &noiseTexture);
-    glBindTexture(GL_TEXTURE_2D, noiseTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
 
     //light shit
@@ -1437,10 +1475,26 @@ void end_renderer()
 
 void init_canvas()
 {
+    int mogus;
+
+    //ingame screen
+    vaszonIngame = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
+
+    mogus = canvas_addImage(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 16, 16, textureHandler_getTexture(TEXTURE_ATLAS_UI));
+    canvas_setImageUV(vaszonIngame, mogus, 0.0f, 0.9f, 0.1f, 0.1f);
+
+    vaszonIngame_selectedBlockText = canvas_addText(vaszonIngame, "", CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, 0, 90, 1, 0.85f, 0, 24);
+
+    for (int i = 0; i < HOTBAR_SIZE; i++)
+    {
+        vaszonIngame_hotbarSlotFrames[i] = canvas_addImage(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80*(HOTBAR_SIZE/2)+80*i, 0, 80, 80, textureHandler_getTexture(TEXTURE_ATLAS_UI));
+        canvas_setImageUV(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.1f, 0.9f, 0.1f, 0.1f);
+    }
+
     //pause screen
     vaszonPause = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
     
-    int mogus = canvas_addButton(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 300, 50);
+    mogus = canvas_addButton(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 300, 50);
     canvas_setButtonText(vaszonPause, mogus, "continue", 24, 1, 0.85f, 0);
     canvas_setButtonBorder(vaszonPause, mogus, 5, 5);
     canvas_setButtonFillColour(vaszonPause, mogus, 0.2, 0, 1);
@@ -1466,8 +1520,9 @@ void init_canvas()
 
     vaszon_render_distance = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 105, 0, 0, 0, 24);
     vaszon_chunk_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 130, 0, 0, 0, 24);
-    vaszon_chunks_loaded = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 155, 0, 0, 0, 24);
-    vaszon_chunks_rendered = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 180, 0, 0, 0, 24);
+    vaszon_chunks_pending_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 155, 0, 0, 0, 24);
+    vaszon_chunks_loaded = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 180, 0, 0, 0, 24);
+    vaszon_chunks_rendered = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 205, 0, 0, 0, 24);
 
     //bototm left
     const char* vendor = glGetString(GL_VENDOR);
@@ -1480,15 +1535,11 @@ void init_canvas()
     vaszon_physics_loaded_groups = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
     vaszon_physics_simulated_colliders = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
     vaszon_physics_raycast_hit = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 60, 0, 0, 0, 24);
-
-    //cursor (should be replaced in a different canvas later)
-    int temp;
-    temp = canvas_addImage(vaszon, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 16, 16, textureHandler_getTexture(TEXTURE_ATLAS_UI));
-    canvas_setImageUV(vaszon, temp, 0.0f, 0.9f, 0.1f, 0.1f);
 }
 
 void end_canvas()
 {
+    canvas_destroy(vaszonIngame);
     canvas_destroy(vaszonPause);
     canvas_destroy(vaszon);
 }
