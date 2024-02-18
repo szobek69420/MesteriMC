@@ -3,5 +3,4 @@ A minecraft clone written in C. When done, it will be so beautiful that mankind 
 
 Currently, it looks like this:
 
-![image](https://github.com/szobek69420/MesteriMC/assets/137615071/ede8dce0-d875-41f1-a46c-f0d7ff56098b)
-
+![screenshot_mesterimc](https://github.com/szobek69420/MesteriMC/assets/137615071/171dbfa2-8e63-45a4-8502-b9c4ce000861)
