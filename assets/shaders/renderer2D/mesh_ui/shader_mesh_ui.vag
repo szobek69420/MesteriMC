@@ -1,0 +1,19 @@
+#version 330 core
+layout (location=0) in vec3 aPos;
+layout (location=1) in vec2 aUV;
+layout (location=2) in float aBrightness;
+
+out vec2 uv;
+out float brightness;
+
+uniform vec4 pos_scale;//(pos x; pos y; scale x; scale y)
+uniform mat4 projection;
+
+void main()
+{
+	uv=aUV;
+	brightness=aBrightness;
+
+	vec3 tempPos=vec3(pos_scale.xy+pos_scale.zw*aPos.xy, aPos.z);
+	gl_Position=projection*vec4(tempPos, 1);
+}

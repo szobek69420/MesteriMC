@@ -127,6 +127,7 @@ pthread_mutex_t mutex_vaszonPause;
 canvas* vaszonIngame;
 pthread_mutex_t mutex_vaszonIngame;
 int vaszonIngame_hotbarSlotFrames[HOTBAR_SIZE];
+int vaszonIngame_hotbarSlotBlockMeshes[HOTBAR_SIZE];
 int vaszonIngame_selectedBlockText;
 
 canvas* vaszon;//debug screen
@@ -1489,6 +1490,8 @@ void init_canvas()
     {
         vaszonIngame_hotbarSlotFrames[i] = canvas_addImage(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80*(HOTBAR_SIZE/2)+80*i, 0, 80, 80, textureHandler_getTexture(TEXTURE_ATLAS_UI));
         canvas_setImageUV(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.1f, 0.9f, 0.1f, 0.1f);
+        
+        vaszonIngame_hotbarSlotBlockMeshes[i] = canvas_addBlockMesh(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, hotbarContent[i], -80 * (HOTBAR_SIZE / 2) + 80 * i, 5, 70, 70);
     }
 
     //pause screen

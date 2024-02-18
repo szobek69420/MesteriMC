@@ -76,4 +76,8 @@ void canvas_setSliderKnobFillColour(canvas* c, int id, float r, float g, float b
 void canvas_setSliderKnobBorderColour(canvas* c, int id, float r, float g, float b);
 void canvas_setKnobWidth(canvas* c, int id, float knobWidth, float knobHeight);
 
+
+//block mesh
+int canvas_addBlockMesh(canvas* c, int hAlign, int vAlign, int blockType, int x, int y, float width, float height);
+
 #endif
