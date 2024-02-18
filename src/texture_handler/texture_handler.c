@@ -5,6 +5,7 @@
 
 //ingame
 static unsigned int atlas_albedo=0;
+static unsigned int atlas_albedo_non_srgb = 0;
 static unsigned int atlas_specular=0;//https://github.com/rre36/lab-pbr/wiki/Specular-Texture-Details (mi csak az r komponenst haszn�ljuk)
 static unsigned int atlas_normal=0;//rgba(normal.x, normal.y, normal.z, height)
 
@@ -38,6 +39,10 @@ int textureHandler_importTextures(int stage)
     case TEXTURE_IN_GAME:
         atlas_albedo = textureHandler_loadImage("../assets/textures/atlas_albedo.png", GL_SRGB_ALPHA, GL_RGBA, GL_NEAREST, 69);
         if (atlas_albedo == 0)
+            problem++;
+
+        atlas_albedo_non_srgb = textureHandler_loadImage("../assets/textures/atlas_albedo.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
+        if (atlas_albedo_non_srgb == 0)
             problem++;
 
         atlas_specular = textureHandler_loadImage("../assets/textures/atlas_specular.png", GL_RGB, GL_RGBA, GL_NEAREST, 69);
@@ -102,6 +107,7 @@ void textureHandler_destroyTextures(int stage)
     {
     case TEXTURE_IN_GAME:
         glDeleteTextures(1, &atlas_albedo);
+        glDeleteTextures(1, &atlas_albedo_non_srgb);
         glDeleteTextures(1, &atlas_specular);
         glDeleteTextures(1, &atlas_normal);
 
@@ -115,6 +121,7 @@ void textureHandler_destroyTextures(int stage)
         glDeleteTextures(1, &menu_title_pause);
 
         atlas_albedo = 0;
+        atlas_albedo_non_srgb = 0;
         atlas_specular = 0;
         atlas_normal = 0;
 
@@ -146,6 +153,9 @@ unsigned int textureHandler_getTexture(int texture)
     {
     case TEXTURE_ATLAS_ALBEDO:
         return atlas_albedo;
+
+    case TEXTURE_ATLAS_ALBEDO_NON_SRGB:
+        return atlas_albedo_non_srgb;
 
     case TEXTURE_ATLAS_SPECULAR:
         return atlas_specular;

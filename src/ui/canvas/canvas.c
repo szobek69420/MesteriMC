@@ -9,8 +9,14 @@
 #include "../text/text_renderer.h"
 
 #include "../button/button_renderer.h"
-
 #include "../image_renderer/image_renderer.h"
+#include "../mesh_ui_renderer/mesh_ui_renderer.h"
+
+#include "../../mesh/mesh.h"
+
+#include "../../world/blocks/blocks.h"
+
+#include "../../texture_handler/texture_handler.h"
 
 #include "../../utils/seqtor.h"
 
@@ -22,6 +28,7 @@
 #define CANVAS_COMPONENT_BUTTON 1
 #define CANVAS_COMPONENT_IMAGE 2
 #define CANVAS_COMPONENT_SLIDER 3
+#define CANVAS_COMPONENT_BLOCK_MESH 4
 
 static int componentIDCounter = 0;//increases by one if a component has been added to the canvas
 
@@ -72,6 +79,11 @@ struct canvasSlider {
 };
 typedef struct canvasSlider canvasSlider;
 
+struct canvasBlockMesh {
+	mesh blockMesh;
+};
+typedef struct canvasBlockMesh canvasBlockMesh;
+
 struct canvasComponent {
 	int id;
 	int componentType;
@@ -86,6 +98,7 @@ struct canvasComponent {
 		canvasButton cb;
 		canvasImage ci;
 		canvasSlider cs;
+		canvasBlockMesh cbm;
 	};
 };
 typedef struct canvasComponent canvasComponent;
@@ -100,11 +113,14 @@ struct canvas {
 
 	imageRenderer* ir;
 
+	meshUiRenderer* mur;
+
 	seqtor_of(canvasComponent) components;
 };
 
 void canvas_calculatePositions(canvas* c);
 void canvas_destroyComponent(canvasComponent* cc);
+
 
 //font handler should be initialized before calling this
 canvas* canvas_create(int width, int height, const char* fontSauce)
@@ -122,6 +138,8 @@ canvas* canvas_create(int width, int height, const char* fontSauce)
 
 	c->ir = imageRenderer_create(width, height);
 
+	c->mur = meshUiRenderer_create(width, height);
+
 	seqtor_init(c->components, 1);
 
 	return c;
@@ -133,6 +151,7 @@ void canvas_destroy(canvas* c)
 	textRenderer_destroy(&c->tr);
 	buttonRenderer_destroy(c->br);
 	imageRenderer_destroy(c->ir);
+	meshUiRenderer_destroy(c->mur);
 
 	while (seqtor_size(c->components) > 0)
 	{
@@ -167,6 +186,7 @@ void canvas_setSize(canvas* c, int width, int height)
 	textRenderer_setSize(&c->tr, width, height);
 	buttonRenderer_setSize(c->br, width, height);
 	imageRenderer_setSize(c->ir, width, height);
+	meshUiRenderer_setSize(c->mur, width, height);
 
 	canvas_calculatePositions(c);
 }
@@ -270,6 +290,10 @@ void canvas_render(canvas* c, int mouseX, int mouseY, int mousePressed)
 				buttonRenderer_setBorderColour(c->br, cc->cs.knobBorderR, cc->cs.knobBorderG, cc->cs.knobBorderB);
 			}
 			buttonRenderer_render(c->br, knobX, knobY, cc->cs.knobWidth, cc->cs.knobHeight, cc->cs.knobBorderWidth, cc->cs.knobBorderRadius);
+			break;
+
+		case CANVAS_COMPONENT_BLOCK_MESH:
+			meshUiRenderer_render(c->mur, &cc->cbm.blockMesh, textureHandler_getTexture(TEXTURE_ATLAS_ALBEDO_NON_SRGB), cc->originX, cc->originY, cc->width, cc->height);
 			break;
 		}
 	}
@@ -462,6 +486,10 @@ void canvas_destroyComponent(canvasComponent* cc)
 
 	case CANVAS_COMPONENT_IMAGE:
 		//nothing
+		break;
+
+	case CANVAS_COMPONENT_BLOCK_MESH:
+		mesh_destroy(cc->cbm.blockMesh);
 		break;
 	}
 }
@@ -946,4 +974,128 @@ void canvas_setKnobWidth(canvas* c, int id, float knobWidth, float knobHeight)
 
 	cc->cs.knobWidth=knobWidth;		cc->cs.knobHeight=knobHeight;
 }
+
+// BLOCK MESH ---------------------------------------------------------------------------
+
+static float blockMeshVertexPositions[72];
+static float blockMeshVertexBrightnesses[24];
+static unsigned int blockMeshIndices[36];
+static const int blockMeshVertexCount = 24;
+
+int canvas_addBlockMesh(canvas* c, int hAlign, int vAlign, int blockType, int x, int y, float width, float height)
+{
+	canvasComponent cc;
+	cc.componentType = CANVAS_COMPONENT_BLOCK_MESH;
+	cc.id = componentIDCounter++;
+	cc.x = x;
+	cc.y = y;
+	cc.hAlign = hAlign;
+	cc.vAlign = vAlign;
+	cc.width = width;
+	cc.height = height;
+	cc.inDrag = 0;
+
+
+	//constructing vertex data (gathering uv values)
+	float a, b;
+	float* vertexData = malloc(blockMeshVertexCount * MESH_UI_RENDERER_VERTEX_FLOATS*sizeof(float));
+	for (int i = 0; i < 6; i++)
+	{
+		for (int j = 0; j < 4; j++)
+		{
+			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j)] = blockMeshVertexPositions[3 * (4 * i + j)];
+			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j)+1] = blockMeshVertexPositions[3 * (4 * i + j)+1];
+			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j)+2] = blockMeshVertexPositions[3 * (4 * i + j)+2];
+
+			blocks_getUV(blockType, i, j, &a, &b);
+			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j) + 3] = a;
+			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j) + 4] = b;
+
+			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j) + 5] = blockMeshVertexBrightnesses[4 * i + j];
+		}
+	}
+
+	//generating buffers
+	glGenVertexArrays(1, &cc.cbm.blockMesh.vao);
+	glBindVertexArray(cc.cbm.blockMesh.vao);
+	
+	glGenBuffers(1, &cc.cbm.blockMesh.vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, cc.cbm.blockMesh.vbo);
+	glBufferData(GL_ARRAY_BUFFER, blockMeshVertexCount*MESH_UI_RENDERER_VERTEX_FLOATS*sizeof(float), vertexData, GL_STATIC_DRAW);
+
+	glGenBuffers(1, &cc.cbm.blockMesh.ebo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cc.cbm.blockMesh.ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(blockMeshIndices), blockMeshIndices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, MESH_UI_RENDERER_VERTEX_FLOATS * sizeof(float), (void*)0);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, MESH_UI_RENDERER_VERTEX_FLOATS * sizeof(float), (void*)(3*sizeof(float)));
+	glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, MESH_UI_RENDERER_VERTEX_FLOATS * sizeof(float), (void*)(5 * sizeof(float)));
+
+	glEnableVertexAttribArray(0);//position
+	glEnableVertexAttribArray(1);//uv
+	glEnableVertexAttribArray(2);//brightness
+
+	cc.cbm.blockMesh.indexCount = sizeof(blockMeshIndices) / sizeof(blockMeshIndices[0]);
+
+	glBindVertexArray(0);
+
+	free(vertexData);
+
+	seqtor_push_back(c->components, cc);
+
+	canvas_calculatePosition(c, &seqtor_back(c->components));
+
+	return cc.id;
+}
+
+static float blockMeshVertexPositions[] = {
+	0.395505, 0.432458, -0.006055,
+	0.911185, 0.382264, 0.253165,
+	0.913757, 0.848056, 0.523000,
+	0.412112, 0.909231, 0.263781,
+
+	0.151376, 0.226626, 0.477000,
+	0.395505, 0.432458, -0.006055,
+	0.412112, 0.909231, 0.263781,
+	0.100814, 0.724119, 0.746835,
+
+	0.661710, 0.079103, 0.736219,
+	0.151376, 0.226626, 0.477000,
+	0.100814, 0.724119, 0.746835,
+	0.636210, 0.626722, 1.006055,
+
+	0.911185, 0.382264, 0.253165,
+	0.661710, 0.079103, 0.736219,
+	0.636210, 0.626722, 1.006055,
+	0.913757, 0.848056, 0.523000,
+
+	0.636210, 0.626722, 1.006055,
+	0.100814, 0.724119, 0.746835,
+	0.412112, 0.909231, 0.263781,
+	0.913757, 0.848056, 0.523000,
+
+	0.911185, 0.382264, 0.253165,
+	0.395505, 0.432458, -0.006055,
+	0.151376, 0.226626, 0.477000,
+	0.661710, 0.079103, 0.736219
+};
+
+
+static float blockMeshVertexBrightnesses[] = {
+	0.5f, 0.5f, 0.5f, 0.5f,
+	0.6f, 0.6f, 0.6f, 0.6f,
+	0.9f, 0.9f, 0.9f, 0.9f,
+	0.7f, 0.7f, 0.7f, 0.7f,
+	1.0f, 1.0f, 1.0f, 1.0f,
+	0.3f, 0.3f, 0.3f, 0.3f
+};
+
+static unsigned int blockMeshIndices[] = {
+	2, 0, 1,	2, 3, 0,
+	6, 4, 5,	6, 7, 4,
+	10, 8, 9,	10, 11, 8,
+	14, 12, 13,	14, 15, 12,
+	18, 16, 17,	18, 19, 16,
+	22, 20, 21,	22, 23, 20
+};
 
