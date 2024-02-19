@@ -4,7 +4,7 @@ layout (location = 1) out vec4 gAlbedoSpec;
 
 in VS_OUT{
     vec2 TexCoords;
-    vec3 viewDir;//view direction in tangent space (fragment to player)
+    //vec3 viewDir;//view direction in tangent space (fragment to player)
     float ao;
     mat3 tangentToView;
 }fs_in;
@@ -22,7 +22,7 @@ const float onePerHeightStep=5.0;
 const float textureWidthInAtlas=0.1;
 const float onePerTextureWidthInAtlas=10;
 
-vec2 parallax();
+//vec2 parallax();
 
 void main()
 {    
@@ -40,6 +40,7 @@ void main()
     gNormal = vec4(0.5*(fs_in.tangentToView*normalTemp)+vec3(0.5), fs_in.ao);
 }  
 
+/*
 vec2 parallax()
 {
     vec2 textureLowerBorder=textureWidthInAtlas*vec2(
@@ -77,14 +78,14 @@ vec2 parallax()
     float weight = afterDepth / (afterDepth - beforeDepth);
     currentUV = currentUV-deltaUV*weight;
 
-    /*if(currentUV.x<textureLowerBorder.x)
-        currentUV.x=textureLowerBorder.x;
-    if(currentUV.x>textureUpperBorder.x)
-        currentUV.x=textureUpperBorder.x;
-    if(currentUV.y<textureLowerBorder.y)
-        currentUV.y=textureLowerBorder.y;
-    if(currentUV.y>textureUpperBorder.y)
-        currentUV.y=textureUpperBorder.y;*/
+    //if(currentUV.x<textureLowerBorder.x)
+    //    currentUV.x=textureLowerBorder.x;
+    //if(currentUV.x>textureUpperBorder.x)
+    //    currentUV.x=textureUpperBorder.x;
+    //if(currentUV.y<textureLowerBorder.y)
+    //    currentUV.y=textureLowerBorder.y;
+    //if(currentUV.y>textureUpperBorder.y)
+    //    currentUV.y=textureUpperBorder.y;
 
     if(currentUV.x<textureLowerBorder.x)
         discard;
@@ -97,3 +98,4 @@ vec2 parallax()
 
     return currentUV;
 }
+*/

@@ -4,7 +4,7 @@ layout (location=0) in uint attributes;
 
 out VS_OUT{
     vec2 TexCoords;
-    vec3 viewDir;//view direction in tangent space
+    //vec3 viewDir;//view direction in tangent space
 	float ao;
     mat3 tangentToView;
 }vs_out;
@@ -65,6 +65,6 @@ void main()
 
     vec4 position=view*model*vec4(posx, posy, posz, 1);
 
-    vs_out.viewDir=-(transpose(vs_out.tangentToView)*position.xyz);
+    //vs_out.viewDir=-(transpose(vs_out.tangentToView)*position.xyz);
     gl_Position=projection*position;
 }  

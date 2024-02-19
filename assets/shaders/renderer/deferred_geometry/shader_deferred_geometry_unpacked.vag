@@ -1,0 +1,31 @@
+#version 330 core
+layout (location=0) in vec3 aPos;
+layout (location=1) in vec2 aUV;
+layout (location=2) in vec3 aNormal;
+layout (location=3) in vec3 aTangent;
+
+out VS_OUT{
+    vec2 TexCoords;
+    //vec3 viewDir;//view direction in tangent space
+	float ao;
+    mat3 tangentToView;
+}vs_out;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform mat3 view_normal;
+uniform mat3 model_normal;
+
+void main()
+{
+	vs_out.TexCoords=aUV;
+	vs_out.ao=1;
+	
+    vs_out.tangentToView=view_normal*mat3(model_normal*aTangent, model_normal*cross(aNormal, aTangent), model_normal*aNormal);
+
+    vec4 position=view*model*vec4(aPos, 1);
+
+    //vs_out.viewDir=-(transpose(vs_out.tangentToView)*position.xyz);
+    gl_Position=projection*position;
+}
