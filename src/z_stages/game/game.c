@@ -31,6 +31,7 @@
 #include "../../mesh/player_mesh/player_mesh.h"
 
 #include "../../renderer/block_selection/block_selection.h"
+#include "../../renderer/hand/hand_renderer.h"
 
 #include "../../ui/font_handler/font_handler.h"
 #include "../../ui/text/text_renderer.h"
@@ -146,7 +147,6 @@ int vaszon_physics_raycast_hit;
 
 int hotbarContent[HOTBAR_SIZE];
 int hotbarSlotSelected = 0;
-int selectedBlockChanged = 0;
 
 unsigned int rectangleVAO;//a deferred resz hasznalja a kepernyo atrajzolasahoz
 unsigned int rectangleVBO;
@@ -160,6 +160,9 @@ light_renderer lightRenderer;
 sun szunce;
 
 flare lensFlare;
+
+handRenderer* hr;
+
 //function prototypes
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
@@ -232,6 +235,8 @@ void game(void* w, int* currentStage)
     init_cube();//egyszer majd ki kene szedni
 
     blockSelection_init();
+    hr = handRenderer_create();
+    handRenderer_setBlock(hr, hotbarContent[hotbarSlotSelected]);
 
     glfwMakeContextCurrent(NULL);
 
@@ -322,6 +327,7 @@ void game(void* w, int* currentStage)
     end_cube();
 
     blockSelection_close();
+    handRenderer_destroy(hr);
 
     int chunksGenerated, chunksDestroyed;
     chunk_getGenerationInfo(&chunksGenerated, &chunksDestroyed);
@@ -344,6 +350,7 @@ void* loop_render(void* arg)
     int framesInLastInterval = 0;
 
     float selectedBlockAppearance = 0;
+    int previousHotbarSlot = hotbarSlotSelected;
 
     int loadedChunks = 0;
     int pendingMeshUpdates, pendingGenerationUpdates;
@@ -466,6 +473,31 @@ void* loop_render(void* arg)
         pthread_mutex_lock(&mutex_cm);
         int renderedChunks = chunkManager_drawTerrain(&cm, &geometryPassShader, &cum, &projection);
         pthread_mutex_unlock(&mutex_cm);
+
+        do {//hand
+            if (previousHotbarSlot != hotbarSlotSelected)
+                handRenderer_setBlock(hr, hotbarContent[hotbarSlotSelected]);
+
+            if (hotbarContent[hotbarSlotSelected] != BLOCK_AIR)
+            {
+                mat4 mamogus = mat4_create(1);
+                mat3 mamogus2;
+                vec3 handPos = cum_render.position;
+                handPos = vec3_sum(handPos, vec3_scale(cum_render.front, 0.3f));
+                handPos = vec3_sum(handPos, vec3_scale(cum_render.right, 0.3f));
+                handPos = vec3_sum(handPos, vec3_scale(cum_render.up, -0.3f));
+
+                mamogus = mat4_translate(mamogus, handPos);
+                mamogus = mat4_rotate(mamogus, (vec3) { 0, 1, 0 }, cum_render.yaw + 10);
+                mamogus = mat4_rotate(mamogus, (vec3) { 1, 0, 0 }, cum_render.pitch);
+                mamogus = mat4_scale(mamogus, (vec3) { 0.2f, 0.2f, 0.2f });
+
+                mamogus2 = mat3_createFromMat(mat4_transpose(mat4_inverse(mamogus)));
+
+                handRenderer_setMatrices(hr, &projection, &view, &viewNormal);
+                handRenderer_renderBlock(hr, &mamogus, &mamogus2);
+            }
+        } while (0);
         
         //copy depth buffer
         glEnable(GL_DEPTH_TEST);
@@ -786,9 +818,8 @@ void* loop_render(void* arg)
 
                 pthread_mutex_lock(&mutex_vaszonIngame);
                 
-                if (selectedBlockChanged != 0)
+                if (previousHotbarSlot!=hotbarSlotSelected)
                 {
-                    selectedBlockChanged = 0;
                     selectedBlockAppearance = glfwGetTime();
                     canvas_setTextText(vaszonIngame, vaszonIngame_selectedBlockText, blocks_getBlockName(hotbarContent[hotbarSlotSelected]));
                 }
@@ -812,6 +843,8 @@ void* loop_render(void* arg)
                 pthread_mutex_unlock(&mutex_vaszonPause);
                 break;
         }
+
+        previousHotbarSlot = hotbarSlotSelected;
 
         glfwSwapBuffers(window);
 
@@ -1048,14 +1081,12 @@ void* loop_physics(void* arg)
                     hotbarSlotSelected++;
                     if (hotbarSlotSelected >= HOTBAR_SIZE)
                         hotbarSlotSelected = 0;
-                    selectedBlockChanged = 69;
                 }
                 if (scrolldy > 0.001)
                 {
                     hotbarSlotSelected--;
                     if (hotbarSlotSelected < 0)
                         hotbarSlotSelected = HOTBAR_SIZE-1;
-                    selectedBlockChanged = 69;
                 }
 
                 //player part done
