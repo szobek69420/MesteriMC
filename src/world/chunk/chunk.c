@@ -157,10 +157,12 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	{
 		for (int j = 0; j < CHUNK_WIDTH + 2; j++)
 		{
-			heightHelper = fnlGetNoise2D(&(cm->noise), basedX + i, basedZ + j)*fnlGetNoise2D(&(cm->noise2),basedX+i, basedZ+j);
+			heightHelper = fnlGetNoise2D(&(cm->noise), basedX + i, basedZ + j);
+			heightHelper += 0.5f*fnlGetNoise2D(&cm->noise, 2 * (basedX + i), 2 * (basedZ + j));
+			heightHelper += 0.25f * fnlGetNoise2D(&cm->noise, 4 * (basedX + i), 2 * (basedZ + j));
+			heightHelper += 0.125f * fnlGetNoise2D(&cm->noise, 8 * (basedX + i), 2 * (basedZ + j));
 			heightHelper *= 200*heightHelper;
-			heightHelper += 20;
-			heightHelper -= basedY;
+			heightHelper -= basedY-20;
 			heightMap[i][j] = heightHelper;
 		}
 	}

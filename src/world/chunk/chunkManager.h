@@ -40,6 +40,9 @@ chunk unload :
 #define CHUNKMANAGER_UNLOAD_CHUNK 2
 #define CHUNKMANAGER_RELOAD_CHUNK 3
 
+#define CHUNKMANAGER_TERRAIN_GENERATION_FREQUENCY_1 0.0007
+#define CHUNKMANAGER_TERRAIN_GENERATION_FREQUENCY_2 0.0083
+
 struct chunkGenerationUpdate{
 	int chunkX, chunkY, chunkZ;
 	int type;

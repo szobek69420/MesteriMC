@@ -25,12 +25,12 @@ chunkManager chunkManager_create(int seed, int renderDistance, physicsSystem* ps
 
 	cm.noise= fnlCreateState();
 	cm.noise.noise_type = FNL_NOISE_OPENSIMPLEX2;
-	cm.noise.frequency = 0.0017;
+	cm.noise.frequency = CHUNKMANAGER_TERRAIN_GENERATION_FREQUENCY_1;
 	cm.noise.seed = seed;
 
 	cm.noise2 = fnlCreateState();
 	cm.noise2.noise_type = FNL_NOISE_OPENSIMPLEX2;
-	cm.noise2.frequency = 0.0083;
+	cm.noise2.frequency = CHUNKMANAGER_TERRAIN_GENERATION_FREQUENCY_2;
 	cm.noise2.seed = seed*seed+seed;
 
 	lista_init(cm.pendingUpdates);

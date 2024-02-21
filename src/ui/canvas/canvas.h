@@ -27,6 +27,9 @@ void canvas_setSize(canvas* c, int width, int height);
 void canvas_render(canvas* c, int glfwMouseX, int glfwMouseY, int mousePressed);
 void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseDown, int mousePressed,  int mouseClicked);
 
+float canvas_calculateTextLength(canvas* c, const char* text, int fontSize);
+float canvas_getTextLineHeight(canvas* c, int fontSize);
+
 void canvas_removeComponent(canvas* c, int id);
 void canvas_setComponentPosition(canvas* c, int id, int x, int y);
 void canvas_setComponentAlignment(canvas* c, int id, int hAlign, int vAlign);

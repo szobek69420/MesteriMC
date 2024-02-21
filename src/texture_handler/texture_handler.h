@@ -26,6 +26,10 @@
 #define TEXTURE_MENU_TITLE_SETTINGS 69420668
 #define TEXTURE_MENU_TITLE_PAUSE 69420669
 
+//random
+#define TEXTURE_PLAIN_WHITE 1000
+#define TEXTURE_GOKU 1001
+
 int textureHandler_importTextures(int stage);//visszateresi ertek 0, ha sikerult
 void textureHandler_destroyTextures(int stage);
 
