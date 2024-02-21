@@ -21,11 +21,16 @@ static unsigned int sky_gradient = 0;
 
 static unsigned int menu_title_pause = 0;
 
+static unsigned int goku = 0;
+
 //menu
 static unsigned int menu_title = 0;
 static unsigned int menu_background = 0;
 static unsigned int menu_title_settings = 0;
 
+
+//general
+static unsigned int plain_white = 0;
 
 
 unsigned int textureHandler_loadImage(const char* pathToTexture, GLint internalFormat, GLenum format, int filterType, int flipVertically);
@@ -77,6 +82,14 @@ int textureHandler_importTextures(int stage)
         if (menu_title_pause == 0)
             problem++;
 
+        plain_white = textureHandler_loadImage("../assets/textures/ui/plain_white.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
+        if (plain_white == 0)
+            problem++;
+
+        goku = textureHandler_loadImage("../assets/textures/ui/inventory/goku.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
+        if (goku == 0)
+            problem++;
+
 
 
         sky_gradient = textureHandler_loadImage("../assets/textures/sky/sky_gradient.png", GL_RGBA, GL_RGBA, GL_LINEAR, 0);
@@ -99,6 +112,10 @@ int textureHandler_importTextures(int stage)
 
         menu_title_settings = textureHandler_loadImage("../assets/textures/ui/settings/settings_title.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
         if (menu_title_settings == 0)
+            problem++;
+
+        plain_white = textureHandler_loadImage("../assets/textures/ui/plain_white.png", GL_RGBA, GL_RGBA, GL_NEAREST, 69);
+        if (plain_white == 0)
             problem++;
         break;
     }
@@ -126,6 +143,9 @@ void textureHandler_destroyTextures(int stage)
 
         glDeleteTextures(1, &menu_title_pause);
 
+        glDeleteTextures(1, &plain_white);
+        glDeleteTextures(1, &goku);
+
         atlas_albedo = 0;
         atlas_albedo_non_srgb = 0;
         atlas_specular = 0;
@@ -140,6 +160,9 @@ void textureHandler_destroyTextures(int stage)
         sky_gradient = 0;
 
         menu_title_pause = 0;
+
+        plain_white = 0;
+        goku = 0;
         break;
 
     case TEXTURE_MAIN_MENU:
@@ -147,9 +170,14 @@ void textureHandler_destroyTextures(int stage)
         glDeleteTextures(1, &menu_title);
         glDeleteTextures(1, &menu_title_settings);
 
+        glDeleteTextures(1, &plain_white);
+
+
         menu_background = 0;
         menu_title = 0;
         menu_title_settings = 0;
+        
+        plain_white = 0;
         break;
     }
 }
@@ -196,6 +224,12 @@ unsigned int textureHandler_getTexture(int texture)
 
     case TEXTURE_MENU_TITLE_PAUSE:
         return menu_title_pause;
+
+    case TEXTURE_PLAIN_WHITE:
+        return plain_white;
+
+    case TEXTURE_GOKU:
+        return goku;
 
     default:
         return 0;

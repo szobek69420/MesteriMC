@@ -65,6 +65,9 @@ float CLIP_FAR = 250.0f;
 
 #define HOTBAR_SIZE 5
 
+#define INVENTORY_ROWS 6
+#define INVENTORY_COLUMNS 4
+
 //global variable
 GLFWwindow* window;
 int windowShouldClose = 0;
@@ -83,7 +86,7 @@ enum {
 int currentCursorMode, targetCursorMode;//glfwSetInputMode should only be called from the main thread, so these serve as a buffer until the main thread gets to change the input mode
 
 enum gameState{
-    GAME_INGAME, GAME_PAUSED
+    GAME_INGAME, GAME_PAUSED, GAME_INVENTORY
 };
 int currentGameState;//is the game paused or in game or idk
 pthread_mutex_t mutex_gameState;
@@ -131,6 +134,13 @@ int vaszonIngame_hotbarSlotFrames[HOTBAR_SIZE];
 int vaszonIngame_hotbarSlotBlockMeshes[HOTBAR_SIZE];
 int vaszonIngame_selectedBlockText;
 
+canvas* vaszonInventory;
+pthread_mutex_t mutex_vaszonInventory;
+int vaszonInventory_inventorySlotFrames[INVENTORY_COLUMNS * INVENTORY_ROWS];
+int vaszonInventory_inventoryHotbarSlotFrames[HOTBAR_SIZE];
+int vaszonInventory_inventoryHotbarSlotBlockMeshes[HOTBAR_SIZE];
+
+
 canvas* vaszon;//debug screen
 pthread_mutex_t mutex_vaszon;
 int vaszon_fps;
@@ -145,11 +155,16 @@ int vaszon_physics_simulated_colliders;
 int vaszon_physics_loaded_groups;
 int vaszon_physics_raycast_hit;
 
-int hotbarContent[HOTBAR_SIZE];
-int hotbarSlotSelected = 0;
 
 unsigned int rectangleVAO;//a deferred resz hasznalja a kepernyo atrajzolasahoz
 unsigned int rectangleVBO;
+
+
+int hotbarContent[HOTBAR_SIZE];
+int hotbarSlotSelected = 0;
+
+int inventoryContent[INVENTORY_ROWS * INVENTORY_COLUMNS];
+int inventoryHotbarContent[HOTBAR_SIZE];
 
 
 vector* lights;
@@ -256,6 +271,7 @@ void game(void* w, int* currentStage)
     pthread_mutex_init(&mutex_vaszon, NULL);
     pthread_mutex_init(&mutex_vaszonPause, NULL);
     pthread_mutex_init(&mutex_vaszonIngame, NULL);
+    pthread_mutex_init(&mutex_vaszonInventory, NULL);
     pthread_mutex_init(&mutex_gameState, NULL);
 
 
@@ -312,6 +328,7 @@ void game(void* w, int* currentStage)
     pthread_mutex_destroy(&mutex_vaszon);
     pthread_mutex_destroy(&mutex_vaszonPause);
     pthread_mutex_destroy(&mutex_vaszonIngame);
+    pthread_mutex_destroy(&mutex_vaszonInventory);
     pthread_mutex_destroy(&mutex_gameState);
 
 
@@ -766,6 +783,10 @@ void* loop_render(void* arg)
             pthread_mutex_lock(&mutex_vaszonIngame);
             canvas_setSize(vaszonIngame, windowWidth, windowHeight);
             pthread_mutex_unlock(&mutex_vaszonIngame);
+
+            pthread_mutex_lock(&mutex_vaszonInventory);
+            canvas_setSize(vaszonInventory, windowWidth, windowHeight);
+            pthread_mutex_unlock(&mutex_vaszonInventory);
         }
 
         static char buffer[50];
@@ -829,9 +850,9 @@ void* loop_render(void* arg)
                 for (int i = 0; i < HOTBAR_SIZE; i++)
                 {
                     if (i == hotbarSlotSelected)
-                        canvas_setImageTint(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 1, 1, 1);
+                        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 1, 0.85f, 0);
                     else
-                        canvas_setImageTint(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.5f, 0.5f, 0.5f);
+                        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.2, 0, 1);
                 }
                 canvas_render(vaszonIngame, 0, 0, 0);
                 pthread_mutex_unlock(&mutex_vaszonIngame);
@@ -841,6 +862,12 @@ void* loop_render(void* arg)
                 pthread_mutex_lock(&mutex_vaszonPause);
                 canvas_render(vaszonPause, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
                 pthread_mutex_unlock(&mutex_vaszonPause);
+                break;
+
+            case GAME_INVENTORY:
+                pthread_mutex_lock(&mutex_vaszonInventory);
+                canvas_render(vaszonInventory, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
+                pthread_mutex_unlock(&mutex_vaszonInventory);
                 break;
         }
 
@@ -970,6 +997,10 @@ void* loop_physics(void* arg)
         case GAME_PAUSED:
             canvas_checkMouseInput(vaszonPause, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
             break;
+
+        case GAME_INVENTORY:
+            (vaszonInventory, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
+                break;
         }
 
         switch (currentGameState)
@@ -980,7 +1011,13 @@ void* loop_physics(void* arg)
                 previousCumPosition = cum.position;
                 cum.position = vec3_sum(playerCollider->position, (vec3) { 0, 0.69f, 0 });
 
-                //keyboard
+                //menu
+                if (input_is_key_released(GLFW_KEY_ESCAPE))
+                    changeGameState(GAME_PAUSED);
+                else if(input_is_key_released(GLFW_KEY_E))
+                    changeGameState(GAME_INVENTORY);
+
+                //movement
                 vec3 velocity = (vec3){ 0,0,0 };
                 vec3 forward = vec3_normalize(vec3_create2(cum.front.x, 0, cum.front.z));
                 if (input_is_key_down(GLFW_KEY_W))
@@ -998,7 +1035,7 @@ void* loop_physics(void* arg)
 
                 playerCollider->velocity = velocity;
 
-                //mouse buttons
+                //block interactions
                 if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT))
                 {
                     if (raycastFound != 0)
@@ -1053,7 +1090,7 @@ void* loop_physics(void* arg)
                     }
                 }
 
-                //mouse movement
+                //look aroiund
                 double dx, dy;
                 input_get_mouse_delta(&dx, &dy);
                 dx *= cum.mouse_sensitivity;
@@ -1073,7 +1110,7 @@ void* loop_physics(void* arg)
                 camera_updateVectors(&cum);
                 pthread_mutex_unlock(&mutex_cum);
 
-                //mouse scroll
+                //hotbar input
                 double scrolldx, scrolldy;
                 input_get_mouse_scroll_delta(&scrolldx, &scrolldy);
                 if (scrolldy < -0.001)
@@ -1088,6 +1125,9 @@ void* loop_physics(void* arg)
                     if (hotbarSlotSelected < 0)
                         hotbarSlotSelected = HOTBAR_SIZE-1;
                 }
+                for (int i = 0; i < HOTBAR_SIZE; i++)
+                    if (input_is_key_pressed(GLFW_KEY_1 + i))
+                        hotbarSlotSelected = i;
 
                 //player part done
 
@@ -1130,6 +1170,18 @@ void* loop_physics(void* arg)
                 playerMesh_calculateOuterModelMatrix(&pm);
                 playerMesh_calculateInnerModelMatrices(&pm);
                 pthread_mutex_unlock(&mutex_pm);
+                break;
+
+            case GAME_PAUSED:
+                if (input_is_key_released(GLFW_KEY_ESCAPE))
+                    changeGameState(GAME_INGAME);
+                break;
+
+            case GAME_INVENTORY:
+                if (input_is_key_released(GLFW_KEY_E))
+                    changeGameState(GAME_INGAME);
+                else if (input_is_key_released(GLFW_KEY_ESCAPE))
+                    changeGameState(GAME_INGAME);
                 break;
         }
 
@@ -1180,19 +1232,6 @@ void handle_event(event e)
         break;
     default:
         input_handle_event(e);
-        if (e.type == KEY_PRESSED && e.data.key_pressed.key_code == GLFW_KEY_ESCAPE)
-        {
-            switch (currentGameState)
-            {
-            case GAME_INGAME:
-                changeGameState(GAME_PAUSED);
-                break;
-
-            case GAME_PAUSED:
-                changeGameState(GAME_INGAME);
-                break;
-            }
-        }
         break;
     }
 }
@@ -1212,6 +1251,7 @@ void changeGameState(int gs)
         switch (gs)
         {
         case GAME_PAUSED:
+        case GAME_INVENTORY:
             pthread_mutex_lock(&mutex_input);
             targetCursorMode = GLFW_CURSOR_NORMAL;
             pthread_mutex_unlock(&mutex_input);
@@ -1228,6 +1268,16 @@ void changeGameState(int gs)
             break;
         }
         break;
+
+    case GAME_INVENTORY:
+        switch (gs)
+        {
+        case GAME_INGAME:
+            pthread_mutex_lock(&mutex_input);
+            targetCursorMode = GLFW_CURSOR_DISABLED;
+            pthread_mutex_unlock(&mutex_input);
+            break;
+        }
     }
     currentGameState = gs;
     pthread_mutex_unlock(&mutex_gameState);
@@ -1519,10 +1569,12 @@ void init_canvas()
 
     for (int i = 0; i < HOTBAR_SIZE; i++)
     {
-        vaszonIngame_hotbarSlotFrames[i] = canvas_addImage(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80*(HOTBAR_SIZE/2)+80*i, 0, 80, 80, textureHandler_getTexture(TEXTURE_ATLAS_UI));
-        canvas_setImageUV(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.1f, 0.9f, 0.1f, 0.1f);
+        vaszonIngame_hotbarSlotFrames[i] = canvas_addButton(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80 * (HOTBAR_SIZE / 2) + 80 * i,5, 70, 70);//player bg
+        canvas_setButtonBorder(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 5, 5);
+        canvas_setButtonFillColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0, 0, 0);
+        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.8f, 0.15f, 1.0f);
         
-        vaszonIngame_hotbarSlotBlockMeshes[i] = canvas_addBlockMesh(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, hotbarContent[i], -80 * (HOTBAR_SIZE / 2) + 80 * i, 5, 70, 70);
+        vaszonIngame_hotbarSlotBlockMeshes[i] = canvas_addBlockMesh(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, hotbarContent[i], -80 * (HOTBAR_SIZE / 2) + 80 * i, 10, 60, 60);
     }
 
     //pause screen
@@ -1544,37 +1596,77 @@ void init_canvas()
 
     canvas_addImage(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_TOP, 0, 100, 630, 100, textureHandler_getTexture(TEXTURE_MENU_TITLE_PAUSE));
 
+    //inventory
+    vaszonInventory = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
+    float inventoryTextLineHeight24 = canvas_getTextLineHeight(vaszonInventory, 24);
+
+    mogus = canvas_addButton(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 600, 510);//bg
+    canvas_setButtonBorder(vaszonInventory, mogus, 5, 5);
+    canvas_setButtonFillColour(vaszonInventory, mogus, 0.2, 0, 1);
+    canvas_setButtonBorderColour(vaszonInventory, mogus, 0.8f, 0.15f, 1.0f);
+
+    canvas_addText(vaszonInventory, "inventory", CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, -270 + 0.5f * canvas_calculateTextLength(vaszonInventory, "inventory", 24), 245 - 0.5f*inventoryTextLineHeight24, 1, 0.85f, 0, 24);//text in the top left
+
+
+    mogus = canvas_addButton(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, -160, -0.5f*canvas_getTextLineHeight(vaszonInventory, 24), 220, 445);//player bg
+    canvas_setButtonBorder(vaszonInventory, mogus, 5, 5);
+    canvas_setButtonFillColour(vaszonInventory, mogus, 0, 0, 0);
+    canvas_setButtonBorderColour(vaszonInventory, mogus, 0.8f, 0.15f, 1.0f);
+
+    canvas_addImage(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, -160, -0.5f * inventoryTextLineHeight24, 220, 445, textureHandler_getTexture(TEXTURE_GOKU));
+
+    for (int i = 0; i < INVENTORY_ROWS; i++)
+    {
+        for (int j = 0; j < INVENTORY_COLUMNS; j++)
+        {
+            mogus = canvas_addButton(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 20+75*j, 187.5-75*i-0.5f * inventoryTextLineHeight24, 70, 70);//player bg
+            canvas_setButtonBorder(vaszonInventory, mogus, 5, 5);
+            canvas_setButtonFillColour(vaszonInventory, mogus, 0, 0, 0);
+            canvas_setButtonBorderColour(vaszonInventory, mogus, 0.8f, 0.15f, 1.0f);
+            vaszonInventory_inventorySlotFrames[i * INVENTORY_COLUMNS + j] = mogus;
+        }
+    }
+
+    for (int i = 0; i < HOTBAR_SIZE; i++)
+    {
+        vaszonInventory_inventoryHotbarSlotFrames[i] = canvas_addButton(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80 * (HOTBAR_SIZE / 2) + 80 * i, 5, 70, 70);//player bg
+        canvas_setButtonBorder(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], 5, 5);
+        canvas_setButtonFillColour(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], 0, 0, 0);
+        canvas_setButtonBorderColour(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], 0.8f, 0.15f, 1.0f);
+    }
+
     //debug screen
     vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
 
     //left side
-    vaszon_fps = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 15, 0, 0, 0, 24);
-    vaszon_pos = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 40, 0, 0, 0, 24);
-    vaszon_rot = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 65, 0, 0, 0, 24);
+    vaszon_fps = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 15, 0.2, 0, 1, 24);
+    vaszon_pos = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 40, 0.2, 0, 1, 24);
+    vaszon_rot = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 65, 0.2, 0, 1, 24);
 
-    vaszon_render_distance = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 105, 0, 0, 0, 24);
-    vaszon_chunk_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 130, 0, 0, 0, 24);
-    vaszon_chunks_pending_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 155, 0, 0, 0, 24);
-    vaszon_chunks_loaded = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 180, 0, 0, 0, 24);
-    vaszon_chunks_rendered = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 205, 0, 0, 0, 24);
+    vaszon_render_distance = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 105, 00.2, 0, 1, 24);
+    vaszon_chunk_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 130, 0.2, 0, 1, 24);
+    vaszon_chunks_pending_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 155, 0.2, 0, 1, 24);
+    vaszon_chunks_loaded = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 180, 0.2, 0, 1, 24);
+    vaszon_chunks_rendered = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 205, 0.2, 0, 1, 24);
 
     //bototm left
     const char* vendor = glGetString(GL_VENDOR);
     const char* renderer = glGetString(GL_RENDERER);
 
-    canvas_addText(vaszon, vendor, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 35, 0, 0, 0, 24);
-    canvas_addText(vaszon, renderer, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 10, 0, 0, 0, 24);
+    canvas_addText(vaszon, vendor, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 35, 0.2, 0, 1, 24);
+    canvas_addText(vaszon, renderer, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 10, 0.2, 0, 1, 24);
 
     //right side
-    vaszon_physics_loaded_groups = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
-    vaszon_physics_simulated_colliders = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
-    vaszon_physics_raycast_hit = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 60, 0, 0, 0, 24);
+    vaszon_physics_loaded_groups = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0.2, 0, 1, 24);
+    vaszon_physics_simulated_colliders = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0.2, 0, 1, 24);
+    vaszon_physics_raycast_hit = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 60, 0.2, 0, 1, 24);
 }
 
 void end_canvas()
 {
     canvas_destroy(vaszonIngame);
     canvas_destroy(vaszonPause);
+    canvas_destroy(vaszonInventory);
     canvas_destroy(vaszon);
 }
 

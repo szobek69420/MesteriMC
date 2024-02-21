@@ -163,6 +163,16 @@ void canvas_destroy(canvas* c)
 	free(c);
 }
 
+float canvas_calculateTextLength(canvas* c, const char* text, int fontSize)
+{
+	return ((float)fontSize/CANVAS_FONT_SIZE)*fontHandler_calculateTextLength(&c->f, text);
+}
+
+float canvas_getTextLineHeight(canvas* c, int fontSize)
+{
+	return ((float)fontSize / CANVAS_FONT_SIZE) * c->f.lineHeight;
+}
+
 canvasComponent* canvas_getComponent(canvas* c, int id)
 {
 	canvasComponent* cc = NULL;
