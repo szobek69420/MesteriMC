@@ -137,6 +137,8 @@ int vaszonIngame_selectedBlockText;
 canvas* vaszonInventory;
 pthread_mutex_t mutex_vaszonInventory;
 int vaszonInventory_inventorySlotFrames[INVENTORY_COLUMNS * INVENTORY_ROWS];
+int vaszonInventory_inventoryHotbarSlotFrames[HOTBAR_SIZE];
+int vaszonInventory_inventoryHotbarSlotBlockMeshes[HOTBAR_SIZE];
 
 
 canvas* vaszon;//debug screen
@@ -162,6 +164,7 @@ int hotbarContent[HOTBAR_SIZE];
 int hotbarSlotSelected = 0;
 
 int inventoryContent[INVENTORY_ROWS * INVENTORY_COLUMNS];
+int inventoryHotbarContent[HOTBAR_SIZE];
 
 
 vector* lights;
@@ -1624,31 +1627,39 @@ void init_canvas()
         }
     }
 
+    for (int i = 0; i < HOTBAR_SIZE; i++)
+    {
+        vaszonInventory_inventoryHotbarSlotFrames[i] = canvas_addButton(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80 * (HOTBAR_SIZE / 2) + 80 * i, 5, 70, 70);//player bg
+        canvas_setButtonBorder(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], 5, 5);
+        canvas_setButtonFillColour(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], 0, 0, 0);
+        canvas_setButtonBorderColour(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], 0.8f, 0.15f, 1.0f);
+    }
+
     //debug screen
     vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
 
     //left side
-    vaszon_fps = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 15, 0, 0, 0, 24);
-    vaszon_pos = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 40, 0, 0, 0, 24);
-    vaszon_rot = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 65, 0, 0, 0, 24);
+    vaszon_fps = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 15, 0.2, 0, 1, 24);
+    vaszon_pos = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 40, 0.2, 0, 1, 24);
+    vaszon_rot = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 65, 0.2, 0, 1, 24);
 
-    vaszon_render_distance = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 105, 0, 0, 0, 24);
-    vaszon_chunk_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 130, 0, 0, 0, 24);
-    vaszon_chunks_pending_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 155, 0, 0, 0, 24);
-    vaszon_chunks_loaded = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 180, 0, 0, 0, 24);
-    vaszon_chunks_rendered = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 205, 0, 0, 0, 24);
+    vaszon_render_distance = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 105, 00.2, 0, 1, 24);
+    vaszon_chunk_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 130, 0.2, 0, 1, 24);
+    vaszon_chunks_pending_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 155, 0.2, 0, 1, 24);
+    vaszon_chunks_loaded = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 180, 0.2, 0, 1, 24);
+    vaszon_chunks_rendered = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 205, 0.2, 0, 1, 24);
 
     //bototm left
     const char* vendor = glGetString(GL_VENDOR);
     const char* renderer = glGetString(GL_RENDERER);
 
-    canvas_addText(vaszon, vendor, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 35, 0, 0, 0, 24);
-    canvas_addText(vaszon, renderer, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 10, 0, 0, 0, 24);
+    canvas_addText(vaszon, vendor, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 35, 0.2, 0, 1, 24);
+    canvas_addText(vaszon, renderer, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 10, 0.2, 0, 1, 24);
 
     //right side
-    vaszon_physics_loaded_groups = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0, 0, 0, 24);
-    vaszon_physics_simulated_colliders = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0, 0, 0, 24);
-    vaszon_physics_raycast_hit = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 60, 0, 0, 0, 24);
+    vaszon_physics_loaded_groups = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0.2, 0, 1, 24);
+    vaszon_physics_simulated_colliders = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0.2, 0, 1, 24);
+    vaszon_physics_raycast_hit = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 60, 0.2, 0, 1, 24);
 }
 
 void end_canvas()
