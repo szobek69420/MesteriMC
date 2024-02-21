@@ -847,9 +847,9 @@ void* loop_render(void* arg)
                 for (int i = 0; i < HOTBAR_SIZE; i++)
                 {
                     if (i == hotbarSlotSelected)
-                        canvas_setImageTint(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 1, 0.85f, 0);
+                        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 1, 0.85f, 0);
                     else
-                        canvas_setImageTint(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.2, 0, 1);
+                        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.2, 0, 1);
                 }
                 canvas_render(vaszonIngame, 0, 0, 0);
                 pthread_mutex_unlock(&mutex_vaszonIngame);
@@ -1566,10 +1566,12 @@ void init_canvas()
 
     for (int i = 0; i < HOTBAR_SIZE; i++)
     {
-        vaszonIngame_hotbarSlotFrames[i] = canvas_addImage(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80*(HOTBAR_SIZE/2)+80*i, 0, 80, 80, textureHandler_getTexture(TEXTURE_ATLAS_UI));
-        canvas_setImageUV(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.1f, 0.9f, 0.1f, 0.1f);
+        vaszonIngame_hotbarSlotFrames[i] = canvas_addButton(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80 * (HOTBAR_SIZE / 2) + 80 * i,5, 70, 70);//player bg
+        canvas_setButtonBorder(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 5, 5);
+        canvas_setButtonFillColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0, 0, 0);
+        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.8f, 0.15f, 1.0f);
         
-        vaszonIngame_hotbarSlotBlockMeshes[i] = canvas_addBlockMesh(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, hotbarContent[i], -80 * (HOTBAR_SIZE / 2) + 80 * i, 5, 70, 70);
+        vaszonIngame_hotbarSlotBlockMeshes[i] = canvas_addBlockMesh(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, hotbarContent[i], -80 * (HOTBAR_SIZE / 2) + 80 * i, 10, 60, 60);
     }
 
     //pause screen
