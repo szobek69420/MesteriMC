@@ -71,12 +71,12 @@ void cursor_position_callback2(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback2(GLFWwindow* window, double xoffset, double yoffset);
 
 //button callbacks
-void startButton(void* currentStage);
-void settingsButton(void* destination);
-void quitButton(void* currentStage);
+void startButton(int inBounds, void* currentStage);
+void settingsButton(int inBounds, void* destination);
+void quitButton(int inBounds, void* currentStage);
 void sliderRenderDistanceFunction(float value);
 void sliderResolutionFunction(float value);
-void buttonShadowFunction(void* param);
+void buttonShadowFunction(int inBounds, void* param);
 void sliderShadowResolutionFunction(float value);
 
 //other function prototypes
@@ -331,13 +331,17 @@ void scroll_callback2(GLFWwindow* window, double xoffset, double yoffset)
 }
 
 //button callbacks
-void startButton(void* currentStage)
+void startButton(int inBounds, void* currentStage)
 {
+    if (inBounds == 0)
+        return;
     (*(int*)currentStage) = STAGE_IN_GAME;
 }
 
-void settingsButton(void* destination)
+void settingsButton(int inBounds, void* destination)
 {
+    if (inBounds == 0)
+        return;
     switch ((int)destination)
     {
     case MENU_MAIN:
@@ -351,8 +355,10 @@ void settingsButton(void* destination)
     }
 }
 
-void quitButton(void* currentStage)
+void quitButton(int inBounds, void* currentStage)
 {
+    if (inBounds == 0)
+        return;
     (*(int*)currentStage) = STAGE_QUIT;
 }
 
@@ -374,8 +380,11 @@ void sliderResolutionFunction(float value)
     canvas_setTextText(vaszonSettings, textResolution, buffer);
 }
 
-void buttonShadowFunction(void* param)
+void buttonShadowFunction(int inBounds, void* param)
 {
+    if (inBounds == 0)
+        return;
+
     if (settings_getInt(SETTINGS_SHADOWS) == 0)
     {
         settings_setInt(SETTINGS_SHADOWS, 1);

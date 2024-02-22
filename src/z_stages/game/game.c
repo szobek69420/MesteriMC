@@ -140,6 +140,7 @@ int vaszonInventory_inventorySlotFrames[INVENTORY_COLUMNS * INVENTORY_ROWS];
 int vaszonInventory_inventorySlotBlockMeshes[INVENTORY_COLUMNS * INVENTORY_ROWS];
 int vaszonInventory_inventoryHotbarSlotFrames[HOTBAR_SIZE];
 int vaszonInventory_inventoryHotbarSlotBlockMeshes[HOTBAR_SIZE];
+int vaszonInventory_dragged;
 
 
 canvas* vaszon;//debug screen
@@ -165,7 +166,11 @@ int hotbarContent[HOTBAR_SIZE];
 int hotbarSlotSelected = 0;
 
 int inventoryContent[INVENTORY_ROWS * INVENTORY_COLUMNS];
-int inventoryHotbarContent[HOTBAR_SIZE];
+//the ids of the slots whose content should be swapped the next graphics(!!!) frame
+//here (and in the callback functions) the inventory hotbar slots will be represented with the id of 100+slotID
+int inventorySlotContentSwap[2] = { -1, -1 };
+int draggedInventorySlot = -1;
+int inventoryDropTarget = -1;//where to drop the dragged item
 
 
 vector* lights;
@@ -183,7 +188,7 @@ handRenderer* hr;
 GLFWwindow* init_window(const char* name, int width, int height);
 void handle_event(event e);
 
-void changeGameState(int gs);
+void changeGameState(int inBounds, int gs);
 
 void* loop_render(void* arg);
 void* loop_generation(void* arg);
@@ -201,7 +206,12 @@ void end_cube();
 
 double lerp(double a, double b, double f);
 
-void quitGame(void* nichts);
+void quitGame(int inBounds, void* nichts);
+
+void inventorySlotPress(int inventorySlotID);
+void inventorySlotRelease(int inBounds, int inventorySlotID);
+void inventorySlotExit(int inventorySlotID);
+void inventorySlotEnter(int inventorySlotID);
 
 //glfw callbacks
 void window_size_callback(GLFWwindow* window, int width, int height);
@@ -378,6 +388,8 @@ void* loop_render(void* arg)
 
     float selectedBlockAppearance = 0;
     int previousHotbarSlot = hotbarSlotSelected;
+    int previousGameState = GAME_INGAME;
+    int previousDraggedInventorySlot = -1;
 
     int loadedChunks = 0;
     int pendingMeshUpdates, pendingGenerationUpdates;
@@ -851,6 +863,7 @@ void* loop_render(void* arg)
 
                 pthread_mutex_lock(&mutex_vaszonIngame);
                 
+                //hotbar
                 if (previousHotbarSlot!=hotbarSlotSelected)
                 {
                     selectedBlockAppearance = glfwGetTime();
@@ -859,6 +872,14 @@ void* loop_render(void* arg)
                 if(glfwGetTime()-selectedBlockAppearance>1.0f)
                     canvas_setTextText(vaszonIngame, vaszonIngame_selectedBlockText, "");
 
+                if (previousGameState == GAME_INVENTORY)//inventory should be reloaded because it could change
+                {
+                    for (int i = 0; i < HOTBAR_SIZE; i++)
+                    {
+                        canvas_setBlockMeshBlock(vaszonIngame, vaszonIngame_hotbarSlotBlockMeshes[i], hotbarContent[i]);
+                    }
+                }
+
                 for (int i = 0; i < HOTBAR_SIZE; i++)
                 {
                     if (i == hotbarSlotSelected)
@@ -866,6 +887,8 @@ void* loop_render(void* arg)
                     else
                         canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], CANVAS_COLOUR_PRIMARY_1);
                 }
+
+
                 canvas_render(vaszonIngame, 0, 0, 0);
                 pthread_mutex_unlock(&mutex_vaszonIngame);
                 break;
@@ -878,12 +901,68 @@ void* loop_render(void* arg)
 
             case GAME_INVENTORY:
                 pthread_mutex_lock(&mutex_vaszonInventory);
+                if (inventorySlotContentSwap[0] != -1)
+                {
+                    int slot0, slot1, * content0, * content1;
+                    if (inventorySlotContentSwap[0] >= 100)
+                    {
+                        slot0 = vaszonInventory_inventoryHotbarSlotBlockMeshes[inventorySlotContentSwap[0] - 100];
+                        content0 = &(hotbarContent[inventorySlotContentSwap[0] - 100]);
+                    }
+                    else
+                    {
+                        slot0 = vaszonInventory_inventorySlotBlockMeshes[inventorySlotContentSwap[0]];
+                        content0 = &(inventoryContent[inventorySlotContentSwap[0]]);
+                    }
+
+                    if (inventorySlotContentSwap[1] >= 100)
+                    {
+                        slot1 = vaszonInventory_inventoryHotbarSlotBlockMeshes[inventorySlotContentSwap[1] - 100];
+                        content1 = &(hotbarContent[inventorySlotContentSwap[1] - 100]);
+                    }
+                    else
+                    {
+                        slot1 = vaszonInventory_inventorySlotBlockMeshes[inventorySlotContentSwap[1]];
+                        content1 = &(inventoryContent[inventorySlotContentSwap[1]]);
+                    }
+
+                    int temp = *content0;
+                    *content0 = *content1;
+                    *content1 = temp;
+
+                    canvas_setBlockMeshBlock(vaszonInventory, slot0, *content0);
+                    canvas_setBlockMeshBlock(vaszonInventory, slot1, *content1);
+
+                    inventorySlotContentSwap[0] = -1;
+                    inventorySlotContentSwap[1] = -1;
+                }
+
+
+                if (previousDraggedInventorySlot != draggedInventorySlot)
+                {
+                    if (draggedInventorySlot >=100)//started draggin' a hotbar slot
+                        canvas_setBlockMeshBlock(vaszonInventory, vaszonInventory_dragged, hotbarContent[draggedInventorySlot - 100]);
+                    else if(draggedInventorySlot!=-1)//started draggin' an inventory slot
+                        canvas_setBlockMeshBlock(vaszonInventory, vaszonInventory_dragged, inventoryContent[draggedInventorySlot]);
+                    else//finished draggin'
+                    {
+                        canvas_setBlockMeshBlock(vaszonInventory, vaszonInventory_dragged, BLOCK_AIR);
+                        canvas_setComponentPosition(vaszonInventory, vaszonInventory_dragged, -100000, -100000);
+                    }
+                }
+                if (draggedInventorySlot != -1)
+                {
+                    canvas_setComponentPosition(vaszonInventory, vaszonInventory_dragged, mouseX-0.5f * windowWidth, 0.5f * windowHeight - mouseY);
+                }
+
                 canvas_render(vaszonInventory, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
                 pthread_mutex_unlock(&mutex_vaszonInventory);
                 break;
         }
 
         previousHotbarSlot = hotbarSlotSelected;
+        previousGameState = currentGameState;
+        previousDraggedInventorySlot = draggedInventorySlot;
 
         glfwSwapBuffers(window);
 
@@ -1011,8 +1090,8 @@ void* loop_physics(void* arg)
             break;
 
         case GAME_INVENTORY:
-            (vaszonInventory, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
-                break;
+            canvas_checkMouseInput(vaszonInventory, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
+            break;
         }
 
         switch (currentGameState)
@@ -1025,9 +1104,9 @@ void* loop_physics(void* arg)
 
                 //menu
                 if (input_is_key_released(GLFW_KEY_ESCAPE))
-                    changeGameState(GAME_PAUSED);
+                    changeGameState(69, GAME_PAUSED);
                 else if(input_is_key_released(GLFW_KEY_E))
-                    changeGameState(GAME_INVENTORY);
+                    changeGameState(69, GAME_INVENTORY);
 
                 //movement
                 vec3 velocity = (vec3){ 0,0,0 };
@@ -1186,14 +1265,14 @@ void* loop_physics(void* arg)
 
             case GAME_PAUSED:
                 if (input_is_key_released(GLFW_KEY_ESCAPE))
-                    changeGameState(GAME_INGAME);
+                    changeGameState(69, GAME_INGAME);
                 break;
 
             case GAME_INVENTORY:
                 if (input_is_key_released(GLFW_KEY_E))
-                    changeGameState(GAME_INGAME);
+                    changeGameState(69, GAME_INGAME);
                 else if (input_is_key_released(GLFW_KEY_ESCAPE))
-                    changeGameState(GAME_INGAME);
+                    changeGameState(69, GAME_INGAME);
                 break;
         }
 
@@ -1246,60 +1325,6 @@ void handle_event(event e)
         input_handle_event(e);
         break;
     }
-}
-
-void changeGameState(int gs)
-{
-    pthread_mutex_lock(&mutex_gameState);
-    if (gs == currentGameState)
-    {
-        pthread_mutex_unlock(&mutex_gameState);
-        return;
-    }
-
-    switch (currentGameState)
-    {
-    case GAME_INGAME:
-        switch (gs)
-        {
-        case GAME_PAUSED:
-        case GAME_INVENTORY:
-            pthread_mutex_lock(&mutex_input);
-            targetCursorMode = GLFW_CURSOR_NORMAL;
-            pthread_mutex_unlock(&mutex_input);
-            break;
-        }
-        break;
-    case GAME_PAUSED:
-        switch (gs)
-        {
-        case GAME_INGAME:
-            pthread_mutex_lock(&mutex_input);
-            targetCursorMode = GLFW_CURSOR_DISABLED;
-            pthread_mutex_unlock(&mutex_input);
-            break;
-        }
-        break;
-
-    case GAME_INVENTORY:
-        switch (gs)
-        {
-        case GAME_INGAME:
-            pthread_mutex_lock(&mutex_input);
-            targetCursorMode = GLFW_CURSOR_DISABLED;
-            pthread_mutex_unlock(&mutex_input);
-            break;
-        }
-    }
-    currentGameState = gs;
-    pthread_mutex_unlock(&mutex_gameState);
-}
-
-void quitGame(void* nichts)
-{
-    pthread_mutex_lock(&mutex_exit);
-    exitStatus = EXIT_STATUS_RETURN_TO_MENU;
-    pthread_mutex_unlock(&mutex_exit);
 }
 
 
@@ -1635,6 +1660,11 @@ void init_canvas()
             canvas_setButtonBorder(vaszonInventory, mogus, 5, 5);
             canvas_setButtonFillColour(vaszonInventory, mogus, 0, 0, 0);
             canvas_setButtonBorderColour(vaszonInventory, mogus, CANVAS_COLOUR_PRIMARY_0);
+
+            canvas_setButtonPressed(vaszonInventory, mogus, inventorySlotPress, i * INVENTORY_COLUMNS + j);
+            canvas_setButtonClicked(vaszonInventory, mogus, inventorySlotRelease, i * INVENTORY_COLUMNS + j);
+            canvas_setButtonEnter(vaszonInventory, mogus, inventorySlotEnter, i * INVENTORY_COLUMNS + j);
+            canvas_setButtonExit(vaszonInventory, mogus, inventorySlotExit, i * INVENTORY_COLUMNS + j);
             vaszonInventory_inventorySlotFrames[i * INVENTORY_COLUMNS + j] = mogus;
 
             vaszonInventory_inventorySlotBlockMeshes[i * INVENTORY_COLUMNS + j] = canvas_addBlockMesh(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, inventoryContent[i * INVENTORY_COLUMNS + j], 20 + 75 * j, 187.5 - 75 * i - 0.5f * inventoryTextLineHeight24, 60, 60);
@@ -1643,11 +1673,23 @@ void init_canvas()
 
     for (int i = 0; i < HOTBAR_SIZE; i++)
     {
-        vaszonInventory_inventoryHotbarSlotFrames[i] = canvas_addButton(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80 * (HOTBAR_SIZE / 2) + 80 * i, 5, 70, 70);//player bg
-        canvas_setButtonBorder(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], 5, 5);
-        canvas_setButtonFillColour(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], 0, 0, 0);
-        canvas_setButtonBorderColour(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], CANVAS_COLOUR_PRIMARY_0);
+        mogus = canvas_addButton(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80 * (HOTBAR_SIZE / 2) + 80 * i, 5, 70, 70);//player bg
+        canvas_setButtonBorder(vaszonInventory, mogus, 5, 5);
+        canvas_setButtonFillColour(vaszonInventory, mogus, 0, 0, 0);
+        canvas_setButtonBorderColour(vaszonInventory, mogus, CANVAS_COLOUR_PRIMARY_0);
+
+        canvas_setButtonPressed(vaszonInventory, mogus, inventorySlotPress, 100+i);
+        canvas_setButtonClicked(vaszonInventory, mogus, inventorySlotRelease, 100 + i);
+        canvas_setButtonEnter(vaszonInventory, mogus, inventorySlotEnter, 100 + i);
+        canvas_setButtonExit(vaszonInventory, mogus, inventorySlotExit, 100 + i);
+
+        mogus = vaszonInventory_inventoryHotbarSlotFrames[i];
+
+
+        vaszonInventory_inventoryHotbarSlotBlockMeshes[i] = canvas_addBlockMesh(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, hotbarContent[i], -80 * (HOTBAR_SIZE / 2) + 80 * i, 10, 60, 60);
     }
+
+    vaszonInventory_dragged = canvas_addBlockMesh(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, BLOCK_AIR, -100000, -100000, 60, 60);
 
     //debug screen
     vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
@@ -1791,4 +1833,99 @@ void end_cube()
 double lerp(double a, double b, double f)
 {
     return a + f * (b - a);
+}
+
+//button callbacks
+void changeGameState(int inBounds, int gs)
+{
+    if (inBounds == 0)
+        return; 
+
+    pthread_mutex_lock(&mutex_gameState);
+    if (gs == currentGameState)
+    {
+        pthread_mutex_unlock(&mutex_gameState);
+        return;
+    }
+
+    switch (currentGameState)
+    {
+    case GAME_INGAME:
+        switch (gs)
+        {
+        case GAME_PAUSED:
+        case GAME_INVENTORY:
+            pthread_mutex_lock(&mutex_input);
+            targetCursorMode = GLFW_CURSOR_NORMAL;
+            pthread_mutex_unlock(&mutex_input);
+            break;
+        }
+        break;
+    case GAME_PAUSED:
+        switch (gs)
+        {
+        case GAME_INGAME:
+            pthread_mutex_lock(&mutex_input);
+            targetCursorMode = GLFW_CURSOR_DISABLED;
+            pthread_mutex_unlock(&mutex_input);
+            break;
+        }
+        break;
+
+    case GAME_INVENTORY:
+        switch (gs)
+        {
+        case GAME_INGAME:
+            pthread_mutex_lock(&mutex_input);
+            targetCursorMode = GLFW_CURSOR_DISABLED;
+            pthread_mutex_unlock(&mutex_input);
+            break;
+        }
+    }
+    currentGameState = gs;
+    pthread_mutex_unlock(&mutex_gameState);
+}
+
+void quitGame(int inBounds, void* nichts)
+{
+    if (inBounds == 0)
+        return;
+
+    pthread_mutex_lock(&mutex_exit);
+    exitStatus = EXIT_STATUS_RETURN_TO_MENU;
+    pthread_mutex_unlock(&mutex_exit);
+}
+
+
+void inventorySlotPress(int inventorySlotID)
+{
+    draggedInventorySlot = inventorySlotID;
+}
+
+void inventorySlotRelease(int inBounds, int inventorySlotID)
+{
+    if (inBounds == 1||inventoryDropTarget==-1)//that means that there is no different slot to drop the thing
+    {
+        draggedInventorySlot = -1;
+        inventoryDropTarget = -1;
+        return;
+    }
+
+    pthread_mutex_lock(&mutex_vaszonInventory);
+    inventorySlotContentSwap[0] = inventorySlotID;
+    inventorySlotContentSwap[1] = inventoryDropTarget;
+    draggedInventorySlot = -1;
+    inventoryDropTarget = -1;
+    pthread_mutex_unlock(&mutex_vaszonInventory);
+}
+
+void inventorySlotExit(int inventorySlotID)
+{
+    if (inventorySlotID == inventoryDropTarget)
+        inventoryDropTarget = -1;
+}
+
+void inventorySlotEnter(int inventorySlotID)
+{
+    inventoryDropTarget = inventorySlotID;
 }

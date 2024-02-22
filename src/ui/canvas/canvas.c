@@ -48,7 +48,7 @@ struct canvasButton {
 	int transparentBackground;
 	void (*pressed)(void*);//executed when the button has just been pressed down
 	void* pressedParam;
-	void (*clicked)(void*);//executed when the button has just been released
+	void (*clicked)(int isInBounds, void*);//executed when the button has just been released
 	void* clickedParam;
 	void (*entered)(void*);//executed when the mouse pointer enters the button
 	void* enteredParam;
@@ -61,7 +61,7 @@ struct canvasImage {
 	unsigned int textureId;
 	float uvX, uvY, uvWidth, uvHeight;
 	float tintR, tintG, tintB;
-	void (*clicked)(void*);
+	void (*clicked)(int, void*);
 	void* clickedParam;
 };
 typedef struct canvasImage canvasImage;
@@ -339,9 +339,9 @@ void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseDown, in
 		case CANVAS_COMPONENT_BUTTON:
 			if (mouseClicked)
 			{
-				if (cc->inDrag && inBounds&& cc->cb.clicked != NULL && interactableFound == 0)
+				if (cc->inDrag && cc->cb.clicked != NULL)
 				{
-					cc->cb.clicked(cc->cb.clickedParam);
+					cc->cb.clicked(inBounds, cc->cb.clickedParam);
 				}
 				cc->inDrag = 0;
 			}
@@ -358,30 +358,6 @@ void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseDown, in
 
 			if (inBounds != 0 && interactableFound == 0)
 			{
-				cc->onStay = 69;
-				interactableFound = 69;
-			}
-			else
-				cc->onStay = 0;
-			break;
-
-		case CANVAS_COMPONENT_IMAGE:
-			if (mouseClicked)
-			{
-				if (cc->inDrag && inBounds && cc->ci.clicked != NULL && interactableFound == 0)
-				{
-					cc->ci.clicked(cc->ci.clickedParam);
-				}
-				cc->inDrag = 0;
-			}
-			if (mousePressed)
-			{
-				if (inBounds && cc->ci.clicked != NULL)
-					cc->inDrag = 69;
-			}
-
-			if (inBounds != 0 && interactableFound == 0)
-			{
 				if (cc->onStay == 0 && cc->cb.entered != NULL)
 					cc->cb.entered(cc->cb.enteredParam);
 				cc->onStay = 69;
@@ -389,10 +365,37 @@ void canvas_checkMouseInput(canvas* c, int mouseX, int mouseY, int mouseDown, in
 			}
 			else
 			{
-				if (cc->onStay != 0 && cc->cb.exited != NULL)
+				if (cc->onStay != 0 && cc->cb.exited != 0)
 					cc->cb.exited(cc->cb.exitedParam);
 				cc->onStay = 0;
 			}
+			break;
+
+		case CANVAS_COMPONENT_IMAGE:
+			if (mouseClicked)
+			{
+				if (cc->inDrag && cc->ci.clicked != NULL)
+				{
+					cc->ci.clicked(inBounds, cc->ci.clickedParam);
+				}
+				cc->inDrag = 0;
+			}
+			if (mousePressed)
+			{
+				if (inBounds != 0 && interactableFound == 0)
+					if (cc->ci.clicked != NULL)
+					{
+						cc->inDrag = 69;
+					}
+			}
+
+			if (inBounds != 0 && interactableFound == 0)
+			{
+				cc->onStay = 69;
+				interactableFound = 69;
+			}
+			else
+				cc->onStay = 0;
 			break;
 
 		case CANVAS_COMPONENT_SLIDER:
@@ -558,6 +561,21 @@ void canvas_setComponentPosition(canvas* c, int id, int x, int y)
 	cc->y = y;
 
 	canvas_calculatePosition(c, cc);
+}
+
+void canvas_getComponentPosition(canvas* c, int id, int* x, int* y)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL)
+	{
+		*x = 0;
+		*y = 0;
+		return;
+	}
+
+	*x = cc->x;
+	*y = cc->y;
 }
 
 void canvas_setComponentAlignment(canvas* c, int id, int hAlign, int vAlign)
@@ -752,7 +770,7 @@ void canvas_setButtonPressed(canvas* c, int id, void(*onPress)(void*), void* par
 	cc->cb.pressedParam = param;
 }
 
-void canvas_setButtonClicked(canvas* c, int id, void (*onClick)(void*), void* param)
+void canvas_setButtonClicked(canvas* c, int id, void (*onClick)(int, void*), void* param)
 {
 	canvasComponent* cc;
 	cc = canvas_getComponent(c, id);
@@ -878,7 +896,7 @@ void canvas_setImageUV(canvas* c, int id, float uvX, float uvY, float uvWidth, f
 	cc->ci.uvHeight = uvHeight;
 }
 
-void canvas_setImageClicked(canvas* c, int id, void (*onClick)(void*), void* param)
+void canvas_setImageClicked(canvas* c, int id, void (*onClick)(int, void*), void* param)
 {
 	canvasComponent* cc;
 	cc = canvas_getComponent(c, id);
@@ -1091,14 +1109,14 @@ int canvas_addBlockMesh(canvas* c, int hAlign, int vAlign, int blockType, int x,
 
 	//constructing vertex data (gathering uv values)
 	float a, b;
-	float* vertexData = malloc(blockMeshVertexCount * MESH_UI_RENDERER_VERTEX_FLOATS*sizeof(float));
+	float* vertexData = malloc(blockMeshVertexCount * MESH_UI_RENDERER_VERTEX_FLOATS * sizeof(float));
 	for (int i = 0; i < 6; i++)
 	{
 		for (int j = 0; j < 4; j++)
 		{
 			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j)] = blockMeshVertexPositions[3 * (4 * i + j)];
-			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j)+1] = blockMeshVertexPositions[3 * (4 * i + j)+1];
-			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j)+2] = blockMeshVertexPositions[3 * (4 * i + j)+2];
+			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j) + 1] = blockMeshVertexPositions[3 * (4 * i + j) + 1];
+			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j) + 2] = blockMeshVertexPositions[3 * (4 * i + j) + 2];
 
 			blocks_getUV(blockType, i, j, &a, &b);
 			vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j) + 3] = a;
@@ -1111,17 +1129,17 @@ int canvas_addBlockMesh(canvas* c, int hAlign, int vAlign, int blockType, int x,
 	//generating buffers
 	glGenVertexArrays(1, &cc.cbm.blockMesh.vao);
 	glBindVertexArray(cc.cbm.blockMesh.vao);
-	
+
 	glGenBuffers(1, &cc.cbm.blockMesh.vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, cc.cbm.blockMesh.vbo);
-	glBufferData(GL_ARRAY_BUFFER, blockMeshVertexCount*MESH_UI_RENDERER_VERTEX_FLOATS*sizeof(float), vertexData, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, blockMeshVertexCount * MESH_UI_RENDERER_VERTEX_FLOATS * sizeof(float), vertexData, GL_STATIC_DRAW);
 
 	glGenBuffers(1, &cc.cbm.blockMesh.ebo);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cc.cbm.blockMesh.ebo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(blockMeshIndices), blockMeshIndices, GL_STATIC_DRAW);
 
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, MESH_UI_RENDERER_VERTEX_FLOATS * sizeof(float), (void*)0);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, MESH_UI_RENDERER_VERTEX_FLOATS * sizeof(float), (void*)(3*sizeof(float)));
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, MESH_UI_RENDERER_VERTEX_FLOATS * sizeof(float), (void*)(3 * sizeof(float)));
 	glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, MESH_UI_RENDERER_VERTEX_FLOATS * sizeof(float), (void*)(5 * sizeof(float)));
 
 	glEnableVertexAttribArray(0);//position
@@ -1140,6 +1158,52 @@ int canvas_addBlockMesh(canvas* c, int hAlign, int vAlign, int blockType, int x,
 	canvas_calculatePosition(c, &seqtor_back(c->components));
 
 	return cc.id;
+}
+
+void canvas_setBlockMeshBlock(canvas* c, int id, int blockType)
+{
+	canvasComponent* cc;
+	cc = canvas_getComponent(c, id);
+	if (cc == NULL || cc->componentType != CANVAS_COMPONENT_BLOCK_MESH)
+		return;
+
+
+	if (blockType != BLOCK_AIR&&cc->cbm.blockType!=blockType)
+	{
+		//constructing vertex data (gathering uv values)
+		float a, b;
+		float* vertexData = malloc(blockMeshVertexCount * MESH_UI_RENDERER_VERTEX_FLOATS * sizeof(float));
+		for (int i = 0; i < 6; i++)
+		{
+			for (int j = 0; j < 4; j++)
+			{
+				vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j)] = blockMeshVertexPositions[3 * (4 * i + j)];
+				vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j) + 1] = blockMeshVertexPositions[3 * (4 * i + j) + 1];
+				vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j) + 2] = blockMeshVertexPositions[3 * (4 * i + j) + 2];
+
+				blocks_getUV(blockType, i, j, &a, &b);
+				vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j) + 3] = a;
+				vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j) + 4] = b;
+
+				vertexData[MESH_UI_RENDERER_VERTEX_FLOATS * (4 * i + j) + 5] = blockMeshVertexBrightnesses[4 * i + j];
+			}
+		}
+
+		//sending data
+		glBindVertexArray(cc->cbm.blockMesh.vao);
+		glBindBuffer(GL_ARRAY_BUFFER, cc->cbm.blockMesh.vbo);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, blockMeshVertexCount * MESH_UI_RENDERER_VERTEX_FLOATS * sizeof(float), vertexData);
+
+		cc->cbm.blockType = blockType;
+
+		glBindVertexArray(0);
+
+		free(vertexData);
+	}
+	else
+	{
+		cc->cbm.blockType = blockType;
+	}
 }
 
 static float blockMeshVertexPositions[] = {
