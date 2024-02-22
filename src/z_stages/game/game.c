@@ -137,6 +137,7 @@ int vaszonIngame_selectedBlockText;
 canvas* vaszonInventory;
 pthread_mutex_t mutex_vaszonInventory;
 int vaszonInventory_inventorySlotFrames[INVENTORY_COLUMNS * INVENTORY_ROWS];
+int vaszonInventory_inventorySlotBlockMeshes[INVENTORY_COLUMNS * INVENTORY_ROWS];
 int vaszonInventory_inventoryHotbarSlotFrames[HOTBAR_SIZE];
 int vaszonInventory_inventoryHotbarSlotBlockMeshes[HOTBAR_SIZE];
 
@@ -225,8 +226,17 @@ void game(void* w, int* currentStage)
 
     currentGameState = GAME_INGAME;
 
-    int tempHotbarContent[HOTBAR_SIZE]={ BLOCK_SUS ,BLOCK_DIRT ,BLOCK_GRASS ,BLOCK_SUS ,BLOCK_SUS };
+    int tempHotbarContent[HOTBAR_SIZE]={ BLOCK_SUS ,BLOCK_DIRT ,BLOCK_GRASS ,BLOCK_OAK_LOG ,BLOCK_OAK_LEAVES };
     memcpy(hotbarContent, tempHotbarContent, sizeof(hotbarContent));
+    int tempInventoryContent[INVENTORY_COLUMNS * INVENTORY_ROWS] = {
+        BLOCK_GRASS, BLOCK_DIRT, BLOCK_STONE, BLOCK_AIR,
+        BLOCK_OAK_LOG, BLOCK_OAK_LEAVES, BLOCK_AIR, BLOCK_AIR,
+        BLOCK_SUS, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
+        BLOCK_AIR, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
+        BLOCK_AIR, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
+        BLOCK_AIR, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
+    };
+    memcpy(inventoryContent, tempInventoryContent, sizeof(inventoryContent));
 
     textureHandler_importTextures(TEXTURE_IN_GAME);
     
@@ -512,7 +522,9 @@ void* loop_render(void* arg)
                 mamogus2 = mat3_createFromMat(mat4_transpose(mat4_inverse(mamogus)));
 
                 handRenderer_setMatrices(hr, &projection, &view, &viewNormal);
+                glDepthFunc(GL_ALWAYS);
                 handRenderer_renderBlock(hr, &mamogus, &mamogus2);
+                glDepthFunc(GL_LESS);
             }
         } while (0);
         
@@ -850,9 +862,9 @@ void* loop_render(void* arg)
                 for (int i = 0; i < HOTBAR_SIZE; i++)
                 {
                     if (i == hotbarSlotSelected)
-                        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 1, 0.85f, 0);
+                        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], CANVAS_COLOUR_ACCENT_0);
                     else
-                        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.2, 0, 1);
+                        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], CANVAS_COLOUR_PRIMARY_1);
                 }
                 canvas_render(vaszonIngame, 0, 0, 0);
                 pthread_mutex_unlock(&mutex_vaszonIngame);
@@ -1565,14 +1577,14 @@ void init_canvas()
     mogus = canvas_addImage(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 16, 16, textureHandler_getTexture(TEXTURE_ATLAS_UI));
     canvas_setImageUV(vaszonIngame, mogus, 0.0f, 0.9f, 0.1f, 0.1f);
 
-    vaszonIngame_selectedBlockText = canvas_addText(vaszonIngame, "", CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, 0, 90, 1, 0.85f, 0, 24);
+    vaszonIngame_selectedBlockText = canvas_addText(vaszonIngame, "", CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, 0, 90, CANVAS_COLOUR_ACCENT_0, 24);
 
     for (int i = 0; i < HOTBAR_SIZE; i++)
     {
         vaszonIngame_hotbarSlotFrames[i] = canvas_addButton(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80 * (HOTBAR_SIZE / 2) + 80 * i,5, 70, 70);//player bg
         canvas_setButtonBorder(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 5, 5);
         canvas_setButtonFillColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0, 0, 0);
-        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], 0.8f, 0.15f, 1.0f);
+        canvas_setButtonBorderColour(vaszonIngame, vaszonIngame_hotbarSlotFrames[i], CANVAS_COLOUR_PRIMARY_1);
         
         vaszonIngame_hotbarSlotBlockMeshes[i] = canvas_addBlockMesh(vaszonIngame, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, hotbarContent[i], -80 * (HOTBAR_SIZE / 2) + 80 * i, 10, 60, 60);
     }
@@ -1581,17 +1593,17 @@ void init_canvas()
     vaszonPause = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
     
     mogus = canvas_addButton(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 300, 50);
-    canvas_setButtonText(vaszonPause, mogus, "continue", 24, 1, 0.85f, 0);
+    canvas_setButtonText(vaszonPause, mogus, "continue", 24, CANVAS_COLOUR_ACCENT_0);
     canvas_setButtonBorder(vaszonPause, mogus, 5, 5);
-    canvas_setButtonFillColour(vaszonPause, mogus, 0.2, 0, 1);
-    canvas_setButtonBorderColour(vaszonPause, mogus, 0.8f, 0.15f, 1.0f);
+    canvas_setButtonFillColour(vaszonPause, mogus, CANVAS_COLOUR_PRIMARY_1);
+    canvas_setButtonBorderColour(vaszonPause, mogus, CANVAS_COLOUR_PRIMARY_0);
     canvas_setButtonClicked(vaszonPause, mogus, changeGameState, (void*)GAME_INGAME);
 
     mogus = canvas_addButton(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, -70, 300, 50);
-    canvas_setButtonText(vaszonPause, mogus, "main menu", 24, 1, 0.85f, 0);
+    canvas_setButtonText(vaszonPause, mogus, "main menu", 24, CANVAS_COLOUR_ACCENT_0);
     canvas_setButtonBorder(vaszonPause, mogus, 5, 5);
-    canvas_setButtonFillColour(vaszonPause, mogus, 0.2, 0, 1);
-    canvas_setButtonBorderColour(vaszonPause, mogus, 0.8f, 0.15f, 1.0f);
+    canvas_setButtonFillColour(vaszonPause, mogus, CANVAS_COLOUR_PRIMARY_1);
+    canvas_setButtonBorderColour(vaszonPause, mogus, CANVAS_COLOUR_PRIMARY_0);
     canvas_setButtonClicked(vaszonPause, mogus, quitGame, NULL);
 
     canvas_addImage(vaszonPause, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_TOP, 0, 100, 630, 100, textureHandler_getTexture(TEXTURE_MENU_TITLE_PAUSE));
@@ -1602,8 +1614,8 @@ void init_canvas()
 
     mogus = canvas_addButton(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 0, 0, 600, 510);//bg
     canvas_setButtonBorder(vaszonInventory, mogus, 5, 5);
-    canvas_setButtonFillColour(vaszonInventory, mogus, 0.2, 0, 1);
-    canvas_setButtonBorderColour(vaszonInventory, mogus, 0.8f, 0.15f, 1.0f);
+    canvas_setButtonFillColour(vaszonInventory, mogus, CANVAS_COLOUR_PRIMARY_1);
+    canvas_setButtonBorderColour(vaszonInventory, mogus, CANVAS_COLOUR_PRIMARY_0);
 
     canvas_addText(vaszonInventory, "inventory", CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, -270 + 0.5f * canvas_calculateTextLength(vaszonInventory, "inventory", 24), 245 - 0.5f*inventoryTextLineHeight24, 1, 0.85f, 0, 24);//text in the top left
 
@@ -1611,7 +1623,7 @@ void init_canvas()
     mogus = canvas_addButton(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, -160, -0.5f*canvas_getTextLineHeight(vaszonInventory, 24), 220, 445);//player bg
     canvas_setButtonBorder(vaszonInventory, mogus, 5, 5);
     canvas_setButtonFillColour(vaszonInventory, mogus, 0, 0, 0);
-    canvas_setButtonBorderColour(vaszonInventory, mogus, 0.8f, 0.15f, 1.0f);
+    canvas_setButtonBorderColour(vaszonInventory, mogus, CANVAS_COLOUR_PRIMARY_0);
 
     canvas_addImage(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, -160, -0.5f * inventoryTextLineHeight24, 220, 445, textureHandler_getTexture(TEXTURE_GOKU));
 
@@ -1622,8 +1634,10 @@ void init_canvas()
             mogus = canvas_addButton(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, 20+75*j, 187.5-75*i-0.5f * inventoryTextLineHeight24, 70, 70);//player bg
             canvas_setButtonBorder(vaszonInventory, mogus, 5, 5);
             canvas_setButtonFillColour(vaszonInventory, mogus, 0, 0, 0);
-            canvas_setButtonBorderColour(vaszonInventory, mogus, 0.8f, 0.15f, 1.0f);
+            canvas_setButtonBorderColour(vaszonInventory, mogus, CANVAS_COLOUR_PRIMARY_0);
             vaszonInventory_inventorySlotFrames[i * INVENTORY_COLUMNS + j] = mogus;
+
+            vaszonInventory_inventorySlotBlockMeshes[i * INVENTORY_COLUMNS + j] = canvas_addBlockMesh(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, inventoryContent[i * INVENTORY_COLUMNS + j], 20 + 75 * j, 187.5 - 75 * i - 0.5f * inventoryTextLineHeight24, 60, 60);
         }
     }
 
@@ -1632,34 +1646,34 @@ void init_canvas()
         vaszonInventory_inventoryHotbarSlotFrames[i] = canvas_addButton(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_BOTTOM, -80 * (HOTBAR_SIZE / 2) + 80 * i, 5, 70, 70);//player bg
         canvas_setButtonBorder(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], 5, 5);
         canvas_setButtonFillColour(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], 0, 0, 0);
-        canvas_setButtonBorderColour(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], 0.8f, 0.15f, 1.0f);
+        canvas_setButtonBorderColour(vaszonInventory, vaszonInventory_inventoryHotbarSlotFrames[i], CANVAS_COLOUR_PRIMARY_0);
     }
 
     //debug screen
     vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
 
     //left side
-    vaszon_fps = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 15, 0.2, 0, 1, 24);
-    vaszon_pos = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 40, 0.2, 0, 1, 24);
-    vaszon_rot = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 65, 0.2, 0, 1, 24);
+    vaszon_fps = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 15, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_pos = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 40, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_rot = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 65, CANVAS_COLOUR_PRIMARY_1, 24);
 
-    vaszon_render_distance = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 105, 00.2, 0, 1, 24);
-    vaszon_chunk_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 130, 0.2, 0, 1, 24);
-    vaszon_chunks_pending_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 155, 0.2, 0, 1, 24);
-    vaszon_chunks_loaded = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 180, 0.2, 0, 1, 24);
-    vaszon_chunks_rendered = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 205, 0.2, 0, 1, 24);
+    vaszon_render_distance = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 105, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_chunk_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 130, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_chunks_pending_updates = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 155, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_chunks_loaded = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 180, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_chunks_rendered = canvas_addText(vaszon, "alma", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_TOP, 15, 205, CANVAS_COLOUR_PRIMARY_1, 24);
 
     //bototm left
     const char* vendor = glGetString(GL_VENDOR);
     const char* renderer = glGetString(GL_RENDERER);
 
-    canvas_addText(vaszon, vendor, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 35, 0.2, 0, 1, 24);
-    canvas_addText(vaszon, renderer, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 10, 0.2, 0, 1, 24);
+    canvas_addText(vaszon, vendor, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 35, CANVAS_COLOUR_PRIMARY_1, 24);
+    canvas_addText(vaszon, renderer, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 10, CANVAS_COLOUR_PRIMARY_1, 24);
 
     //right side
-    vaszon_physics_loaded_groups = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, 0.2, 0, 1, 24);
-    vaszon_physics_simulated_colliders = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, 0.2, 0, 1, 24);
-    vaszon_physics_raycast_hit = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 60, 0.2, 0, 1, 24);
+    vaszon_physics_loaded_groups = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_physics_simulated_colliders = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_physics_raycast_hit = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 60, CANVAS_COLOUR_PRIMARY_1, 24);
 }
 
 void end_canvas()
