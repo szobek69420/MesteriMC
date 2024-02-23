@@ -57,6 +57,7 @@
 float CLIP_NEAR = 0.1f;
 float CLIP_FAR = 250.0f;
 
+
 #define PHYSICS_UPDATE 0.02f
 #define PHYSICS_STEPS_PER_UPDATE 100
 #define GENERATION_UPDATE 0.001f
@@ -90,6 +91,11 @@ enum gameState{
 };
 int currentGameState;//is the game paused or in game or idk
 pthread_mutex_t mutex_gameState;
+
+enum playerState {
+    PLAYER_MORTAL, PLAYER_IMMORTAL
+};
+int currentPlayerState = PLAYER_MORTAL;
 
 pthread_mutex_t mutex_window;//for window calls (like window_getHeight())
 
@@ -236,6 +242,8 @@ void game(void* w, int* currentStage)
 
     currentGameState = GAME_INGAME;
 
+    currentPlayerState = PLAYER_MORTAL;
+
     int tempHotbarContent[HOTBAR_SIZE]={ BLOCK_SUS ,BLOCK_DIRT ,BLOCK_GRASS ,BLOCK_OAK_LOG ,BLOCK_OAK_LEAVES };
     memcpy(hotbarContent, tempHotbarContent, sizeof(hotbarContent));
     int tempInventoryContent[INVENTORY_COLUMNS * INVENTORY_ROWS] = {
@@ -258,7 +266,7 @@ void game(void* w, int* currentStage)
     init_canvas();
 
     CLIP_FAR = settings_getInt(SETTINGS_RENDER_DISTANCE) * CHUNK_WIDTH + 50;
-    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 40, 0.2);
+    cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 4, 0.2);
     camera_setProjection(&cum, currentFov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
 
     ps = physicsSystem_create();
@@ -1056,7 +1064,6 @@ void* loop_physics(void* arg)
     physicsSystem_processPending(&ps);//make sure that the collider is loaded into the physics system
     playerCollider = physicsSystem_getCollider(&ps, temp.id);
 
-
     float lastFrame = glfwGetTime();
     vec3 previousCumPosition = cum.position;
     while (69)
@@ -1108,23 +1115,22 @@ void* loop_physics(void* arg)
                 else if(input_is_key_released(GLFW_KEY_E))
                     changeGameState(69, GAME_INVENTORY);
 
-                //movement
-                vec3 velocity = (vec3){ 0,0,0 };
-                vec3 forward = vec3_normalize(vec3_create2(cum.front.x, 0, cum.front.z));
-                if (input_is_key_down(GLFW_KEY_W))
-                    velocity = vec3_sum(velocity, vec3_scale(forward, cum.move_speed));
-                if (input_is_key_down(GLFW_KEY_S))
-                    velocity = vec3_sum(velocity, vec3_scale(forward, -cum.move_speed));
-                if (input_is_key_down(GLFW_KEY_A))
-                    velocity = vec3_sum(velocity, vec3_scale(cum.right, -cum.move_speed));
-                if (input_is_key_down(GLFW_KEY_D))
-                    velocity = vec3_sum(velocity, vec3_scale(cum.right, cum.move_speed));
-                if (input_is_key_down(GLFW_KEY_LEFT_SHIFT))
-                    velocity = vec3_sum(velocity, (vec3) { 0, -cum.move_speed, 0 });
-                if (input_is_key_down(GLFW_KEY_SPACE))
-                    velocity = vec3_sum(velocity, (vec3) { 0, cum.move_speed, 0 });
+                //player mode
+                if (input_is_key_released(GLFW_KEY_M))
+                {
+                    switch (currentPlayerState)
+                    {
+                    case PLAYER_MORTAL:
+                        collider_setSolidity(playerCollider, 0);
+                        currentPlayerState = PLAYER_IMMORTAL;
+                        break;
 
-                playerCollider->velocity = velocity;
+                    case PLAYER_IMMORTAL:
+                        collider_setSolidity(playerCollider, 69);
+                        currentPlayerState = PLAYER_MORTAL;
+                        break;
+                    }
+                }
 
                 //block interactions
                 if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT))
@@ -1145,7 +1151,7 @@ void* loop_physics(void* arg)
                         if (raycastBlockZ == 0)
                             chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ - 1);
                         else if (raycastBlockZ == CHUNK_WIDTH - 1)
-                            chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ + 1);
+                            chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ + 1); 
                     }
                 }
                 if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_RIGHT))
@@ -1176,8 +1182,12 @@ void* loop_physics(void* arg)
                                 }
                             }
                         }
-                        chunkManager_changeBlock(&cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2], tempRaycastBlock[0], tempRaycastBlock[1], tempRaycastBlock[2], hotbarContent[hotbarSlotSelected]);
-                        chunkManager_reloadChunk(&cm, &mutex_cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2]);
+                        
+                        if (0==collider_isInBounds(playerCollider, (vec3) { CHUNK_WIDTH* tempRaycastChunk[0] + tempRaycastBlock[0], CHUNK_HEIGHT * tempRaycastChunk[1] + tempRaycastBlock[1], CHUNK_WIDTH* tempRaycastChunk[2] + tempRaycastBlock[2] }, (vec3) { CHUNK_WIDTH* tempRaycastChunk[0] + tempRaycastBlock[0]+1, CHUNK_HEIGHT* tempRaycastChunk[1] + tempRaycastBlock[1]+1, CHUNK_WIDTH* tempRaycastChunk[2] + tempRaycastBlock[2]+1 }))
+                        {
+                            chunkManager_changeBlock(&cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2], tempRaycastBlock[0], tempRaycastBlock[1], tempRaycastBlock[2], hotbarContent[hotbarSlotSelected]);
+                            chunkManager_reloadChunk(&cm, &mutex_cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2]);
+                        }
                     }
                 }
 
@@ -1219,6 +1229,54 @@ void* loop_physics(void* arg)
                 for (int i = 0; i < HOTBAR_SIZE; i++)
                     if (input_is_key_pressed(GLFW_KEY_1 + i))
                         hotbarSlotSelected = i;
+
+                //movement
+                vec3 velocity = (vec3){ 0,0,0 };
+                vec3 forward = vec3_normalize(vec3_create2(cum.front.x, 0, cum.front.z));
+
+                switch (currentPlayerState)
+                {
+                case PLAYER_MORTAL:
+                    if (input_is_key_down(GLFW_KEY_W))
+                        velocity = vec3_sum(velocity, vec3_scale(forward, cum.move_speed));
+                    if (input_is_key_down(GLFW_KEY_S))
+                        velocity = vec3_sum(velocity, vec3_scale(forward, -cum.move_speed));
+                    if (input_is_key_down(GLFW_KEY_A))
+                        velocity = vec3_sum(velocity, vec3_scale(cum.right, -cum.move_speed));
+                    if (input_is_key_down(GLFW_KEY_D))
+                        velocity = vec3_sum(velocity, vec3_scale(cum.right, cum.move_speed));
+
+                    velocity.y = playerCollider->velocity.y;
+                    velocity.y += GRAVITY * PHYSICS_UPDATE;
+                    if (velocity.y < -70.0f)
+                        velocity.y = lerp(velocity.y, -70.0f, 0.1f);
+
+                    if (input_is_key_down(GLFW_KEY_SPACE))
+                    {
+                        if (COLLISION_GET_NEG_Y(playerCollider->flags))
+                        {
+                            velocity.y = 10.0f;
+                        }
+                    }
+                    break;
+
+                case PLAYER_IMMORTAL:
+                    if (input_is_key_down(GLFW_KEY_W))
+                        velocity = vec3_sum(velocity, vec3_scale(forward, 10*cum.move_speed));
+                    if (input_is_key_down(GLFW_KEY_S))
+                        velocity = vec3_sum(velocity, vec3_scale(forward, -10*cum.move_speed));
+                    if (input_is_key_down(GLFW_KEY_A))
+                        velocity = vec3_sum(velocity, vec3_scale(cum.right, -10*cum.move_speed));
+                    if (input_is_key_down(GLFW_KEY_D))
+                        velocity = vec3_sum(velocity, vec3_scale(cum.right, 10*cum.move_speed));
+                    if (input_is_key_down(GLFW_KEY_LEFT_SHIFT))
+                        velocity = vec3_sum(velocity, (vec3) { 0, -10*cum.move_speed, 0 });
+                    if (input_is_key_down(GLFW_KEY_SPACE))
+                        velocity = vec3_sum(velocity, (vec3) { 0, 10*cum.move_speed, 0 });
+                    break;
+                }
+
+                playerCollider->velocity = velocity;
 
                 //player part done
 
@@ -1273,6 +1331,20 @@ void* loop_physics(void* arg)
                     changeGameState(69, GAME_INGAME);
                 else if (input_is_key_released(GLFW_KEY_ESCAPE))
                     changeGameState(69, GAME_INGAME);
+
+                for (int i = 0; i < HOTBAR_SIZE && inventoryDropTarget != -1; i++)
+                {
+                    if (input_is_key_released(GLFW_KEY_1 + i) == 0)
+                        continue;
+
+                    if (i == inventoryDropTarget - 100)//if true, the content of the hotbar slot wants to be swapped with itself
+                        continue;
+
+                    inventorySlotContentSwap[0] = inventoryDropTarget;
+                    inventorySlotContentSwap[1] = 100 + i;
+
+                    break;//only one swap can be registered per frame anyway
+                }
                 break;
         }
 

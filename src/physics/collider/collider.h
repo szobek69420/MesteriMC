@@ -32,8 +32,8 @@ struct collider_internal_sphere {
 };
 
 struct collider {
-	unsigned long id;
-	unsigned long flags;
+	unsigned int id;
+	unsigned int flags;
 	/*
 	* flags: [fedddddd cccccccc bbbbbbbb aaaaaaaa]
 	* a) type: 8 bits
@@ -63,6 +63,7 @@ collider collider_createBallCollider(vec3 position, float radius, unsigned char 
 
 int collider_isKinematic(collider* c);
 
+void collider_setSolidity(collider* c, int isSolid);
 int collider_isSolid(collider* c);
 
 int collider_getType(collider* c);
@@ -78,5 +79,7 @@ vec3 collider_getPosition(collider* c);
 
 void collider_setVelocity(collider* c, vec3 velocity);
 vec3 collider_getVelocity(collider* c);
+
+int collider_isInBounds(collider* c, vec3 lowerBound, vec3 upperBound);
 
 #endif

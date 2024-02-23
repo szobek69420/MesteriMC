@@ -51,20 +51,30 @@ int collisionDetection_collisionBoxBox(struct collider* cn, struct collider* ck)
 	if (penetrations[2] < penetrations[minIndex])
 		minIndex = 2;
 
+	int shouldBeResolved = collider_isSolid(cn) && collider_isSolid(ck);
+
 	switch (minIndex)
 	{
 	case 0://x ist minimal
 		if (cn->position.x > ck->position.x)
 		{
 			COLLISION_SET_NEG_X(cn->flags);//mert a non-kinematic-kal a negativ z iranybol utkozott a kinematic
-			cn->position.x = ck->position.x + minDistanceX;
-			cn->velocity.x = 0;
+			
+			if (shouldBeResolved)
+			{
+				cn->position.x = ck->position.x + minDistanceX;
+				cn->velocity.x = 0;
+			}
 		}
 		else
 		{
 			COLLISION_SET_POS_X(cn->flags);
-			cn->position.x = ck->position.x - minDistanceX;
-			cn->velocity.x = 0;
+
+			if (shouldBeResolved)
+			{
+				cn->position.x = ck->position.x - minDistanceX;
+				cn->velocity.x = 0;
+			}
 		}
 		break;
 
@@ -72,14 +82,22 @@ int collisionDetection_collisionBoxBox(struct collider* cn, struct collider* ck)
 		if (cn->position.y > ck->position.y)
 		{
 			COLLISION_SET_NEG_Y(cn->flags);
-			cn->position.y = ck->position.y + minDistanceY;
-			cn->velocity.y = 0;
+			
+			if (shouldBeResolved)
+			{
+				cn->position.y = ck->position.y + minDistanceY;
+				cn->velocity.y = 0;
+			}
 		}
 		else
 		{
 			COLLISION_SET_POS_Y(cn->flags);
-			cn->position.y = ck->position.y - minDistanceY;
-			cn->velocity.y = 0;
+			
+			if (shouldBeResolved)
+			{
+				cn->position.y = ck->position.y - minDistanceY;
+				cn->velocity.y = 0;
+			}
 		}
 		break;
 
@@ -87,14 +105,22 @@ int collisionDetection_collisionBoxBox(struct collider* cn, struct collider* ck)
 		if (cn->position.z > ck->position.z)
 		{
 			COLLISION_SET_NEG_Z(cn->flags);
-			cn->position.z = ck->position.z + minDistanceZ;
-			cn->velocity.z = 0;
+			
+			if (shouldBeResolved)
+			{
+				cn->position.z = ck->position.z + minDistanceZ;
+				cn->velocity.z = 0;
+			}
 		}
 		else
 		{
 			COLLISION_SET_POS_Z(cn->flags);
-			cn->position.z = ck->position.z - minDistanceZ;
-			cn->velocity.z = 0;
+			
+			if (shouldBeResolved)
+			{
+				cn->position.z = ck->position.z - minDistanceZ;
+				cn->velocity.z = 0;
+			}
 		}
 		break;
 	}
