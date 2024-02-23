@@ -1,5 +1,7 @@
 #include "collider.h"
 
+#include <math.h>
+
 #include "../../glm2/vec3.h"
 
 static unsigned long colliderId=0;
@@ -48,6 +50,14 @@ int collider_isKinematic(collider* c)
 	if ((c->flags & 0b1000000000000000000000000000000ul) != 0)
 		return 69;
 	return 0;
+}
+
+void collider_setSolidity(collider* c, int isSolid)
+{
+	if (isSolid)
+		c->flags |= 0b10000000000000000000000000000000ul;
+	else
+		c->flags &= 0b01111111111111111111111111111111ul;
 }
 
 int collider_isSolid(collider* c)
@@ -104,3 +114,32 @@ vec3 collider_getVelocity(collider* c)
 	return c->velocity;
 }
 
+int collider_isInBounds(collider* c, vec3 lowerBound, vec3 upperBound)
+{
+	float minDistanceX = 0, minDistanceY = 0, minDistanceZ = 0;
+
+	switch (collider_getType(c))
+	{
+	case COLLIDER_TYPE_BOX:
+		minDistanceX = c->box.sizePerTwo.x + 0.5f * (upperBound.x - lowerBound.x);
+		minDistanceY = c->box.sizePerTwo.y + 0.5f * (upperBound.y - lowerBound.y);
+		minDistanceZ = c->box.sizePerTwo.z + 0.5f * (upperBound.z - lowerBound.z);
+		break;
+
+	case COLLIDER_TYPE_BALL:
+		minDistanceX = c->ball.radius + 0.5f * (upperBound.x - lowerBound.x);
+		minDistanceY = c->ball.radius + 0.5f * (upperBound.y - lowerBound.y);
+		minDistanceZ = c->ball.radius + 0.5f * (upperBound.z - lowerBound.z);
+		break;
+	}
+
+	//a cheap pre-check
+	if (fabsf(c->position.x - 0.5f * (upperBound.x + lowerBound.x)) > minDistanceX)
+		return 0;
+	if (fabsf(c->position.y - 0.5f * (upperBound.y + lowerBound.y)) > minDistanceY)
+		return 0;
+	if (fabsf(c->position.z - 0.5f * (upperBound.z + lowerBound.z)) > minDistanceZ)
+		return 0;
+
+	return 69;
+}

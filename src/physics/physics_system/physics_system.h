@@ -8,6 +8,8 @@
 
 #include <pthread.h>
 
+#define GRAVITY -25.0
+
 #define PHYSICS_ADD_GROUP 1
 #define PHYSICS_REMOVE_GROUP 2
 #define PHYSICS_ADD_COLLIDER 3
