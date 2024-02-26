@@ -99,7 +99,8 @@ int currentPlayerState = PLAYER_MORTAL;
 
 pthread_mutex_t mutex_window;//for window calls (like window_getHeight())
 
-physicsSystem ps;
+physicsSystem* ps;
+float physicsUpdateTime = 0;
 raycastHit rh;
 int raycastChunkX, raycastChunkY, raycastChunkZ;
 int raycastBlockX, raycastBlockY, raycastBlockZ;
@@ -113,6 +114,7 @@ int chunkUpdatesInLastSecond = 0;
 camera cum;
 pthread_mutex_t mutex_cum;
 float currentFov = 90;
+int isCameraSubmerged = 0;
 
 playerMesh pm;
 pthread_mutex_t mutex_pm;
@@ -159,6 +161,7 @@ int vaszon_chunk_updates;
 int vaszon_chunks_loaded;
 int vaszon_chunks_pending_updates;
 int vaszon_chunks_rendered;
+int vaszon_physics_update_time;
 int vaszon_physics_simulated_colliders;
 int vaszon_physics_loaded_groups;
 int vaszon_physics_raycast_hit;
@@ -271,13 +274,14 @@ void game(void* w, int* currentStage)
 
     ps = physicsSystem_create();
 
-    cm = chunkManager_create(69, settings_getInt(SETTINGS_RENDER_DISTANCE), &ps);
+    cm = chunkManager_create(69, settings_getInt(SETTINGS_RENDER_DISTANCE), ps);
     chunk_resetGenerationInfo();
     init_renderer();
 
     init_cube();//egyszer majd ki kene szedni
 
     blockSelection_init();
+    blockSelection_setColour(CANVAS_COLOUR_PRIMARY_1);
     hr = handRenderer_create();
     handRenderer_setBlock(hr, hotbarContent[hotbarSlotSelected]);
 
@@ -363,7 +367,7 @@ void game(void* w, int* currentStage)
     glfwMakeContextCurrent(window);
 
     chunkManager_destroy(&cm);
-    physicsSystem_destroy(&ps);
+    physicsSystem_destroy(ps);
     textureHandler_destroyTextures(TEXTURE_IN_GAME);
     end_canvas();
     fontHandler_close();
@@ -651,7 +655,7 @@ void* loop_render(void* arg)
         //raycast
         do {
             vec3 sPos = (vec3){ CHUNK_WIDTH * raycastChunkX + raycastBlockX + 0.5f, CHUNK_HEIGHT * raycastChunkY + raycastBlockY + 0.5f, CHUNK_WIDTH * raycastChunkZ + raycastBlockZ + 0.5f };
-            vec3 sSize = vec3_create2(1.005f, 1.005f, 1.005f);
+            vec3 sSize = vec3_create2(1.000f, 1.000f, 1.000f);
             blockSelection_render(sPos, sSize, &pv);
         } while (0);
         
@@ -781,13 +785,15 @@ void* loop_render(void* arg)
         }
 
         glUseProgram(finalPassShader.id);
+        glUniform1i(glGetUniformLocation(finalPassShader.id, "isSubmerged"), isCameraSubmerged);
         glBindVertexArray(rectangleVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glDisable(GL_BLEND);
 
         //lens flare
-        flare_render(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
+        if(isCameraSubmerged==0)
+            flare_render(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
 
         //switch to default fbo ------------------------------------------------------------------------
         glViewport(0, 0, windowWidth, windowHeight);
@@ -854,10 +860,14 @@ void* loop_render(void* arg)
                 sprintf(buffer, "rendered chunks: %d", renderedChunks);
                 canvas_setTextText(vaszon, vaszon_chunks_rendered, buffer);
 
-                sprintf(buffer, "simulated colliders: %d", ps.simulatedColliders.size);
+
+                sprintf(buffer, "physics update: %.3f ms", 1000 * physicsUpdateTime);
+                canvas_setTextText(vaszon, vaszon_physics_update_time, buffer);
+
+                sprintf(buffer, "simulated colliders: %d", physicsSystem_getColliderCount(ps));
                 canvas_setTextText(vaszon, vaszon_physics_simulated_colliders, buffer);
 
-                sprintf(buffer, "collider groups: %d", ps.colliderGroups.size);
+                sprintf(buffer, "collider groups: %d", physicsSystem_getColliderGroupCount(ps));
                 canvas_setTextText(vaszon, vaszon_physics_loaded_groups, buffer);
 
                 if (raycastFound != 0)
@@ -1059,10 +1069,29 @@ void* loop_generation(void* arg)
 void* loop_physics(void* arg)
 {
     collider* playerCollider;
-    collider temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.5f, 1.79f, 0.5f }, 0, 1, 0);
-    physicsSystem_addCollider(&ps, temp);
-    physicsSystem_processPending(&ps);//make sure that the collider is loaded into the physics system
-    playerCollider = physicsSystem_getCollider(&ps, temp.id);
+    collider* cameraCollider;//a little collider for the camera to detect walter
+    
+    do {
+        int playerColliderId=0, cameraColliderId=0;
+
+        collider temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.5f, 1.79f, 0.5f }, 0, 1, 0);
+        physicsSystem_addCollider(ps, temp);
+        playerColliderId = temp.id;
+
+        temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.01f, 0.01f, 0.01f }, 0, 0, 0);
+        physicsSystem_addCollider(ps, temp);
+        cameraColliderId = temp.id;
+        
+        physicsSystem_processPendingAll(ps);
+
+        playerCollider = physicsSystem_getCollider(ps, playerColliderId);
+        cameraCollider = physicsSystem_getCollider(ps, cameraColliderId);
+
+        if (playerCollider == NULL || cameraCollider == NULL)
+            printf("amogus\n");
+
+    } while (0);
+
 
     float lastFrame = glfwGetTime();
     vec3 previousCumPosition = cum.position;
@@ -1071,7 +1100,7 @@ void* loop_physics(void* arg)
         float currentTime = glfwGetTime();
         while (currentTime - lastFrame < PHYSICS_UPDATE)
         {
-            physicsSystem_processPending(&ps);
+            physicsSystem_processPending(ps);
             currentTime = glfwGetTime();
         }
         lastFrame = currentTime;
@@ -1108,6 +1137,12 @@ void* loop_physics(void* arg)
                 pthread_mutex_lock(&mutex_cum);
                 previousCumPosition = cum.position;
                 cum.position = vec3_sum(playerCollider->position, (vec3) { 0, 0.69f, 0 });
+
+                cameraCollider->position= vec3_sum(playerCollider->position, (vec3) { 0, 0.69f, 0 });
+                if (collider_getLastCollisionTag(cameraCollider) == CHUNK_COLLIDER_WATER)
+                    isCameraSubmerged = 69;
+                else
+                    isCameraSubmerged = 0;
 
                 //menu
                 if (input_is_key_released(GLFW_KEY_ESCAPE))
@@ -1283,14 +1318,14 @@ void* loop_physics(void* arg)
 
                 //physics update
                 double time = glfwGetTime();
-                physicsSystem_resetCollisions(&ps);
+                physicsSystem_resetCollisions(ps);
                 for (int i = 0; i < PHYSICS_STEPS_PER_UPDATE; i++)
                 {
-                    physicsSystem_update(&ps, PHYSICS_UPDATE / PHYSICS_STEPS_PER_UPDATE);
+                    physicsSystem_update(ps, PHYSICS_UPDATE / PHYSICS_STEPS_PER_UPDATE);
                 }
                 lastRaycastHit = rh.position;
                 rh.position = (vec3){ 0,100000,0 };
-                raycastFound = physicsSystem_raycast(&ps, cum.position, cum.front, 6, 0.01f, &rh);
+                raycastFound = physicsSystem_raycast(ps, cum.position, cum.front, 6, 0.01f, &rh);
 
                 rh.position = vec3_sum(rh.position, vec3_scale(rh.normal, -0.02f));
                 rh.position = vec3_sum(rh.position, vec3_scale(cum.front, 0.02f));
@@ -1352,6 +1387,8 @@ void* loop_physics(void* arg)
         pthread_mutex_lock(&mutex_input);
         shouldPoll = 69;
         pthread_mutex_unlock(&mutex_input);
+
+        physicsUpdateTime = glfwGetTime() - currentTime;
 
         int shouldExit2 = 0;
         int shouldPoll2 = 0;
@@ -1442,9 +1479,11 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_dudv"), 1);
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_depth_geometry"), 2);
     glUniform1i(glGetUniformLocation(waterShader.id, "texture_depth_shadow"), 3);
-    glUniform1f(glGetUniformLocation(waterShader.id, "fogStart"), fogEnd-10);
+    //glUniform1f(glGetUniformLocation(waterShader.id, "fogExponent"), -0.00015f * 16.0f / settings_getInt(SETTINGS_RENDER_DISTANCE));
+    //glUniform3f(glGetUniformLocation(waterShader.id, "fogColour"), 5, 5, 5);
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogStart"), fogEnd - 10);
     glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), fogEnd);
-    glUniform1f(glGetUniformLocation(waterShader.id, "fogHelper"), 1.0f / 10);
+    glUniform1f(glGetUniformLocation(waterShader.id, "fogHelper"), 0.1f);
     glUniform1f(glGetUniformLocation(waterShader.id, "projectionNear"), CLIP_NEAR);
     glUniform1f(glGetUniformLocation(waterShader.id, "projectionFar"), CLIP_FAR);
     glUniform1f(glGetUniformLocation(waterShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
@@ -1453,27 +1492,6 @@ void init_renderer()
     glUniform1f(glGetUniformLocation(waterShader.id, "shadowEnd"), shadowEnd);
     glUniform1f(glGetUniformLocation(waterShader.id, "shadowHelper"), 1.0f / 10);
 
-    ssaoShader = shader_import(
-        "../assets/shaders/renderer/ssao/shader_ssao.vag",
-        "../assets/shaders/renderer/ssao/shader_ssao.fag",
-        NULL
-    );
-    glUseProgram(ssaoShader.id);
-    glUniform1i(glGetUniformLocation(ssaoShader.id, "texture_normal"), 0);
-    glUniform1i(glGetUniformLocation(ssaoShader.id, "texture_depth"), 1);
-    glUniform1i(glGetUniformLocation(ssaoShader.id, "texture_noise"), 2);
-    glUniform1f(glGetUniformLocation(ssaoShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
-    glUniform1f(glGetUniformLocation(ssaoShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
-    glUniform1f(glGetUniformLocation(ssaoShader.id, "projectionNear"), CLIP_NEAR);
-    glUniform1f(glGetUniformLocation(ssaoShader.id, "projectionFar"), CLIP_FAR);
-
-    ssaoBlurShader = shader_import(
-        "../assets/shaders/renderer/ssao/shader_ssao.vag",
-        "../assets/shaders/renderer/ssao/shader_ssao_blur.fag",
-        NULL
-    );
-    glUseProgram(ssaoBlurShader.id);
-    glUniform1i(glGetUniformLocation(ssaoBlurShader.id, "ssaoInput"), 0);
 
     lightingPassShader = shader_import(
         "../assets/shaders/renderer/deferred_lighting/shader_deferred_lighting.vag",
@@ -1488,9 +1506,11 @@ void init_renderer()
     glUniform1i(glGetUniformLocation(lightingPassShader.id, "texture_ssao"), 4);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenWidth"), 1.0f / RENDERER_WIDTH);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "onePerScreenHeight"), 1.0f / RENDERER_HEIGHT);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), fogEnd-10);
+    //glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogExponent"), -0.00015f*16.0f/settings_getInt(SETTINGS_RENDER_DISTANCE));
+    //glUniform3f(glGetUniformLocation(lightingPassShader.id, "fogColour"), 5, 5, 5);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), fogEnd - 10);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), fogEnd);
-    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 1.0f / 10);
+    glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogHelper"), 0.1f);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStart"), shadowEnd-10);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowEnd"), shadowEnd);
     glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowHelper"), 1.0f / 10);
@@ -1532,6 +1552,7 @@ void init_renderer()
         glUniform1i(glGetUniformLocation(finalPassShader.id, buffer), i);
     }
     glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 0.2);
+    glUniform1i(glGetUniformLocation(finalPassShader.id, "isSubmerged"), 0);
 
     fxaaShader = shader_import(
         "../assets/shaders/renderer/fxaa/shader_fxaa.vag",
@@ -1785,9 +1806,10 @@ void init_canvas()
     canvas_addText(vaszon, renderer, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 10, CANVAS_COLOUR_PRIMARY_1, 24);
 
     //right side
-    vaszon_physics_loaded_groups = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, CANVAS_COLOUR_PRIMARY_1, 24);
-    vaszon_physics_simulated_colliders = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, CANVAS_COLOUR_PRIMARY_1, 24);
-    vaszon_physics_raycast_hit = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 60, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_physics_update_time= canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 10, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_physics_loaded_groups = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 35, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_physics_simulated_colliders = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 60, CANVAS_COLOUR_PRIMARY_1, 24);
+    vaszon_physics_raycast_hit = canvas_addText(vaszon, "alma", CANVAS_ALIGN_RIGHT, CANVAS_ALIGN_TOP, 15, 85, CANVAS_COLOUR_PRIMARY_1, 24);
 }
 
 void end_canvas()

@@ -25,7 +25,7 @@ void blockSelection_init()
 	bs.program = shader_import(
 		"../assets/shaders/random/block_selection/shader_block_selection.vag",
 		"../assets/shaders/random/block_selection/shader_block_selection.fag",
-		NULL
+		"../assets/shaders/random/block_selection/shader_block_selection.gag"
 	);
 	blockSelection_setColour(0, 0, 0);
 	
@@ -70,7 +70,8 @@ void blockSelection_render(vec3 position, vec3 size, mat4* pv)
 
 	position = vec3_sum(position, vec3_scale(size, -0.5f));
 
-	glDepthFunc(GL_LEQUAL);
+	glDepthFunc(GL_ALWAYS);
+	glDepthMask(GL_FALSE);
 	glLineWidth(3);
 
 	glUseProgram(bs.program.id);
@@ -79,11 +80,12 @@ void blockSelection_render(vec3 position, vec3 size, mat4* pv)
 	glUniformMatrix4fv(glGetUniformLocation(bs.program.id, "pv"), 1, GL_FALSE, pv->data);
 
 	glBindVertexArray(bs.vao);
-	glDrawElements(GL_LINES,36,GL_UNSIGNED_INT,0);
+	glDrawElements(GL_TRIANGLES,36,GL_UNSIGNED_INT,0);
 	glBindVertexArray(0);
 
 	glUseProgram(0);
 	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
 }
 
 void blockSelection_setColour(float r, float g, float b)
@@ -108,7 +110,13 @@ static float vertices[] = {
 };
 
 static unsigned int indices[] = {
-	0,1,	3,2,	4,5,	7,6,
+	/*0,1,	3,2,	4,5,	7,6,
 	4,0,	5,1,	6,2,	7,3,
-	2,1,	3,0,	6,5,	7,4
+	2,1,	3,0,	6,5,	7,4*/
+	2,1,0, 0,3,2,
+	4,5,6, 6,7,4,
+	0,4,7, 7,3,0,
+	3,7,6, 6,2,3,
+	2,6,5, 5,1,2,
+	1,5,4, 4,0,1
 };

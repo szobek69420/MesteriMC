@@ -6,8 +6,6 @@
 
 #include "../../utils/lista.h"
 
-#include <pthread.h>
-
 #define GRAVITY -25.0
 
 #define PHYSICS_ADD_GROUP 1
@@ -27,12 +25,7 @@ struct physicsSystemUpdate {
 };
 typedef struct physicsSystemUpdate physicsSystemUpdate;
 
-struct physicsSystem {
-	lista_of(collider) simulatedColliders;//list of non kinematic colliders
-	lista_of(colliderGroup) colliderGroups;
-	lista_of(physicsSystemUpdate) pendingUpdates;
-	pthread_mutex_t mutex_pending;
-};
+struct physicsSystem;
 typedef struct physicsSystem physicsSystem;
 
 struct raycastHit {
@@ -42,7 +35,7 @@ struct raycastHit {
 };
 typedef struct raycastHit raycastHit;
 
-physicsSystem physicsSystem_create();
+physicsSystem* physicsSystem_create();
 void physicsSystem_destroy(physicsSystem* ps);
 
 void physicsSystem_addGroup(physicsSystem* ps, colliderGroup cg);
@@ -54,10 +47,14 @@ void physicsSystem_removeCollider(physicsSystem* ps, int colliderId);
 collider* physicsSystem_getCollider(physicsSystem* ps, int colliderId);
 
 void physicsSystem_processPending(physicsSystem* ps);
+void physicsSystem_processPendingAll(physicsSystem* ps);//processes all of the pending updates that exist at the time of calling
 
 void physicsSystem_resetCollisions(physicsSystem* ps);
 void physicsSystem_update(physicsSystem* ps, float deltaTime);
 
 int physicsSystem_raycast(physicsSystem* ps, vec3 origin, vec3 direction, float distance, float precision, raycastHit* rh);//return value is zero, if nothing has been hit
+
+int physicsSystem_getColliderCount(physicsSystem* ps);
+int physicsSystem_getColliderGroupCount(physicsSystem* ps);
 
 #endif

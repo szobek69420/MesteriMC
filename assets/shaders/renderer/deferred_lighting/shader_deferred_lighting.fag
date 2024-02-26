@@ -43,9 +43,11 @@ uniform mat4 projection_inverse;
 uniform float onePerScreenWidth;
 uniform float onePerScreenHeight;
 
+uniform float fogExponent;
+uniform vec3 fogColour;
 uniform float fogStart;
 uniform float fogEnd;
-uniform float fogHelper;//1/(fogEnd-fogStart)
+uniform float fogHelper;
 
 uniform float shadowStart;
 uniform float shadowEnd;
@@ -123,11 +125,13 @@ void main()
 	spec *= attenuation*oneMinusShadowStrength;
 	lighting += amb + alb + spec;
 
-	float alpha=1;
-	if(distanceFromEye>fogStart)
-		alpha=(fogEnd-distanceFromEye)*fogHelper;
-	if(alpha<0)
-		alpha=0;
+
+	//fog
+	float alpha= 1;
+    if(distanceFromEye>fogStart)
+        alpha*=(fogEnd-distanceFromEye)*fogHelper;
+    if(alpha<0)
+        alpha=0;
 
 	fragColor = vec4(lighting,alpha);
 

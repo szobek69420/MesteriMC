@@ -19,7 +19,7 @@ shader shader_import(const char* pathToVertexShader, const char* pathToFragmentS
     FILE* file;
     char* sauce = (char*)malloc(SHADER_MAX_LENGTH*sizeof(char));
     int currentLength;
-    char line[200];
+    char line[300];
 
     GLuint vertexShader, fragmentShader, geometryShader;
 
@@ -32,7 +32,7 @@ shader shader_import(const char* pathToVertexShader, const char* pathToFragmentS
         free(sauce);
         return program;
     }
-    while (fgets(line, 200, file) != NULL)
+    while (fgets(line, 300, file) != NULL)
     {
         strcpy(sauce + currentLength, line);
         currentLength += strlen(line);
@@ -64,7 +64,7 @@ shader shader_import(const char* pathToVertexShader, const char* pathToFragmentS
             free(sauce);
             return program;
         }
-        while (fgets(line, 200, file) != NULL)
+        while (fgets(line, 300, file) != NULL)
         {
             strcpy(sauce + currentLength, line);
             currentLength += strlen(line);
@@ -97,7 +97,7 @@ shader shader_import(const char* pathToVertexShader, const char* pathToFragmentS
         free(sauce);
         return program;
     }
-    while (fgets(line, 200, file) != NULL)
+    while (fgets(line, 300, file) != NULL)
     {
         strcpy(sauce + currentLength, line);
         currentLength += strlen(line);

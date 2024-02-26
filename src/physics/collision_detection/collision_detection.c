@@ -53,6 +53,10 @@ int collisionDetection_collisionBoxBox(struct collider* cn, struct collider* ck)
 
 	int shouldBeResolved = collider_isSolid(cn) && collider_isSolid(ck);
 
+	if (collider_getLastCollisionTag(cn) == 0||shouldBeResolved)//csak akkor irhatja felul az elozo last collision tag-et, ha tenyleges, feloldando utkozes van
+		collider_setLastCollisionTag(cn, collider_getTag(ck));
+		
+
 	switch (minIndex)
 	{
 	case 0://x ist minimal

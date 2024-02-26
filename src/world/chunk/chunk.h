@@ -4,6 +4,9 @@
 #ifndef CHUNK_WIDTH
 #define CHUNK_WIDTH 32
 #define CHUNK_HEIGHT 32
+
+#define CHUNK_COLLIDER_SOLID 69
+#define CHUNK_COLLIDER_WATER 70
 #endif
 
 #include "../../mesh/mesh.h"
