@@ -13,8 +13,6 @@ uniform sampler2D bloom3;
 
 uniform float exposure;
 
-uniform int isSubmerged;
-
 
 void main()
 {
@@ -27,15 +25,8 @@ void main()
 	colour+=texture(bloom2, uv).rgb;
 	colour+=texture(bloom3, uv).rgb;
 
-	//underwalter
-	if(isSubmerged!=0)
-		colour*=vec3(0,0,1);
-
 	// exposure tone mapping
     colour = vec3(1.0) - exp(-colour * exposure);
-
-    // gamma correction 
-    colour = pow(colour, vec3(0.4545));
 
     fragColour=vec4(colour,alpha);
 }

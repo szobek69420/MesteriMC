@@ -64,7 +64,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	int basedX = CHUNK_WIDTH * chunkX;
 	int basedY = CHUNK_HEIGHT * chunkY;
 	int basedZ = CHUNK_WIDTH * chunkZ;
-
+	
 	chomk.normalColliderGroupId = 0;
 	chomk.waterColliderGroupId = 0;
 	colliderGroup normalCg = colliderGroup_create((vec3) { basedX, basedY, basedZ }, (vec3) { basedX + CHUNK_WIDTH, basedY + CHUNK_HEIGHT, basedZ + CHUNK_WIDTH });

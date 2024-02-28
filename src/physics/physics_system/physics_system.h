@@ -35,7 +35,7 @@ struct raycastHit {
 };
 typedef struct raycastHit raycastHit;
 
-physicsSystem* physicsSystem_create();
+struct physicsSystem* physicsSystem_create();
 void physicsSystem_destroy(physicsSystem* ps);
 
 void physicsSystem_addGroup(physicsSystem* ps, colliderGroup cg);

@@ -87,7 +87,7 @@ enum {
 int currentCursorMode, targetCursorMode;//glfwSetInputMode should only be called from the main thread, so these serve as a buffer until the main thread gets to change the input mode
 
 enum gameState{
-    GAME_INGAME, GAME_PAUSED, GAME_INVENTORY
+    GAME_INGAME, GAME_PAUSED, GAME_INVENTORY, GAME_COMMAND_LINE
 };
 int currentGameState;//is the game paused or in game or idk
 pthread_mutex_t mutex_gameState;
@@ -130,7 +130,7 @@ shader waterShader;
 shader forwardPassShader;
 shader bloomFilterShader; shader bloomDownsampleShader;
 shader finalPassShader;
-shader fxaaShader;
+shader finalPassNonHdrShader;
 shader skyboxShader; mesh skyboxMesh;
 
 canvas* vaszonPause;
@@ -149,6 +149,11 @@ int vaszonInventory_inventorySlotBlockMeshes[INVENTORY_COLUMNS * INVENTORY_ROWS]
 int vaszonInventory_inventoryHotbarSlotFrames[HOTBAR_SIZE];
 int vaszonInventory_inventoryHotbarSlotBlockMeshes[HOTBAR_SIZE];
 int vaszonInventory_dragged;
+
+canvas* vaszonCommand;
+pthread_mutex_t mutex_vaszonCommand;
+int vaszonCommand_commandText;
+char currentCommand[100];
 
 
 canvas* vaszon;//debug screen
@@ -304,6 +309,7 @@ void game(void* w, int* currentStage)
     pthread_mutex_init(&mutex_vaszonPause, NULL);
     pthread_mutex_init(&mutex_vaszonIngame, NULL);
     pthread_mutex_init(&mutex_vaszonInventory, NULL);
+    pthread_mutex_init(&mutex_vaszonCommand, NULL);
     pthread_mutex_init(&mutex_gameState, NULL);
 
 
@@ -361,6 +367,7 @@ void game(void* w, int* currentStage)
     pthread_mutex_destroy(&mutex_vaszonPause);
     pthread_mutex_destroy(&mutex_vaszonIngame);
     pthread_mutex_destroy(&mutex_vaszonInventory);
+    pthread_mutex_destroy(&mutex_vaszonCommand);
     pthread_mutex_destroy(&mutex_gameState);
 
 
@@ -701,6 +708,7 @@ void* loop_render(void* arg)
         }
 
         glEnable(GL_BLEND);
+        glDisable(GL_CULL_FACE);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         pthread_mutex_lock(&mutex_cm);
@@ -708,6 +716,7 @@ void* loop_render(void* arg)
         pthread_mutex_unlock(&mutex_cm);
 
         glDisable(GL_BLEND);
+        glEnable(GL_CULL_FACE);
 
         //get lens flare data
         flare_queryQueryResult(&lensFlare);
@@ -785,7 +794,6 @@ void* loop_render(void* arg)
         }
 
         glUseProgram(finalPassShader.id);
-        glUniform1i(glGetUniformLocation(finalPassShader.id, "isSubmerged"), isCameraSubmerged);
         glBindVertexArray(rectangleVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -799,11 +807,12 @@ void* loop_render(void* arg)
         glViewport(0, 0, windowWidth, windowHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);//default framebuffer
 
-        //fxaa
+        //fxaa and other non hdr post processing things
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, rendor.screenBuffer.colorBuffer);
 
-        glUseProgram(fxaaShader.id);
+        glUseProgram(finalPassNonHdrShader.id);
+        glUniform1i(glGetUniformLocation(finalPassNonHdrShader.id, "isSubmerged"), isCameraSubmerged);
         glBindVertexArray(rectangleVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -825,6 +834,10 @@ void* loop_render(void* arg)
             pthread_mutex_lock(&mutex_vaszonInventory);
             canvas_setSize(vaszonInventory, windowWidth, windowHeight);
             pthread_mutex_unlock(&mutex_vaszonInventory);
+
+            pthread_mutex_lock(&mutex_vaszonCommand);
+            canvas_setSize(vaszonCommand, windowWidth, windowHeight);
+            pthread_mutex_unlock(&mutex_vaszonCommand);
         }
 
         static char buffer[50];
@@ -975,6 +988,13 @@ void* loop_render(void* arg)
 
                 canvas_render(vaszonInventory, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
                 pthread_mutex_unlock(&mutex_vaszonInventory);
+                break;
+
+            case GAME_COMMAND_LINE:
+                pthread_mutex_lock(&mutex_vaszonCommand);
+                canvas_setTextText(vaszonCommand, vaszonCommand_commandText, currentCommand);
+                canvas_render(vaszonCommand, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT));
+                pthread_mutex_unlock(&mutex_vaszonCommand);
                 break;
         }
 
@@ -1128,6 +1148,10 @@ void* loop_physics(void* arg)
         case GAME_INVENTORY:
             canvas_checkMouseInput(vaszonInventory, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
             break;
+
+        case GAME_COMMAND_LINE:
+            canvas_checkMouseInput(vaszonCommand, mouseX, mouseY, input_is_mouse_button_down(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT), input_is_mouse_button_released(GLFW_MOUSE_BUTTON_LEFT));
+            break;
         }
 
         switch (currentGameState)
@@ -1147,11 +1171,13 @@ void* loop_physics(void* arg)
                 //menu
                 if (input_is_key_released(GLFW_KEY_ESCAPE))
                     changeGameState(69, GAME_PAUSED);
-                else if(input_is_key_released(GLFW_KEY_E))
+                else if (input_is_key_released(GLFW_KEY_E))
                     changeGameState(69, GAME_INVENTORY);
+                else if (input_is_key_released(GLFW_KEY_T))
+                    changeGameState(69, GAME_COMMAND_LINE);
 
                 //player mode
-                if (input_is_key_released(GLFW_KEY_M))
+                /*if (input_is_key_released(GLFW_KEY_M))
                 {
                     switch (currentPlayerState)
                     {
@@ -1165,7 +1191,7 @@ void* loop_physics(void* arg)
                         currentPlayerState = PLAYER_MORTAL;
                         break;
                     }
-                }
+                }*/
 
                 //block interactions
                 if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT))
@@ -1381,6 +1407,76 @@ void* loop_physics(void* arg)
                     break;//only one swap can be registered per frame anyway
                 }
                 break;
+
+            case GAME_COMMAND_LINE:
+                if (input_is_key_released(GLFW_KEY_ESCAPE))
+                {
+                    changeGameState(69, GAME_INGAME);
+                    break;
+                }
+                if (input_is_key_released(GLFW_KEY_ENTER))
+                {
+                    if (strcmp(currentCommand, ".gm mortal") == 0)
+                    {
+                        collider_setSolidity(playerCollider, 69);
+                        currentPlayerState = PLAYER_MORTAL;
+                    }
+
+                    if (strcmp(currentCommand, ".gm divine") == 0)
+                    {
+                        collider_setSolidity(playerCollider, 0);
+                        currentPlayerState = PLAYER_IMMORTAL;
+                    }
+
+                    changeGameState(69, GAME_INGAME);
+                    break;
+                }
+
+                pthread_mutex_lock(&mutex_vaszonCommand);
+                int length = strlen(currentCommand);
+                for (int i = GLFW_KEY_A; i <= GLFW_KEY_Z; i++)
+                {
+                    if (input_is_key_pressed(i))
+                    {
+                        if (length < 199)
+                        {
+                            currentCommand[length] = i - GLFW_KEY_A + 'a';
+                            currentCommand[length + 1] = '\0';
+                            length++;
+                        }
+                    }
+                }
+
+                if (input_is_key_pressed(GLFW_KEY_BACKSPACE))
+                {
+                    if (length > 0)
+                    {
+                        currentCommand[length - 1] = '\0';
+                        length--;
+                    }
+                }
+
+                if (input_is_key_pressed(GLFW_KEY_PERIOD))
+                {
+                    if (length < 199)
+                    {
+                        currentCommand[length] = '.';
+                        currentCommand[length + 1] = '\0';
+                        length++;
+                    }
+                }
+
+                if (input_is_key_pressed(GLFW_KEY_SPACE))
+                {
+                    if (length < 199)
+                    {
+                        currentCommand[length] = ' ';
+                        currentCommand[length + 1] = '\0';
+                        length++;
+                    }
+                }
+                pthread_mutex_unlock(&mutex_vaszonCommand);
+                break;
         }
 
 
@@ -1554,14 +1650,14 @@ void init_renderer()
     glUniform1f(glGetUniformLocation(finalPassShader.id, "exposure"), 0.2);
     glUniform1i(glGetUniformLocation(finalPassShader.id, "isSubmerged"), 0);
 
-    fxaaShader = shader_import(
-        "../assets/shaders/renderer/fxaa/shader_fxaa.vag",
-        "../assets/shaders/renderer/fxaa/shader_fxaa.fag",
+    finalPassNonHdrShader = shader_import(
+        "../assets/shaders/renderer/final_pass_non_hdr/shader_final_non_hdr.vag",
+        "../assets/shaders/renderer/final_pass_non_hdr/shader_final_non_hdr.fag",
         NULL
     );
-    glUseProgram(fxaaShader.id);
-    glUniform1i(glGetUniformLocation(fxaaShader.id, "tex"), 0);
-    glUniform2f(glGetUniformLocation(fxaaShader.id, "onePerResolution"), 1.0f / RENDERER_WIDTH, 1.0f / RENDERER_HEIGHT);
+    glUseProgram(finalPassNonHdrShader.id);
+    glUniform1i(glGetUniformLocation(finalPassNonHdrShader.id, "tex"), 0);
+    glUniform2f(glGetUniformLocation(finalPassNonHdrShader.id, "onePerResolution"), 1.0f / RENDERER_WIDTH, 1.0f / RENDERER_HEIGHT);
 
     //rectangle VAO, VBO
     float vertices[] = {
@@ -1659,7 +1755,7 @@ void end_renderer()
     shader_delete(&bloomFilterShader);
     shader_delete(&bloomDownsampleShader);
     shader_delete(&finalPassShader);
-    shader_delete(&fxaaShader);
+    shader_delete(&finalPassNonHdrShader);
 
     glDeleteVertexArrays(1, &rectangleVAO);
     glDeleteBuffers(1, &rectangleVBO);
@@ -1784,6 +1880,16 @@ void init_canvas()
 
     vaszonInventory_dragged = canvas_addBlockMesh(vaszonInventory, CANVAS_ALIGN_CENTER, CANVAS_ALIGN_MIDDLE, BLOCK_AIR, -100000, -100000, 60, 60);
 
+    //command screen
+    vaszonCommand = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
+
+    mogus = canvas_addImage(vaszonCommand, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 10, 10, 400, 30, textureHandler_getTexture(TEXTURE_ATLAS_UI));
+    canvas_setImageTint(vaszonCommand, mogus, CANVAS_COLOUR_PRIMARY_1);
+    canvas_setImageUV(vaszonCommand, mogus, 0, 0, 0.1f, 0.1f);
+
+    vaszonCommand_commandText = canvas_addText(vaszonCommand, "", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 12, 15, CANVAS_COLOUR_ACCENT_0, 24);
+
+
     //debug screen
     vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
 
@@ -1817,6 +1923,7 @@ void end_canvas()
     canvas_destroy(vaszonIngame);
     canvas_destroy(vaszonPause);
     canvas_destroy(vaszonInventory);
+    canvas_destroy(vaszonCommand);
     canvas_destroy(vaszon);
 }
 
@@ -1949,6 +2056,7 @@ void changeGameState(int inBounds, int gs)
         {
         case GAME_PAUSED:
         case GAME_INVENTORY:
+        case GAME_COMMAND_LINE:
             pthread_mutex_lock(&mutex_input);
             targetCursorMode = GLFW_CURSOR_NORMAL;
             pthread_mutex_unlock(&mutex_input);
@@ -1975,6 +2083,22 @@ void changeGameState(int inBounds, int gs)
             pthread_mutex_unlock(&mutex_input);
             break;
         }
+        break;
+
+    case GAME_COMMAND_LINE:
+        switch (gs)
+        {
+        case GAME_INGAME:
+            pthread_mutex_lock(&mutex_input);
+            targetCursorMode = GLFW_CURSOR_DISABLED;
+            pthread_mutex_unlock(&mutex_input);
+
+            pthread_mutex_lock(&mutex_vaszonCommand);
+            strcpy(currentCommand, "");
+            pthread_mutex_unlock(&mutex_vaszonCommand);
+            break;
+        }
+        break;
     }
     currentGameState = gs;
     pthread_mutex_unlock(&mutex_gameState);
