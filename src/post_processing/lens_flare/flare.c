@@ -170,6 +170,7 @@ void flare_query(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, flo
 	glBeginQuery(GL_SAMPLES_PASSED, sus->queries[sus->nextQuery]);
 
 	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
 	glBindVertexArray(sus->vao);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -179,6 +180,7 @@ void flare_query(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, flo
 	if (sus->nextQuery >= FLARE_QUERY_COUNT)
 		sus->nextQuery = 0;
 
+	glDepthFunc(GL_LESS);
 	glBindVertexArray(0);
 	glUseProgram(0);
 }

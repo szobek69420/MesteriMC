@@ -64,12 +64,12 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	int basedX = CHUNK_WIDTH * chunkX;
 	int basedY = CHUNK_HEIGHT * chunkY;
 	int basedZ = CHUNK_WIDTH * chunkZ;
-
+	
 	chomk.normalColliderGroupId = 0;
 	chomk.waterColliderGroupId = 0;
 	colliderGroup normalCg = colliderGroup_create((vec3) { basedX, basedY, basedZ }, (vec3) { basedX + CHUNK_WIDTH, basedY + CHUNK_HEIGHT, basedZ + CHUNK_WIDTH });
 	colliderGroup waterCg = colliderGroup_create((vec3) { basedX, basedY, basedZ }, (vec3) { basedX + CHUNK_WIDTH, basedY + CHUNK_HEIGHT, basedZ + CHUNK_WIDTH });
-
+	
 	chomk.model = mat4_translate(mat4_create(1), vec3_create2(basedX, basedY, basedZ));
 
 	chomk.blocks = (char***)malloc((CHUNK_HEIGHT+2) * sizeof(char**));
@@ -523,7 +523,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 				//add a collider only if the block is visible
 				if (isBlockVisible != 0)
-					colliderGroup_addCollider(&normalCg, collider_createBoxCollider( (vec3) { basedX + j - 0.5f, basedY + i - 0.5f, basedZ + k - 0.5f }, (vec3) { 1, 1, 1 }, 1, 1, 0 ) );//azert -0.5f, mert az i,j,k 1-rol kezdodnek
+					colliderGroup_addCollider(&normalCg, collider_createBoxCollider( (vec3) { basedX + j - 0.5f, basedY + i - 0.5f, basedZ + k - 0.5f }, (vec3) { 1, 1, 1 }, 1, 1, CHUNK_COLLIDER_SOLID ) );//azert -0.5f, mert az i,j,k 1-rol kezdodnek
 			}
 		}
 	}
@@ -595,6 +595,9 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					}
 					currentVertex += 4;
 				}
+
+				//add a collider only if the block is visible
+				colliderGroup_addCollider(&waterCg, collider_createBoxCollider((vec3) { basedX + j - 0.5f, basedY + i - 0.5f, basedZ + k - 0.5f }, (vec3) { 1, 1, 1 }, 1, 0, CHUNK_COLLIDER_WATER));//azert -0.5f, mert az i,j,k 1-rol kezdodnek
 			}
 		}
 	}

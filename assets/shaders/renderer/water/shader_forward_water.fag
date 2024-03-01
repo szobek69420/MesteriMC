@@ -50,6 +50,8 @@ uniform float shadowEnd;
 uniform float shadowHelper;// 1/(shadowEnd-shadowStart)
 
 //fog
+uniform float fogExponent;
+uniform vec3 fogColour;
 uniform float fogStart;
 uniform float fogEnd;
 uniform float fogHelper;

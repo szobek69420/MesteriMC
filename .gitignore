@@ -4,6 +4,7 @@
 /x64
 /src/pthreadGC2.dll
 /src/pthreadVC2.dll
+/src/freetype.dll
 
 .vscode
 build

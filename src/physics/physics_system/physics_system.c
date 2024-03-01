@@ -4,33 +4,41 @@
 #include "../collider_group/collider_group.h"
 #include "../collision_detection/collision_detection.h"
 
+#include "../../utils/seqtor.h"
 #include "../../utils/lista.h"
 
 #include <stdlib.h>
 #include <math.h>
 #include <pthread.h>
 
-physicsSystem physicsSystem_create()
+struct physicsSystem {
+	seqtor_of(collider) simulatedColliders;//list of non kinematic colliders
+	seqtor_of(colliderGroup) colliderGroups;
+	lista_of(physicsSystemUpdate) pendingUpdates;
+	pthread_mutex_t mutex_pending;
+};
+
+physicsSystem* physicsSystem_create()
 {
-	physicsSystem ps;
-	lista_init(ps.simulatedColliders);
-	lista_init(ps.colliderGroups);
-	lista_init(ps.pendingUpdates);
-	pthread_mutex_init(&ps.mutex_pending, NULL);
+	physicsSystem* ps=malloc(sizeof(physicsSystem));
+	if (ps == NULL)
+		return NULL;
+	seqtor_init(ps->simulatedColliders,1);
+	seqtor_init(ps->colliderGroups,1);
+	lista_init(ps->pendingUpdates);
+	pthread_mutex_init(&ps->mutex_pending, NULL);
 	return ps;
 }
 
 void physicsSystem_destroy(physicsSystem* ps)
 {
-	lista_clear(ps->simulatedColliders);
+	seqtor_destroy(ps->simulatedColliders);
 
-	colliderGroup cg;
-	while (ps->colliderGroups.size > 0)
-	{
-		lista_at(ps->colliderGroups, 0, &cg);
-		lista_remove_at(ps->colliderGroups, 0);
-		colliderGroup_destroy(&cg);
-	}
+
+	for (int i = 0; i < seqtor_size(ps->colliderGroups); i++)
+		colliderGroup_destroy(&seqtor_at(ps->colliderGroups, i));
+	seqtor_destroy(ps->colliderGroups);
+
 
 	physicsSystemUpdate psu;
 	pthread_mutex_lock(&ps->mutex_pending);
@@ -44,6 +52,8 @@ void physicsSystem_destroy(physicsSystem* ps)
 	pthread_mutex_unlock(&ps->mutex_pending);
 
 	pthread_mutex_destroy(&ps->mutex_pending);
+
+	free(ps);
 }
 
 void physicsSystem_addGroup(physicsSystem* ps, colliderGroup cg)
@@ -70,10 +80,10 @@ void physicsSystem_removeGroup(physicsSystem* ps, int colliderGroupId)
 
 colliderGroup* physicsSystem_getGroup(physicsSystem* ps, int colliderGroupId)
 {
-	for (lista_element_of(colliderGroup)* it = ps->colliderGroups.head; it != NULL; it = it->next)
+	for (int i = 0; i < seqtor_size(ps->colliderGroups); i++)
 	{
-		if (it->data.id == colliderGroupId)
-			return &it->data;
+		if (seqtor_at(ps->colliderGroups, i).id == colliderGroupId)
+			return &seqtor_at(ps->colliderGroups, i);
 	}
 	return NULL;
 }
@@ -96,10 +106,10 @@ void physicsSystem_removeCollider(physicsSystem* ps, int colliderId)
 
 collider* physicsSystem_getCollider(physicsSystem* ps, int colliderId)
 {
-	for (lista_element_of(collider)* it = ps->simulatedColliders.head; it != NULL; it = it->next)
+	for (int i = 0; i < seqtor_size(ps->simulatedColliders); i++)
 	{
-		if (it->data.id == colliderId)
-			return &it->data;
+		if (seqtor_at(ps->simulatedColliders, i).id == colliderId)
+			return &seqtor_at(ps->simulatedColliders, i);
 	}
 	return NULL;
 }
@@ -110,6 +120,7 @@ void physicsSystem_processPending(physicsSystem* ps)
 		return;
 
 	physicsSystemUpdate psu;
+
 	pthread_mutex_lock(&ps->mutex_pending);
 	lista_at(ps->pendingUpdates, 0, &psu);
 	lista_remove_at(ps->pendingUpdates, 0);
@@ -121,41 +132,50 @@ void physicsSystem_processPending(physicsSystem* ps)
 	switch (psu.type)
 	{
 	case PHYSICS_ADD_GROUP:
-		lista_push_back(ps->colliderGroups,  psu.cg);
+		seqtor_push_back(ps->colliderGroups,  psu.cg);
 		break;
 
 	case PHYSICS_REMOVE_GROUP:
-		it1 = ps->colliderGroups.head;
-		while (it1 != NULL)
+		for (int i = 0; i < seqtor_size(ps->colliderGroups); i++)
 		{
-			if (it1->data.id == psu.colliderGroupId)
+			if (seqtor_at(ps->colliderGroups, i).id == psu.colliderGroupId)
 			{
-				colliderGroup_destroy(&it1->data);
-				lista_remove_at(ps->colliderGroups, index);
+				colliderGroup cg = seqtor_at(ps->colliderGroups, i);
+				seqtor_at(ps->colliderGroups, i) = seqtor_at(ps->colliderGroups, seqtor_size(ps->colliderGroups) - 1);
+				seqtor_remove_at(ps->colliderGroups, seqtor_size(ps->colliderGroups) - 1);
+				colliderGroup_destroy(&cg);
 				break;
 			}
-			it1 = it1->next;
-			index++;
 		}
 		break;
 
 	case PHYSICS_ADD_COLLIDER:
-		lista_push_back(ps->simulatedColliders, psu.c);
+		seqtor_push_back(ps->simulatedColliders, psu.c);
 		break;
 
 	case PHYSICS_REMOVE_COLLIDER:
-		it2 = ps->simulatedColliders.head;
-		while (it2 != NULL)
+		for (int i = 0; i < seqtor_size(ps->simulatedColliders); i++)
 		{
-			if (it2->data.id == psu.colliderId)
+			if (seqtor_at(ps->simulatedColliders, i).id == psu.colliderId)
 			{
-				lista_remove_at(ps->simulatedColliders, index);
+				seqtor_at(ps->simulatedColliders, i) = seqtor_at(ps->simulatedColliders, seqtor_size(ps->simulatedColliders) - 1);
+				seqtor_remove_at(ps->simulatedColliders, seqtor_size(ps->simulatedColliders) - 1);
 				break;
 			}
-			it2 = it2->next;
-			index++;
 		}
 		break;
+	}
+}
+
+void physicsSystem_processPendingAll(physicsSystem* ps)
+{
+	pthread_mutex_lock(&ps->mutex_pending);
+	int pendingCount = ps->pendingUpdates.size;
+	pthread_mutex_unlock(&ps->mutex_pending);
+
+	for (int i = 0; i < pendingCount; i++)
+	{
+		physicsSystem_processPending(ps);
 	}
 }
 
@@ -163,22 +183,22 @@ void physicsSystem_resolveCollisions(colliderGroup* cg, collider* c);
 
 void physicsSystem_resetCollisions(physicsSystem* ps)
 {
-	for (lista_element_of(collider)* it1 = ps->simulatedColliders.head; it1 != NULL; it1 = it1->next)
-		COLLISION_RESET(it1->data.flags);
+	for (int i=0; i<seqtor_size(ps->simulatedColliders); i++)
+		COLLISION_RESET(seqtor_at(ps->simulatedColliders,i).flags);
 }
 
 void physicsSystem_update(physicsSystem* ps, float deltaTime)
 {
-	for (lista_element_of(collider)* it1 = ps->simulatedColliders.head; it1 != NULL; it1 = it1->next)
+	for (int i=0; i<seqtor_size(ps->simulatedColliders); i++)
 	{
-		it1->data.position = vec3_sum(it1->data.position, vec3_scale(it1->data.velocity, deltaTime));
+		seqtor_at(ps->simulatedColliders,i).position = vec3_sum(seqtor_at(ps->simulatedColliders, i).position, vec3_scale(seqtor_at(ps->simulatedColliders, i).velocity, deltaTime));
 
-		for (lista_element_of(colliderGroup)* it2 = ps->colliderGroups.head; it2 != NULL; it2 = it2->next)
+		for (int j=0; j<seqtor_size(ps->colliderGroups); j++)
 		{
-			if (colliderGroup_isColliderInBounds(&it2->data, &it1->data) == 0)
+			if (colliderGroup_isColliderInBounds(&seqtor_at(ps->colliderGroups,j), &seqtor_at(ps->simulatedColliders,i)) == 0)
 				continue;
 			
-			physicsSystem_resolveCollisions(&it2->data, &it1->data);
+			physicsSystem_resolveCollisions(&seqtor_at(ps->colliderGroups, j), &seqtor_at(ps->simulatedColliders, i));
 		}
 	}
 }
@@ -293,12 +313,12 @@ int physicsSystem_raycast(physicsSystem* ps, vec3 origin, vec3 direction, float 
 		if (currentCg == NULL || colliderGroup_isColliderInBounds(currentCg, &raycaster) == 0)//ha meg nincsen vizsgalt collidergroup vagy az elozo mar elavult, akkor keres egy ujat
 		{
 			currentCg = NULL;
-			for (lista_element_of(colliderGroup)* it2 = ps->colliderGroups.head; it2 != NULL; it2 = it2->next)
+			for (int j=0; j<seqtor_size(ps->colliderGroups); j++)
 			{
-				if (colliderGroup_isColliderInBounds(&it2->data, &raycaster) == 0)
+				if (colliderGroup_isColliderInBounds(&seqtor_at(ps->colliderGroups,j), &raycaster) == 0)
 					continue;
 
-				currentCg = &it2->data;
+				currentCg = &seqtor_at(ps->colliderGroups,j);
 				break;
 			}
 		}
@@ -342,4 +362,14 @@ int physicsSystem_raycast(physicsSystem* ps, vec3 origin, vec3 direction, float 
 	}
 
 	return 0;
+}
+
+int physicsSystem_getColliderCount(physicsSystem* ps)
+{
+	return seqtor_size(ps->simulatedColliders);
+}
+
+int physicsSystem_getColliderGroupCount(physicsSystem* ps)
+{
+	return seqtor_size(ps->colliderGroups);
 }

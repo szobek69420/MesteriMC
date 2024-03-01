@@ -11,5 +11,5 @@ uniform vec2 scale;
 void main()
 {
 	uv=aUV;
-	gl_Position=vec4(scale.x*aPos.x+pos.x, scale.y*aPos.y+pos.y, 0.999999999,1);
+	gl_Position=vec4(scale.x*aPos.x+pos.x, scale.y*aPos.y+pos.y, 1,1);
 }

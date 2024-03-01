@@ -24,6 +24,9 @@ out vec4 fragColour;
 uniform sampler2D tex;
 uniform vec2 onePerResolution;
 
+uniform int isSubmerged;
+
+
 const float FXAA_SPAN_MAX =8.0;
 const float FXAA_REDUCE_MUL  = (1.0/FXAA_SPAN_MAX);
 const float FXAA_REDUCE_MIN  = (1.0/128.0);
@@ -33,10 +36,17 @@ vec3 magic( vec4 uv, vec2 rcpFrame);
 
 void main()
 {
+    //fxaa
     vec2 rcpFrame = onePerResolution;
     vec4 uv3 = vec4( uv, uv - (rcpFrame * (0.5 + FXAA_SUBPIX_SHIFT)));
 	fragColour = vec4(magic( uv3, onePerResolution ),1);
-    //fragColour=texture(tex, uv);
+
+    //underwalter
+    if(isSubmerged!=0)
+        fragColour*=vec4(0,0.0627,0.8,1);
+
+    // gamma correction 
+    fragColour = pow(fragColour, vec4(0.4545));
 }
 
 vec3 magic( vec4 uv, vec2 rcpFrame) {
