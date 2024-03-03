@@ -1995,7 +1995,7 @@ void window_size_callback(GLFWwindow* window, int width, int height)
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	if (action == GLFW_PRESS)
-		event_queue_push((event) { .type = KEY_PRESSED, .data.key_pressed = { key } });
+		event_queue_push((event) { .type = KEY_PRESSED, .data.key_pressed = { key, mods } });
 	else if (action == GLFW_RELEASE)
 		event_queue_push((event) { .type = KEY_RELEASED, .data.key_released = { key } });
 }
@@ -2097,6 +2097,35 @@ double lerp(double a, double b, double f)
 void updateCommandLine()
 {
 	int length = strlen(currentCommand);
+	
+	for (int i = 0; i < GLFW_KEY_LAST; i++)
+	{
+		if (input_is_key_pressed(i))
+		{
+			if (i == GLFW_KEY_ENTER)
+				continue;
+			if (i == GLFW_KEY_BACKSPACE&&length>0)
+			{
+				currentCommand[length - 1] = '\0';
+				length--;
+				continue;
+			}
+
+			const char* temp = glfwGetKeyName(i, 0);
+			if (temp == NULL || isprint(temp[0]) == 0 || length >= 99)//line is full or character is not printable or some error happened
+				continue;
+			
+			if(input_is_key_capital(i)) 
+				currentCommand[length] = toupper(temp[0]);
+			else
+				currentCommand[length] = tolower(temp[0]);
+			currentCommand[length + 1] = '\0';
+			length++;
+		}
+	}
+
+	return;
+
 	for (int i = GLFW_KEY_A; i <= GLFW_KEY_Z; i++)
 	{
 		if (input_is_key_pressed(i))

@@ -9,6 +9,7 @@
 typedef struct {
     int previous_key_state[GLFW_KEY_LAST];
     int current_key_state[GLFW_KEY_LAST];
+    int key_modifiers[GLFW_KEY_LAST];
     int previous_mouse_button_state[GLFW_MOUSE_BUTTON_LAST];
     int current_mouse_button_state[GLFW_MOUSE_BUTTON_LAST];
     double previous_mouse_x, previous_mouse_y;
@@ -23,6 +24,8 @@ void input_handle_event(event e);
 int input_is_key_pressed(int key);
 int input_is_key_down(int key);
 int input_is_key_released(int key);
+int input_get_key_modifiers(int key);
+int input_is_key_capital(int key);
 
 int input_is_mouse_button_pressed(int button);
 int input_is_mouse_button_down(int button);

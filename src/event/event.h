@@ -17,6 +17,7 @@ typedef struct {
 
 typedef struct {
     int key_code;
+    int mods;
 } key_pressed_event;
 
 typedef struct {
