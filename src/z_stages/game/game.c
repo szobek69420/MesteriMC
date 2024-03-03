@@ -59,6 +59,9 @@
 float CLIP_NEAR = 0.1f;
 float CLIP_FAR = 250.0f;
 
+const float MOVEMENT_SPEED_BASED = 4;
+const float GRAVITY_BASED = -25.0f;
+const float JUMP_STRENGTH_BASED = 10;
 float MOVEMENT_SPEED = 4;
 float GRAVITY = -25.0;
 float JUMP_STRENGTH = 10;
@@ -247,7 +250,6 @@ void inventorySlotExit(int inventorySlotID);
 void inventorySlotEnter(int inventorySlotID);
 
 //command line functions
-void updateCommandLine();
 void convertCommandLine(const char* command, int* commandType, int* argumentCount, int* arguments);
 
 //glfw callbacks
@@ -256,6 +258,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void command_line_character_callback(GLFWwindow* window, unsigned int codepoint);
 
 void game(void* w, int* currentStage)
 {
@@ -1434,6 +1437,10 @@ void* loop_physics(void* arg)
 			case GAME_COMMAND_LINE:
 				if (input_is_key_released(GLFW_KEY_ESCAPE))
 				{
+					pthread_mutex_lock(&mutex_vaszonCommand);
+					strcpy(currentCommand, "");
+					pthread_mutex_unlock(&mutex_vaszonCommand);
+
 					changeGameState(69, GAME_INGAME);
 					break;
 				}
@@ -1526,12 +1533,20 @@ void* loop_physics(void* arg)
 						break;
 					}
 
+					pthread_mutex_lock(&mutex_vaszonCommand);
+					strcpy(currentCommand, "");
+					pthread_mutex_unlock(&mutex_vaszonCommand);
+
 					changeGameState(69, GAME_INGAME);
 					break;
 				}
 
 				pthread_mutex_lock(&mutex_vaszonCommand);
-				updateCommandLine();
+				//the printable characters are detected and added with/in a callback function (command_line_character_callback)
+				//the callback function is only active when the command line is open
+				//backslash is not detected in the callback function
+				if (input_is_key_pressed(GLFW_KEY_BACKSPACE)&&strlen(currentCommand)>0)
+					currentCommand[strlen(currentCommand) - 1] = '\0';
 				pthread_mutex_unlock(&mutex_vaszonCommand);
 				break;
 		}
@@ -1995,7 +2010,7 @@ void window_size_callback(GLFWwindow* window, int width, int height)
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	if (action == GLFW_PRESS)
-		event_queue_push((event) { .type = KEY_PRESSED, .data.key_pressed = { key } });
+		event_queue_push((event) { .type = KEY_PRESSED, .data.key_pressed = { key, mods } });
 	else if (action == GLFW_RELEASE)
 		event_queue_push((event) { .type = KEY_RELEASED, .data.key_released = { key } });
 }
@@ -2013,6 +2028,21 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
 	event_queue_push((event) { .type = MOUSE_SCROLLED, .data.mouse_scrolled = { xoffset, yoffset } });
+}
+
+void command_line_character_callback(GLFWwindow* window, unsigned int codepoint)
+{
+	pthread_mutex_lock(&mutex_vaszonCommand);
+	int length = strlen(currentCommand);
+	if (isprint(codepoint) == 0 || length >= 99)
+	{
+		pthread_mutex_unlock(&mutex_vaszonCommand);
+		return;
+	}
+
+	currentCommand[length] = codepoint;
+	currentCommand[length + 1] = '\0';
+	pthread_mutex_unlock(&mutex_vaszonCommand);
 }
 
 void init_cube()
@@ -2094,72 +2124,13 @@ double lerp(double a, double b, double f)
 }
 
 //command line things
-void updateCommandLine()
-{
-	int length = strlen(currentCommand);
-	for (int i = GLFW_KEY_A; i <= GLFW_KEY_Z; i++)
-	{
-		if (input_is_key_pressed(i))
-		{
-			if (length < 99)
-			{
-				currentCommand[length] = i - GLFW_KEY_A + 'a';
-				currentCommand[length + 1] = '\0';
-				length++;
-			}
-		}
-	}
-
-	for (int i = GLFW_KEY_0; i <= GLFW_KEY_9; i++)
-	{
-		if (input_is_key_pressed(i))
-		{
-			if (length < 99)
-			{
-				currentCommand[length] = i - GLFW_KEY_0 + '0';
-				currentCommand[length + 1] = '\0';
-				length++;
-			}
-		}
-	}
-
-	if (input_is_key_pressed(GLFW_KEY_BACKSPACE))
-	{
-		if (length > 0)
-		{
-			currentCommand[length - 1] = '\0';
-			length--;
-		}
-	}
-
-	if (input_is_key_pressed(GLFW_KEY_PERIOD))
-	{
-		if (length < 99)
-		{
-			currentCommand[length] = '.';
-			currentCommand[length + 1] = '\0';
-			length++;
-		}
-	}
-
-	if (input_is_key_pressed(GLFW_KEY_SPACE))
-	{
-		if (length < 99)
-		{
-			currentCommand[length] = ' ';
-			currentCommand[length + 1] = '\0';
-			length++;
-		}
-	}
-}
-
 void convertCommandLine(const char* command, int* commandType, int* argumentCount, int* arguments)
 {
 	*commandType = COMMAND_NOT_COMMAND;
 	*argumentCount = 0;
 
 
-	if (currentCommand==NULL||strlen(currentCommand) == 0 || command[0] != '.')
+	if (currentCommand==NULL||strlen(currentCommand) == 0 || command[0] != '/')
 		return;
 
 	int commandLength = strlen(currentCommand);
@@ -2202,15 +2173,15 @@ void convertCommandLine(const char* command, int* commandType, int* argumentCoun
 	//fill arguments
 	*argumentCount = wordCount - 1;
 
-	if (strcmp(words[0], ".gm") == 0)
+	if (strcmp(words[0], "/gm") == 0)
 		*commandType = COMMAND_GAMEMODE;
-	else if (strcmp(words[0], ".speed") == 0)
+	else if (strcmp(words[0], "/speed") == 0)
 		*commandType = COMMAND_SPEED;
-	else if (strcmp(words[0], ".jump") == 0)
+	else if (strcmp(words[0], "/jump_strength") == 0)
 		*commandType = COMMAND_JUMP;
-	else if (strcmp(words[0], ".gravity") == 0)
+	else if (strcmp(words[0], "/gravity") == 0)
 		*commandType = COMMAND_GRAVITY;
-	else if (strcmp(words[0], ".tp") == 0)
+	else if (strcmp(words[0], "/warp") == 0)
 		*commandType = COMMAND_TELEPORT;
 	else
 		*commandType = COMMAND_UNKNOWN;
@@ -2220,6 +2191,33 @@ void convertCommandLine(const char* command, int* commandType, int* argumentCoun
 	{
 		arguments[i] = 0;
 		sscanf(words[i + 1], "%d", arguments + i);
+	}
+
+	//check if the player wants to reset the value
+	if (strcmp(words[1], "reset") == 0)
+	{
+		switch (*currentCommand)
+		{
+		case COMMAND_GAMEMODE:
+			arguments[0] = lroundf(10*PLAYER_MORTAL);
+			break;
+
+		case COMMAND_SPEED:
+			arguments[0] = lroundf(10 * MOVEMENT_SPEED_BASED);
+			break;
+
+		case COMMAND_GRAVITY:
+			arguments[0] = lroundf(10 *GRAVITY_BASED);
+			break;
+
+		case COMMAND_JUMP:
+			arguments[0] = lroundf(10 * JUMP_STRENGTH_BASED);
+			break;
+
+		default:
+			*argumentCount = 0;
+			break;
+		}
 	}
 
 	//if the input type is special, then rescan
@@ -2262,7 +2260,13 @@ void changeGameState(int inBounds, int gs)
 		{
 		case GAME_PAUSED:
 		case GAME_INVENTORY:
+			pthread_mutex_lock(&mutex_input);
+			targetCursorMode = GLFW_CURSOR_NORMAL;
+			pthread_mutex_unlock(&mutex_input);
+			break;
+
 		case GAME_COMMAND_LINE:
+			glfwSetCharCallback(window, command_line_character_callback);//ez frissiti a command lineon az osszes irhato karaktert
 			pthread_mutex_lock(&mutex_input);
 			targetCursorMode = GLFW_CURSOR_NORMAL;
 			pthread_mutex_unlock(&mutex_input);
@@ -2292,16 +2296,13 @@ void changeGameState(int inBounds, int gs)
 		break;
 
 	case GAME_COMMAND_LINE:
+		glfwSetCharCallback(window, NULL);
 		switch (gs)
 		{
 		case GAME_INGAME:
 			pthread_mutex_lock(&mutex_input);
 			targetCursorMode = GLFW_CURSOR_DISABLED;
 			pthread_mutex_unlock(&mutex_input);
-
-			pthread_mutex_lock(&mutex_vaszonCommand);
-			strcpy(currentCommand, "");
-			pthread_mutex_unlock(&mutex_vaszonCommand);
 			break;
 		}
 		break;
