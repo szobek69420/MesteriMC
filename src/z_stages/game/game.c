@@ -509,6 +509,9 @@ void* loop_render(void* arg)
 		);
 		mat4 shadowLightMatrix = mat4_multiply(shadowViewProjection, mat4_inverse(view));//from the camera's view space to the suns projection space
 		
+		//fog distance
+		int fogEnd = settings_getInt(SETTINGS_RENDER_DISTANCE) * CHUNK_WIDTH - 10;
+
 		//shadow
 		if (settings_getInt(SETTINGS_SHADOWS) != 0)
 		{
@@ -634,6 +637,17 @@ void* loop_render(void* arg)
 		glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection"), 1, GL_FALSE, projection.data);
 		glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "projection_inverse"), 1, GL_FALSE, projectionInverse.data);
 
+		if (isCameraSubmerged != 0)//ha vizben van, akkor kevesebb a latotavolsag
+		{
+			glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), 1);
+			glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), 11);
+		}
+		else
+		{
+			glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogStart"), fogEnd - 10);
+			glUniform1f(glGetUniformLocation(lightingPassShader.id, "fogEnd"), fogEnd);
+		}
+
 		//point lights
 		//light_setPosition((light*)vector_get(lights, 0), cum->position);
 		float* bufferData = (float*)malloc(lights->size * LIGHT_SIZE_IN_VBO);
@@ -716,6 +730,17 @@ void* loop_render(void* arg)
 		}
 		else
 			glUniform1i(glGetUniformLocation(waterShader.id, "shadowOn"), 0);
+
+		if (isCameraSubmerged != 0)
+		{
+			glUniform1f(glGetUniformLocation(waterShader.id, "fogStart"), 1);
+			glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), 11);
+		}
+		else
+		{
+			glUniform1f(glGetUniformLocation(waterShader.id, "fogStart"), fogEnd - 10);
+			glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), fogEnd);
+		}
 
 		glUniform3f(glGetUniformLocation(waterShader.id, "sun.position"), sunTzu.position.x, sunTzu.position.y, sunTzu.position.z);
 		glUniform3f(glGetUniformLocation(waterShader.id, "sun.colour"), sunTzu.colour.x, sunTzu.colour.y, sunTzu.colour.z);
@@ -846,6 +871,7 @@ void* loop_render(void* arg)
 
 		glUseProgram(finalPassNonHdrShader.id);
 		glUniform1i(glGetUniformLocation(finalPassNonHdrShader.id, "isSubmerged"), isCameraSubmerged);
+		glUniform1f(glGetUniformLocation(finalPassNonHdrShader.id, "currentTime"), (float)glfwGetTime());
 		glBindVertexArray(rectangleVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 

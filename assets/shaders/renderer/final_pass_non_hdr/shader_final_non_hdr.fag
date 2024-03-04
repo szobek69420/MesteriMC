@@ -25,6 +25,7 @@ uniform sampler2D tex;
 uniform vec2 onePerResolution;
 
 uniform int isSubmerged;
+uniform float currentTime;
 
 
 const float FXAA_SPAN_MAX =8.0;
@@ -36,14 +37,19 @@ vec3 magic( vec4 uv, vec2 rcpFrame);
 
 void main()
 {
+    //underwalter
+    vec2 modifiedUV=uv;
+    fragColour=vec4(1);
+    if(isSubmerged!=0)
+    {
+        fragColour=vec4(0,0.0627,0.8,1);
+        modifiedUV+=vec2(0.02*sin(currentTime+0.01*gl_FragCoord.x)+0.01*sin(currentTime+0.013*gl_FragCoord.y),0);
+    }
+
     //fxaa
     vec2 rcpFrame = onePerResolution;
-    vec4 uv3 = vec4( uv, uv - (rcpFrame * (0.5 + FXAA_SUBPIX_SHIFT)));
-	fragColour = vec4(magic( uv3, onePerResolution ),1);
-
-    //underwalter
-    if(isSubmerged!=0)
-        fragColour*=vec4(0,0.0627,0.8,1);
+    vec4 uv3 = vec4( modifiedUV, modifiedUV - (rcpFrame * (0.5 + FXAA_SUBPIX_SHIFT)));
+	fragColour *= vec4(magic( uv3, onePerResolution ),1);
 
     // gamma correction 
     fragColour = pow(fragColour, vec4(0.4545));
