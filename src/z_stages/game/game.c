@@ -173,8 +173,14 @@ int vaszonInventory_dragged;
 
 canvas* vaszonCommand;
 pthread_mutex_t mutex_vaszonCommand;
-int vaszonCommand_commandText;
+const int COMMAND_LINE_FONT_SIZE = 21;
+const int COMMAND_LINE_HISTORY_LENGTH = 20;
 char currentCommand[100];
+float currentCommandWidth = 0;
+char commandHistory[20][100]; int indexOfMostRecentCommand = 0;//ha pl az index 3, akkor a 3. elemtol kezdi a kiirast es ha eleri a 19-iket, akkor utana visszaugrik 0-ra es onnan folytatja
+int vaszonCommand_commandText;
+int vaszonCommand_commandHistory[20];
+int vaszonCommand_commandCursor;
 
 
 canvas* vaszon;//debug screen
@@ -251,6 +257,7 @@ void inventorySlotEnter(int inventorySlotID);
 
 //command line functions
 void convertCommandLine(const char* command, int* commandType, int* argumentCount, int* arguments);
+void updateCommandHistory(const char* newCommand);
 
 //glfw callbacks
 void window_size_callback(GLFWwindow* window, int width, int height);
@@ -1439,6 +1446,8 @@ void* loop_physics(void* arg)
 				{
 					pthread_mutex_lock(&mutex_vaszonCommand);
 					strcpy(currentCommand, "");
+					currentCommandWidth = canvas_calculateTextLength(vaszonCommand, currentCommand, COMMAND_LINE_FONT_SIZE);
+					canvas_setComponentPosition(vaszonCommand, vaszonCommand_commandCursor, 15 + currentCommandWidth, 15);
 					pthread_mutex_unlock(&mutex_vaszonCommand);
 
 					changeGameState(69, GAME_INGAME);
@@ -1452,6 +1461,9 @@ void* loop_physics(void* arg)
 					
 					convertCommandLine(currentCommand, &commandType, &argumentCount, arguments);
 
+					char commandToShow[100];//the command that should be written into the history
+					strcpy(commandToShow, "");
+
 					switch (commandType)
 					{
 					case COMMAND_GAMEMODE:
@@ -1460,17 +1472,20 @@ void* loop_physics(void* arg)
 						case PLAYER_MORTAL:
 							collider_setSolidity(playerCollider, 69);
 							currentPlayerState = PLAYER_MORTAL;
-							printf("gamemode changed to mortal\n");
+							printf("gamemode set to mortal\n");
+							strcpy(commandToShow, "gamemode set to mortal");
 							break;
 
 						case PLAYER_IMMORTAL:
 							collider_setSolidity(playerCollider, 0);
 							currentPlayerState = PLAYER_IMMORTAL;
-							printf("gamemode changed to divine\n");
+							printf("gamemode set to divine\n");
+							strcpy(commandToShow, "gamemode set to divine");
 							break;
 
 						default:
 							printf("invalid argument(s)\n");
+							strcpy(commandToShow, "invalid argument(s)");
 							break;
 						}
 						break;
@@ -1479,62 +1494,87 @@ void* loop_physics(void* arg)
 						if (argumentCount == 1)
 						{
 							MOVEMENT_SPEED = arguments[0]*0.1f;
-							printf("movement speed changed to %.1f\n", MOVEMENT_SPEED);
+							printf("movement speed set to %.1f\n", MOVEMENT_SPEED);
+							sprintf(commandToShow, "movement speed set to %.1f", MOVEMENT_SPEED);
 						}
 						else
+						{
 							printf("invalid argument(s)\n");
+							strcpy(commandToShow, "invalid argument(s)");
+						}
 						break;
 
 					case COMMAND_GRAVITY:
 						if (argumentCount == 1)
 						{
 							GRAVITY = -0.1f*arguments[0];
-							printf("gravity changed to %.1f\n", GRAVITY);
+							printf("gravity set to %.1f\n", -GRAVITY);
+							sprintf(commandToShow, "gravity set to %.1f", -GRAVITY);
 						}
 						else
+						{
 							printf("invalid argument(s)\n");
+							strcpy(commandToShow, "invalid argument(s)");
+						}
 						break;
 
 					case COMMAND_JUMP:
 						if (argumentCount == 1)
 						{
 							JUMP_STRENGTH = 0.1f * arguments[0];
-							printf("jump strength changed to %.1f\n", JUMP_STRENGTH);
+							printf("jump strength set to %.1f\n", JUMP_STRENGTH);
+							sprintf(commandToShow, "jump strength set to %.1f", JUMP_STRENGTH);
 						}
 						else
+						{
 							printf("invalid argument(s)\n");
+							strcpy(commandToShow, "invalid argument(s)");
+						}
 						break;
 
 					case COMMAND_TELEPORT:
 						if (argumentCount == 2)
 						{
 							playerCollider->position = (vec3){ arguments[0], playerCollider->position.y, arguments[1] };
-							printf("teleported to %.0f, %.0f, %.0f\n", playerCollider->position.x, playerCollider->position.y, playerCollider->position.z);
+							printf("warped to %.0f, %.0f, %.0f\n", playerCollider->position.x, playerCollider->position.y, playerCollider->position.z);
+							sprintf(commandToShow, "warped to %.0f, %.0f, %.0f", playerCollider->position.x, playerCollider->position.y, playerCollider->position.z);
 						}
 						else if (argumentCount == 3)
 						{
 							playerCollider->position = (vec3){ arguments[0], arguments[1], arguments[2]};
-							printf("teleported to %.0f, %.0f, %.0f\n", playerCollider->position.x, playerCollider->position.y, playerCollider->position.z);
+							printf("warped to %.0f, %.0f, %.0f\n", playerCollider->position.x, playerCollider->position.y, playerCollider->position.z);
+							sprintf(commandToShow, "warped to %.0f, %.0f, %.0f", playerCollider->position.x, playerCollider->position.y, playerCollider->position.z);
 						}
 						else
+						{
 							printf("invalid argument(s)\n");
+							strcpy(commandToShow, "invalid argument(s)");
+						}
 						break;
 
 					case COMMAND_UNKNOWN:
 						printf("invalid command\n");
+						strcpy(commandToShow, "invalid command");
 						break;
 
 					case COMMAND_NOT_COMMAND:
 						printf("%s\n", currentCommand);
+						strcpy(commandToShow, currentCommand);
 						break;
 
 					default:
 						printf("something's wrong with the command interpreter\n");
+						strcpy(commandToShow, "an error occured while analysing input");
 						break;
 					}
 
 					pthread_mutex_lock(&mutex_vaszonCommand);
+					if (strcmp(commandToShow, "") != 0)
+						updateCommandHistory(commandToShow);
+
 					strcpy(currentCommand, "");
+					currentCommandWidth = canvas_calculateTextLength(vaszonCommand, currentCommand, COMMAND_LINE_FONT_SIZE);
+					canvas_setComponentPosition(vaszonCommand, vaszonCommand_commandCursor, 15 + currentCommandWidth, 15);
 					pthread_mutex_unlock(&mutex_vaszonCommand);
 
 					changeGameState(69, GAME_INGAME);
@@ -1545,8 +1585,18 @@ void* loop_physics(void* arg)
 				//the printable characters are detected and added with/in a callback function (command_line_character_callback)
 				//the callback function is only active when the command line is open
 				//backslash is not detected in the callback function
-				if (input_is_key_pressed(GLFW_KEY_BACKSPACE)&&strlen(currentCommand)>0)
+				if (input_is_key_pressed(GLFW_KEY_BACKSPACE) && strlen(currentCommand) > 0)
+				{
 					currentCommand[strlen(currentCommand) - 1] = '\0';
+					currentCommandWidth = canvas_calculateTextLength(vaszonCommand, currentCommand, COMMAND_LINE_FONT_SIZE);
+					canvas_setComponentPosition(vaszonCommand, vaszonCommand_commandCursor, 15 + currentCommandWidth, 15);
+				}
+
+				//flashing cursor
+				if (((int)(1.5f*glfwGetTime())) % 2)
+					canvas_setImageTint(vaszonCommand, vaszonCommand_commandCursor, CANVAS_COLOUR_ACCENT_0);
+				else
+					canvas_setImageTint(vaszonCommand, vaszonCommand_commandCursor, CANVAS_COLOUR_PRIMARY_1);
 				pthread_mutex_unlock(&mutex_vaszonCommand);
 				break;
 		}
@@ -1955,12 +2005,22 @@ void init_canvas()
 	//command screen
 	vaszonCommand = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
 
-	mogus = canvas_addImage(vaszonCommand, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 10, 10, 400, 30, textureHandler_getTexture(TEXTURE_ATLAS_UI));
+	mogus = canvas_addImage(vaszonCommand, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 10, 10, 600, 30, textureHandler_getTexture(TEXTURE_ATLAS_UI));
 	canvas_setImageTint(vaszonCommand, mogus, CANVAS_COLOUR_PRIMARY_1);
 	canvas_setImageUV(vaszonCommand, mogus, 0, 0, 0.1f, 0.1f);
 
-	vaszonCommand_commandText = canvas_addText(vaszonCommand, "", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 12, 15, CANVAS_COLOUR_ACCENT_0, 24);
+	vaszonCommand_commandCursor = canvas_addImage(vaszonCommand, CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 15, 3, 20, textureHandler_getTexture(TEXTURE_ATLAS_UI));
+	canvas_setImageTint(vaszonCommand, vaszonCommand_commandCursor, CANVAS_COLOUR_ACCENT_0);
+	canvas_setImageUV(vaszonCommand, vaszonCommand_commandCursor, 0, 0, 0.1f, 0.1f);
 
+	vaszonCommand_commandText = canvas_addText(vaszonCommand, "", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 17, CANVAS_COLOUR_ACCENT_0, COMMAND_LINE_FONT_SIZE);
+
+	for (int i = 0; i < COMMAND_LINE_HISTORY_LENGTH; i++)
+	{
+		vaszonCommand_commandHistory[i] = canvas_addText(vaszonCommand, "", CANVAS_ALIGN_LEFT, CANVAS_ALIGN_BOTTOM, 15, 47 + i * 25, CANVAS_COLOUR_ACCENT_0, COMMAND_LINE_FONT_SIZE);
+		strcpy(commandHistory[i], "");
+	}
+	indexOfMostRecentCommand = 0;
 
 	//debug screen
 	vaszon = canvas_create(window_getWidth(), window_getHeight(), "../assets/fonts/Monocraft.ttf");
@@ -2042,6 +2102,10 @@ void command_line_character_callback(GLFWwindow* window, unsigned int codepoint)
 
 	currentCommand[length] = codepoint;
 	currentCommand[length + 1] = '\0';
+
+	currentCommandWidth = canvas_calculateTextLength(vaszonCommand, currentCommand, COMMAND_LINE_FONT_SIZE);
+	canvas_setComponentPosition(vaszonCommand, vaszonCommand_commandCursor, 15 + currentCommandWidth, 15);
+
 	pthread_mutex_unlock(&mutex_vaszonCommand);
 }
 
@@ -2237,6 +2301,23 @@ void convertCommandLine(const char* command, int* commandType, int* argumentCoun
 			}
 		}
 		break;
+	}
+}
+
+void updateCommandHistory(const char* newCommand)
+{
+	indexOfMostRecentCommand--;
+	if (indexOfMostRecentCommand < 0)
+		indexOfMostRecentCommand = COMMAND_LINE_HISTORY_LENGTH - 1;
+	strcpy_s(commandHistory[indexOfMostRecentCommand], 100, newCommand);
+
+	int index = indexOfMostRecentCommand;
+	for (int i = 0; i < COMMAND_LINE_HISTORY_LENGTH; i++,index++)
+	{
+		if (index >= COMMAND_LINE_HISTORY_LENGTH)
+			index = 0;
+
+		canvas_setTextText(vaszonCommand, vaszonCommand_commandHistory[i], commandHistory[index]);
 	}
 }
 
