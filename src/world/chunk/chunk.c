@@ -24,6 +24,14 @@ static blockModel model_oak_tree[67];
 
 static int generated = 0, destroyed = 0;
 
+const float BORSOD_INTERPOLATION_START = 0;
+const float BORSOD_INTERPOLATION_END = -20;
+const float BORSOD_INTERPOLATION_HELPER = 0.05f;
+const float BORSOD_CEILING_MAX = -30;
+const float BORSOD_FLOOR_MIN = -130;
+
+const float ONE_PER_RAND_MAX = 1.0f / RAND_MAX;
+
 
 void chunk_drawTerrain(chunk* chomk)
 {
@@ -152,6 +160,8 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 	//generating terrain
 	int heightMap[CHUNK_WIDTH + 2][CHUNK_WIDTH + 2];//[x][z], a +2 az�rt van, hogy a sz�leken is ismerje a magass�got
+	int borsodFloorHeightMap[CHUNK_WIDTH + 2][CHUNK_WIDTH + 2];
+	int borsodCeilingHeightMap[CHUNK_WIDTH + 2][CHUNK_WIDTH + 2];
 	float heightHelper;
 	for (int i = 0; i < CHUNK_WIDTH + 2; i++)
 	{
@@ -164,6 +174,16 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 			heightHelper *= 200*heightHelper;
 			heightHelper -= basedY-20;
 			heightMap[i][j] = heightHelper;
+
+			borsodCeilingHeightMap[i][j] = BORSOD_CEILING_MAX-150 * powf((0.5f * fnlGetNoise2D(&(cm->noise), 13.51f * (basedX + i), 14.87f * (basedZ + j)) + 0.5f),5);
+			borsodCeilingHeightMap[i][j] -= basedY - 20;
+			borsodFloorHeightMap[i][j] = BORSOD_FLOOR_MIN + 150 * powf((0.5f * fnlGetNoise2D(&(cm->noise), 14.87f * (177.32+basedX + i), 13.51f * (193.17f+basedZ + j)) + 0.5f), 5);
+			borsodFloorHeightMap[i][j] -= basedY - 20;
+			if (borsodCeilingHeightMap[i][j] < borsodFloorHeightMap[i][j])
+			{
+				borsodFloorHeightMap[i][j] = -60.0f-basedY;
+				borsodCeilingHeightMap[i][j] = -60.0f-basedY;
+			}
 		}
 	}
 	
@@ -203,6 +223,43 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 		}
 	}
 
+	//swapping blocks to borsod
+	srand(1000000 * chunkX + 1000 * chunkY + chunkZ);
+	for (int y = CHUNK_HEIGHT + 1; y >= 0; y--)
+	{
+		float currentHeight = y + basedY;
+		if (currentHeight > BORSOD_INTERPOLATION_START)
+			continue;
+		if (currentHeight > BORSOD_INTERPOLATION_END)
+		{
+			for (int x = 0; x < CHUNK_WIDTH+2; x++)
+			{
+				for (int z = 0; z < CHUNK_WIDTH+2; z++)
+				{
+					float szam = rand() * ONE_PER_RAND_MAX;
+					if(szam>(currentHeight-BORSOD_INTERPOLATION_END)*BORSOD_INTERPOLATION_HELPER)
+						chomk.blocks[y][x][z] = BLOCK_BORSOD;
+				}
+			}
+
+			continue;
+		}
+
+		for (int x = 0; x < CHUNK_WIDTH+2; x++)
+		{
+			for (int z = 0; z < CHUNK_WIDTH+2; z++)
+			{
+				if (y > borsodFloorHeightMap[x][z] && y < borsodCeilingHeightMap[x][z])
+				{
+					chomk.blocks[y][x][z] = BLOCK_AIR;
+					continue;
+				}
+
+				chomk.blocks[y][x][z] = BLOCK_BORSOD;
+			}
+		}
+	}
+
 	//things that should be generated only once and then stored in the changedBlocks (for example trees)
 	if (isCurrentFilledAlready==0)
 	{
@@ -215,7 +272,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 				int height = heightMap[i + 1][j + 1];
 				if (height >= 1 && height < CHUNK_HEIGHT - 5)
 				{
-					float szam = (float)rand() / RAND_MAX;
+					float szam = rand() *ONE_PER_RAND_MAX;
 					if (chomk.blocks[height][i][j] == BLOCK_GRASS && szam > 0.995f)
 					{
 						for (int k = 0; k < sizeof(model_oak_tree) / sizeof(blockModel); k++)
