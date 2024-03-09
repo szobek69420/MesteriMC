@@ -70,8 +70,9 @@ float JUMP_STRENGTH = 10;
 #define PHYSICS_UPDATE 0.02f
 #define PHYSICS_STEPS_PER_UPDATE 100
 #define GENERATION_UPDATE 0.001f
-#define CHUNK_UPDATES_PER_GENERATION_UPDATE 2
+#define CHUNK_UPDATES_PER_GENERATION_UPDATE 4
 #define CHUNK_MESH_UPDATES_PER_FRAME 20
+#define CHUNK_UPDATE_BURST_SIZE 2
 
 #define HOTBAR_SIZE 5
 
@@ -1120,7 +1121,7 @@ void* loop_generation(void* arg)
 		if (shouldSearch!=0)
 		{
 			pthread_mutex_lock(&mutex_cm);
-			shouldSearch = chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ);
+			shouldSearch = chunkManager_searchForUpdates(&cm, chunkX, chunkY, chunkZ, 2);
 			pthread_mutex_unlock(&mutex_cm);
 		}
 
@@ -1129,7 +1130,7 @@ void* loop_generation(void* arg)
 			if (cm.pendingUpdates.size > 0)
 			{
 				chunkManager_update(&cm, &mutex_cm);
-				chunkUpdates++;
+				chunkUpdates+=CHUNK_UPDATE_BURST_SIZE;
 			}
 		}
 

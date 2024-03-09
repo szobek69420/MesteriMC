@@ -147,7 +147,7 @@ int chunkManager_isChunkRegistered(chunkManager* cm, int chunkX, int chunkY, int
 }
 
 
-int chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ)//return 0 if no update has been found
+int chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int playerChunkY, int playerChunkZ, int burstSize)//return 0 if no update has been found
 {
 	/*
 	* the chunkmanager object has a helper array of type char and size (2*renderDistance+1)^3 bytes
@@ -166,7 +166,10 @@ int chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int player
 	int updateFound = 0;
 	memset(cm->chunkUpdateHelper, 0, (2 * cm->renderDistance + 1) * (2 * cm->renderDistance + 1) * (2 * cm->renderDistance + 1) * sizeof(char));
 
-	int unload = -1;
+	int *unload, unloadFoundCount=0;
+	int loadFoundCount = 0;
+	unload = malloc(burstSize * sizeof(int));//an array of indices (in loadedChunks) of such chunks, that should be unloaded
+
 	int helper = 2 * cm->renderDistance+1;
 	int helper2 = helper / 2;
 	for (int i = 0; i < seqtor_size(cm->loadedChunks); i++)
@@ -178,11 +181,12 @@ int chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int player
 
 		if (x<0 || x>=helper || y<0 || y>=helper || z<0 || z>=helper)
 		{
-			if (unload == -1)
+			if (unloadFoundCount<burstSize)
 			{
-				if (chunkManager_isChunkPending(cm, seqtor_at(cm->loadedChunks, i).chunkX, seqtor_at(cm->loadedChunks, i).chunkY, seqtor_at(cm->loadedChunks, i).chunkZ) == 0)
+				if (0==chunkManager_isChunkPending(cm, seqtor_at(cm->loadedChunks, i).chunkX, seqtor_at(cm->loadedChunks, i).chunkY, seqtor_at(cm->loadedChunks, i).chunkZ))
 				{
-					unload = i;
+					unload[unloadFoundCount] = i;
+					unloadFoundCount++;
 				}
 			}
 
@@ -241,7 +245,10 @@ int chunkManager_searchForUpdates(chunkManager* cm, int playerChunkX, int player
 
 						lista_push_back(cm->pendingUpdates, ceu);
 						updateFound = 1;
-						goto exit_load;
+						loadFoundCount++;
+
+						if(loadFoundCount>=burstSize)//ha már betöltött annyi chunkot, amennyit akart
+							goto exit_load;
 					}
 				}
 			}
@@ -253,16 +260,21 @@ exit_load:
 	//unload
 	if (unload != -1)
 	{
-		chunkGenerationUpdate ceu;
-		ceu.chunkX = seqtor_at(cm->loadedChunks, unload).chunkX;
-		ceu.chunkY = seqtor_at(cm->loadedChunks, unload).chunkY;
-		ceu.chunkZ = seqtor_at(cm->loadedChunks, unload).chunkZ;
-		ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
-		ceu.isUrgent = 0;
+		for (int i = 0; i < unloadFoundCount; i++)
+		{
+			chunkGenerationUpdate ceu;
+			ceu.chunkX = seqtor_at(cm->loadedChunks, unload[i]).chunkX;
+			ceu.chunkY = seqtor_at(cm->loadedChunks, unload[i]).chunkY;
+			ceu.chunkZ = seqtor_at(cm->loadedChunks, unload[i]).chunkZ;
+			ceu.type = CHUNKMANAGER_UNLOAD_CHUNK;
+			ceu.isUrgent = 0;
 
-		lista_push_back(cm->pendingUpdates, ceu);
-		updateFound = 1;
+			lista_push_back(cm->pendingUpdates, ceu);
+			updateFound = 1;
+		}
 	}
+
+	free(unload);
 
 
 exit_unload:

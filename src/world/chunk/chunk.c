@@ -24,11 +24,11 @@ static blockModel model_oak_tree[67];
 
 static int generated = 0, destroyed = 0;
 
-const float BORSOD_INTERPOLATION_START = 0;
-const float BORSOD_INTERPOLATION_END = -20;
-const float BORSOD_INTERPOLATION_HELPER = 0.05f;
-const float BORSOD_CEILING_MAX = -30;
-const float BORSOD_FLOOR_MIN = -130;
+const float BORSOD_INTERPOLATION_START = -500;
+const float BORSOD_INTERPOLATION_END = -550;
+const float BORSOD_INTERPOLATION_HELPER = 0.02f;
+const float BORSOD_CEILING_MAX = -580;
+const float BORSOD_FLOOR_MIN = -720;
 
 const float ONE_PER_RAND_MAX = 1.0f / RAND_MAX;
 
@@ -175,14 +175,17 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 			heightHelper -= basedY-20;
 			heightMap[i][j] = heightHelper;
 
-			borsodCeilingHeightMap[i][j] = BORSOD_CEILING_MAX-150 * powf((0.5f * fnlGetNoise2D(&(cm->noise), 13.51f * (basedX + i), 14.87f * (basedZ + j)) + 0.5f),5);
-			borsodCeilingHeightMap[i][j] -= basedY - 20;
-			borsodFloorHeightMap[i][j] = BORSOD_FLOOR_MIN + 150 * powf((0.5f * fnlGetNoise2D(&(cm->noise), 14.87f * (177.32+basedX + i), 13.51f * (193.17f+basedZ + j)) + 0.5f), 5);
-			borsodFloorHeightMap[i][j] -= basedY - 20;
-			if (borsodCeilingHeightMap[i][j] < borsodFloorHeightMap[i][j])
+			if (basedY <= BORSOD_INTERPOLATION_END)
 			{
-				borsodFloorHeightMap[i][j] = -60.0f-basedY;
-				borsodCeilingHeightMap[i][j] = -60.0f-basedY;
+				borsodCeilingHeightMap[i][j] = BORSOD_CEILING_MAX - 150 * powf((0.5f * fnlGetNoise2D(&(cm->noise), 13.51f * (basedX + i), 14.87f * (basedZ + j)) + 0.5f), 5);
+				borsodCeilingHeightMap[i][j] -= basedY - 20;
+				borsodFloorHeightMap[i][j] = BORSOD_FLOOR_MIN + 150 * powf((0.5f * fnlGetNoise2D(&(cm->noise), 14.87f * (177.32 + basedX + i), 13.51f * (193.17f + basedZ + j)) + 0.5f), 5);
+				borsodFloorHeightMap[i][j] -= basedY - 20;
+				if (borsodCeilingHeightMap[i][j] < borsodFloorHeightMap[i][j])
+				{
+					borsodFloorHeightMap[i][j] = -630.0f - basedY;
+					borsodCeilingHeightMap[i][j] = -630.0f - basedY;
+				}
 			}
 		}
 	}
