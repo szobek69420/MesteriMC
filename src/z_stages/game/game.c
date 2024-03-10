@@ -222,7 +222,7 @@ light_renderer lightRenderer;
 
 sun szunce;
 
-flare lensFlare;
+flare* lensFlare;
 
 handRenderer* hr;
 
@@ -778,8 +778,8 @@ void* loop_render(void* arg)
 		glEnable(GL_CULL_FACE);
 
 		//get lens flare data
-		flare_queryQueryResult(&lensFlare);
-		flare_query(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
+		flare_queryQueryResult(lensFlare);
+		flare_query(lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
 
 		//prepare bloom--------------------------------------------------------------------------------
 		int viewportWidth = RENDERER_WIDTH/2, viewportHeight = RENDERER_HEIGHT/2;
@@ -860,7 +860,7 @@ void* loop_render(void* arg)
 
 		//lens flare
 		if(isCameraSubmerged==0)
-			flare_render(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
+			flare_render(lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
 
 		//switch to default fbo ------------------------------------------------------------------------
 		glViewport(0, 0, windowWidth, windowHeight);
@@ -1924,7 +1924,7 @@ void end_renderer()
 	sun_destroy(&szunce);
 
 	//lens flare
-	flare_destroy(&lensFlare);
+	flare_destroy(lensFlare);
 
 	//player mesh
 	playerMesh_destroy(&pm);
