@@ -62,9 +62,11 @@ float CLIP_FAR = 250.0f;
 const float MOVEMENT_SPEED_BASED = 4;
 const float GRAVITY_BASED = -25.0f;
 const float JUMP_STRENGTH_BASED = 10;
+const float FOV_BASED = 90;
 float MOVEMENT_SPEED = 4;
 float GRAVITY = -25.0;
 float JUMP_STRENGTH = 10;
+float FOV = 90;
 
 
 #define PHYSICS_UPDATE 0.02f
@@ -310,6 +312,7 @@ void game(void* w, int* currentStage)
 	CLIP_FAR = settings_getInt(SETTINGS_RENDER_DISTANCE) * CHUNK_WIDTH + 50;
 	cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 4, 0.2);
 	camera_setProjection(&cum, currentFov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
+	cum.fov = FOV_BASED;
 
 	ps = physicsSystem_create();
 
@@ -1236,22 +1239,6 @@ void* loop_physics(void* arg)
 				else if (input_is_key_released(GLFW_KEY_T))
 					changeGameState(69, GAME_COMMAND_LINE);
 
-				//player mode
-				/*if (input_is_key_released(GLFW_KEY_M))
-				{
-					switch (currentPlayerState)
-					{
-					case PLAYER_MORTAL:
-						collider_setSolidity(playerCollider, 0);
-						currentPlayerState = PLAYER_IMMORTAL;
-						break;
-
-					case PLAYER_IMMORTAL:
-						collider_setSolidity(playerCollider, 69);
-						currentPlayerState = PLAYER_MORTAL;
-						break;
-					}
-				}*/
 
 				//block interactions
 				if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT))
@@ -1398,6 +1385,14 @@ void* loop_physics(void* arg)
 				}
 
 				playerCollider->velocity = velocity;
+
+				//optifine zoom
+				float fov = cum.fov;
+				if (input_is_key_down(GLFW_KEY_C))
+					fov = lerp(fov, 15.0f, 0.1f);
+				else
+					fov = lerp(fov, FOV, 0.1f);
+				camera_setProjection(&cum, fov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
 
 				//player part done
 
