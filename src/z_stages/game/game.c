@@ -68,7 +68,7 @@ float GRAVITY = -25.0;
 float JUMP_STRENGTH = 10;
 float FOV = 90;
 
-const float LENGTH_OF_DAY_IN_SECONDS = 600;
+const float LENGTH_OF_DAY_IN_SECONDS = 100;
 float TIME_OF_DAY = 0.0f;//napkelte a 0, [0;1)-ben van az értéke
 
 
@@ -836,11 +836,20 @@ void* loop_render(void* arg)
 		glDisable(GL_DEPTH_TEST);
 		glFrontFace(GL_CW);
 
+		
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT));
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT_COLOUR_0));
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT_COLOUR_1));
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT_HORIZON));
+
 
 		glUseProgram(skyboxShader.id);
 		vec3 sunDirectionNormalized = vec3_normalize(sunDirection);
+		glUniform1f(glGetUniformLocation(skyboxShader.id, "timeOfDay"), TIME_OF_DAY);
 		glUniform3f(glGetUniformLocation(skyboxShader.id, "sunDirectionNormalized"), sunDirectionNormalized.x, sunDirectionNormalized.y, sunDirectionNormalized.z);
 		glUniformMatrix4fv(glGetUniformLocation(skyboxShader.id, "pvm"), 1, GL_FALSE, mat4_multiply(pv, mat4_create2((float[]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, cum_render.position.x, cum_render.position.y, cum_render.position.z, 1 })).data);
 		glBindVertexArray(skyboxMesh.vao);
@@ -1636,8 +1645,8 @@ void* loop_physics(void* arg)
 		TIME_OF_DAY += PHYSICS_UPDATE / LENGTH_OF_DAY_IN_SECONDS;
 		if (TIME_OF_DAY > 1.0f)
 			TIME_OF_DAY -= 1.0f;
-		sunDirection.x = cosf(3.14159265f * TIME_OF_DAY);
-		sunDirection.y = sinf(3.14159265f * TIME_OF_DAY);
+		sunDirection.x = cosf(2*3.14159265f * TIME_OF_DAY);
+		sunDirection.y = sinf(2*3.14159265f * TIME_OF_DAY);
 		sunDirection.z = 0;
 
 
@@ -1881,11 +1890,11 @@ void init_renderer()
 	);
 	glUseProgram(skyboxShader.id);
 	glUniform1i(glGetUniformLocation(skyboxShader.id, "texture_gradient"), 0);
+	glUniform1i(glGetUniformLocation(skyboxShader.id, "texture_gradient_colour_0"), 1);
+	glUniform1i(glGetUniformLocation(skyboxShader.id, "texture_gradient_colour_1"), 2);
+	glUniform1i(glGetUniformLocation(skyboxShader.id, "texture_gradient_horizon"), 3);
 	glUniform3f(glGetUniformLocation(skyboxShader.id, "sunDirectionNormalized"), sunTzu.position.x, sunTzu.position.y, sunTzu.position.z);
 	glUniform3f(glGetUniformLocation(skyboxShader.id, "sunColour"), 1, 1, 1);
-	glUniform3f(glGetUniformLocation(skyboxShader.id, "skyColour0"), 0, 0.8f, 1.0f);
-	glUniform3f(glGetUniformLocation(skyboxShader.id, "skyColour1"), 1, 1, 1);
-	glUniform3f(glGetUniformLocation(skyboxShader.id, "skyColour2"), 0, 0.8f, 1.0f);
 	glUseProgram(0);
 
 	skyboxMesh = kuba_create();
