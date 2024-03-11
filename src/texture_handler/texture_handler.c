@@ -18,6 +18,8 @@ static unsigned int water_dudv=0;
 static unsigned int skybox = 0;
 static unsigned int sun = 0;
 static unsigned int sky_gradient = 0;
+static unsigned int sky_gradient_colour_0 = 0;
+static unsigned int sky_gradient_colour_1 = 0;
 
 static unsigned int menu_title_pause = 0;
 
@@ -99,6 +101,22 @@ int textureHandler_importTextures(int stage)
         glBindTexture(GL_TEXTURE_2D, 0);
         if (sky_gradient == 0)
             problem++;
+
+        sky_gradient_colour_0 = textureHandler_loadImage("../assets/textures/sky/sky_gradient_colour_0.png", GL_RGBA, GL_RGBA, GL_LINEAR, 0);
+        glBindTexture(GL_TEXTURE_2D, sky_gradient_colour_0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        if (sky_gradient_colour_0 == 0)
+            problem++;
+
+        sky_gradient_colour_1 = textureHandler_loadImage("../assets/textures/sky/sky_gradient_colour_1.png", GL_RGBA, GL_RGBA, GL_LINEAR, 0);
+        glBindTexture(GL_TEXTURE_2D, sky_gradient_colour_1);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        if (sky_gradient_colour_1 == 0)
+            problem++;
         break;
 
     case TEXTURE_MAIN_MENU:
@@ -140,6 +158,8 @@ void textureHandler_destroyTextures(int stage)
         glDeleteTextures(1, &water_normal);
 
         glDeleteTextures(1, &sky_gradient);
+        glDeleteTextures(1, &sky_gradient_colour_0);
+        glDeleteTextures(1, &sky_gradient_colour_1);
 
         glDeleteTextures(1, &menu_title_pause);
 
@@ -158,6 +178,8 @@ void textureHandler_destroyTextures(int stage)
         water_normal = 0;
 
         sky_gradient = 0;
+        sky_gradient_colour_0 = 0;
+        sky_gradient_colour_1 = 0;
 
         menu_title_pause = 0;
 
@@ -212,6 +234,12 @@ unsigned int textureHandler_getTexture(int texture)
 
     case TEXTURE_SKY_GRADIENT:
         return sky_gradient;
+
+    case TEXTURE_SKY_GRADIENT_COLOUR_0:
+        return sky_gradient_colour_0;
+
+    case TEXTURE_SKY_GRADIENT_COLOUR_1:
+        return sky_gradient_colour_1;
 
     case TEXTURE_MENU_BACKGROUND:
         return menu_background;

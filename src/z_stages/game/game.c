@@ -68,6 +68,9 @@ float GRAVITY = -25.0;
 float JUMP_STRENGTH = 10;
 float FOV = 90;
 
+const float LENGTH_OF_DAY_IN_SECONDS = 600;
+float TIME_OF_DAY = 0.0f;//napkelte a 0, [0;1)-ben van az értéke
+
 
 #define PHYSICS_UPDATE 0.02f
 #define PHYSICS_STEPS_PER_UPDATE 100
@@ -221,8 +224,7 @@ vector* lights;
 light sunTzu;
 
 light_renderer lightRenderer;
-
-sun szunce;
+vec3 sunDirection;
 
 flare* lensFlare;
 
@@ -288,12 +290,15 @@ void game(void* w, int* currentStage)
 
 	currentPlayerState = PLAYER_MORTAL;
 
+	TIME_OF_DAY = 0;
+	sunDirection = (vec3){ 0.0f, 0.0f, 1.0f };
+
 	int tempHotbarContent[HOTBAR_SIZE]={ BLOCK_SUS ,BLOCK_DIRT ,BLOCK_GRASS ,BLOCK_OAK_LOG ,BLOCK_OAK_LEAVES };
 	memcpy(hotbarContent, tempHotbarContent, sizeof(hotbarContent));
 	int tempInventoryContent[INVENTORY_COLUMNS * INVENTORY_ROWS] = {
 		BLOCK_GRASS, BLOCK_DIRT, BLOCK_STONE, BLOCK_AIR,
 		BLOCK_OAK_LOG, BLOCK_OAK_LEAVES, BLOCK_AIR, BLOCK_AIR,
-		BLOCK_SUS, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
+		BLOCK_SUS, BLOCK_BORSOD, BLOCK_AIR, BLOCK_AIR,
 		BLOCK_AIR, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
 		BLOCK_AIR, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
 		BLOCK_AIR, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
@@ -506,8 +511,8 @@ void* loop_render(void* arg)
 		mat4 shadowViewProjection = mat4_multiply(
 			mat4_ortho(-150, 150, -150, 150, 1, 200),
 			mat4_lookAt(
-				vec3_sum(cum_render.position, vec3_create2(szunce.direction.x * 100, szunce.direction.y * 100, szunce.direction.z * 100)),
-				vec3_create2(-1 * szunce.direction.x, -1 * szunce.direction.y, -1 * szunce.direction.z),
+				vec3_sum(cum_render.position, vec3_create2(sunDirection.x * 100, sunDirection.y * 100, sunDirection.z * 100)),
+				vec3_create2(-1 * sunDirection.x, -1 * sunDirection.y, -1 * sunDirection.z),
 				vec3_create2(0, 1, 0)
 			)
 		);
@@ -669,6 +674,8 @@ void* loop_render(void* arg)
 		free(bufferData);
 
 		//directional (sun)
+		sunTzu.position = sunDirection;//move sun according to day-night cycle
+
 		if (settings_getInt(SETTINGS_SHADOWS) != 0)
 		{
 			glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
@@ -782,7 +789,7 @@ void* loop_render(void* arg)
 
 		//get lens flare data
 		flare_queryQueryResult(lensFlare);
-		flare_query(lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
+		flare_query(lensFlare, &pv, cum_render.position, sunDirection, 1.0f / windowAspectXY);
 
 		//prepare bloom--------------------------------------------------------------------------------
 		int viewportWidth = RENDERER_WIDTH/2, viewportHeight = RENDERER_HEIGHT/2;
@@ -833,6 +840,8 @@ void* loop_render(void* arg)
 		glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT));
 
 		glUseProgram(skyboxShader.id);
+		vec3 sunDirectionNormalized = vec3_normalize(sunDirection);
+		glUniform3f(glGetUniformLocation(skyboxShader.id, "sunDirectionNormalized"), sunDirectionNormalized.x, sunDirectionNormalized.y, sunDirectionNormalized.z);
 		glUniformMatrix4fv(glGetUniformLocation(skyboxShader.id, "pvm"), 1, GL_FALSE, mat4_multiply(pv, mat4_create2((float[]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, cum_render.position.x, cum_render.position.y, cum_render.position.z, 1 })).data);
 		glBindVertexArray(skyboxMesh.vao);
 		glDrawElements(GL_TRIANGLES, skyboxMesh.indexCount, GL_UNSIGNED_INT, 0);
@@ -1623,6 +1632,14 @@ void* loop_physics(void* arg)
 				break;
 		}
 
+		//day-night cycle
+		TIME_OF_DAY += PHYSICS_UPDATE / LENGTH_OF_DAY_IN_SECONDS;
+		if (TIME_OF_DAY > 1.0f)
+			TIME_OF_DAY -= 1.0f;
+		sunDirection.x = cosf(3.14159265f * TIME_OF_DAY);
+		sunDirection.y = sinf(3.14159265f * TIME_OF_DAY);
+		sunDirection.z = 0;
+
 
 		pthread_mutex_lock(&mutex_input);
 		shouldPoll = 69;
@@ -1873,9 +1890,6 @@ void init_renderer()
 
 	skyboxMesh = kuba_create();
 
-	//sun
-	szunce = sun_create();
-	sun_setDirection(&szunce, vec3_create2(0.6, 1, -0.8));
 
 	//lens flare
 	lensFlare = flare_create(0.4f);
@@ -1914,9 +1928,6 @@ void end_renderer()
 	//skybox
 	shader_delete(&skyboxShader);
 	mesh_destroy(skyboxMesh);
-
-	//sun
-	sun_destroy(&szunce);
 
 	//lens flare
 	flare_destroy(lensFlare);
