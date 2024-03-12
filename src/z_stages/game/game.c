@@ -110,7 +110,7 @@ int currentGameState;//is the game paused or in game or idk
 pthread_mutex_t mutex_gameState;
 
 enum playerState {
-	PLAYER_MORTAL, PLAYER_IMMORTAL
+	PLAYER_MORTAL=1, PLAYER_IMMORTAL=2
 };
 int currentPlayerState = PLAYER_MORTAL;
 
@@ -121,7 +121,8 @@ enum commandType {
 	COMMAND_SPEED, 
 	COMMAND_JUMP, 
 	COMMAND_GRAVITY,
-	COMMAND_TELEPORT
+	COMMAND_TELEPORT,
+	COMMAND_TIME
 };
 
 pthread_mutex_t mutex_window;//for window calls (like window_getHeight())
@@ -222,6 +223,7 @@ int inventoryDropTarget = -1;//where to drop the dragged item
 
 vector* lights;
 light sunTzu;
+light moonTzu;
 
 light_renderer lightRenderer;
 vec3 sunDirection;
@@ -673,23 +675,51 @@ void* loop_render(void* arg)
 		light_render(&lightRenderer, 69);
 		free(bufferData);
 
-		//directional (sun)
-		sunTzu.position = sunDirection;//move sun according to day-night cycle
+		//directional (sun and moon)
+		do {//sun
+			sunTzu.position = sunDirection;//move sun according to day-night cycle
+			sunTzu.colour = (vec3){ 1, 0.97, 0.4 };
 
-		if (settings_getInt(SETTINGS_SHADOWS) != 0)
-		{
-			glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
-			glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
-		}
-		else
+			float intensity= 10* (0.9f * vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, 1, 0 }) + 0.1f);
+			if (intensity < 0)
+				break;
+
+			sunTzu.attenuation.x = intensity;
+
+			if (settings_getInt(SETTINGS_SHADOWS) != 0)
+			{
+				glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
+				glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
+			}
+			else
+				glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
+
+
+			bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
+			memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
+			light_fillRenderer(&lightRenderer, bufferData, 1);
+			light_render(&lightRenderer, 0);
+			free(bufferData);
+		} while (0);
+		do {
+			moonTzu.position = vec3_scale(sunDirection,-1);//move moon according to day-night cycle
+			moonTzu.colour = (vec3){ 1,1,1 };
+
+			float intensity = (0.9f * vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, -1, 0 }) + 0.1f);
+			if (intensity < 0)
+				break;
+
+			moonTzu.attenuation.x = intensity;
+
 			glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
 
-	 
-		bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
-		memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
-		light_fillRenderer(&lightRenderer, bufferData, 1);
-		light_render(&lightRenderer, 0);
-		free(bufferData);
+
+			bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
+			memcpy(bufferData, &(moonTzu.position.x), LIGHT_SIZE_IN_VBO);
+			light_fillRenderer(&lightRenderer, bufferData, 1);
+			light_render(&lightRenderer, 0);
+			free(bufferData);
+		} while (0);
 
 		glDepthMask(GL_TRUE);
 		glDepthFunc(GL_LESS);
@@ -789,7 +819,7 @@ void* loop_render(void* arg)
 
 		//get lens flare data
 		flare_queryQueryResult(lensFlare);
-		flare_query(lensFlare, &pv, cum_render.position, sunDirection, 1.0f / windowAspectXY);
+		flare_query(lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
 
 		//prepare bloom--------------------------------------------------------------------------------
 		int viewportWidth = RENDERER_WIDTH/2, viewportHeight = RENDERER_HEIGHT/2;
@@ -880,8 +910,14 @@ void* loop_render(void* arg)
 		glDisable(GL_BLEND);
 
 		//lens flare
-		if(isCameraSubmerged==0)
-			flare_render(lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
+		do {
+			float intensity = (0.9f * vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, 1, 0 }) + 0.1f);
+			if (intensity > 0&& isCameraSubmerged == 0)
+			{
+				flare_setStrength(lensFlare, intensity);
+				flare_render(lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
+			}
+		} while (0);
 
 		//switch to default fbo ------------------------------------------------------------------------
 		glViewport(0, 0, windowWidth, windowHeight);
@@ -1592,6 +1628,26 @@ void* loop_physics(void* arg)
 						}
 						break;
 
+					case COMMAND_TIME:
+						if (argumentCount == 0)
+						{
+							printf("too few arguments\n");
+							strcpy(commandToShow, "too few arguments");
+						}
+						else if (argumentCount == 1)
+						{
+							arguments[0] %= 2400;
+							TIME_OF_DAY = (float)arguments[0] / 2400.0f;
+							printf("time set to %d\n", arguments[0]);
+							sprintf(commandToShow, "time set to %d", arguments[0]);
+						}
+						else
+						{
+							printf("invalid argument(s)\n");
+							strcpy(commandToShow, "invalid argument(s)");
+						}
+						break;
+
 					case COMMAND_UNKNOWN:
 						printf("invalid command\n");
 						strcpy(commandToShow, "invalid command");
@@ -1645,9 +1701,9 @@ void* loop_physics(void* arg)
 		TIME_OF_DAY += PHYSICS_UPDATE / LENGTH_OF_DAY_IN_SECONDS;
 		if (TIME_OF_DAY > 1.0f)
 			TIME_OF_DAY -= 1.0f;
-		sunDirection.x = cosf(2*3.14159265f * TIME_OF_DAY);
+		sunDirection.x = 0;
 		sunDirection.y = sinf(2*3.14159265f * TIME_OF_DAY);
-		sunDirection.z = 0;
+		sunDirection.z = cosf(2 * 3.14159265f * TIME_OF_DAY);
 
 
 		pthread_mutex_lock(&mutex_input);
@@ -1880,6 +1936,12 @@ void init_renderer()
 		vec3_create2(1, 0.97, 0.4),
 		vec3_create2(0.6, 0.5, -0.8),
 		vec3_create2(10, 0, 0)
+	);
+
+	moonTzu=light_create(
+		vec3_create2(1, 1, 1),
+		vec3_create2(-0.6, -0.5, 0.8),
+		vec3_create2(1, 0, 0)
 	);
 
 	//skybox
@@ -2289,6 +2351,8 @@ void convertCommandLine(const char* command, int* commandType, int* argumentCoun
 		*commandType = COMMAND_GRAVITY;
 	else if (strcmp(words[0], "/warp") == 0)
 		*commandType = COMMAND_TELEPORT;
+	else if (strcmp(words[0], "/time") == 0)
+		*commandType = COMMAND_TIME;
 	else
 		*commandType = COMMAND_UNKNOWN;
 
@@ -2320,13 +2384,17 @@ void convertCommandLine(const char* command, int* commandType, int* argumentCoun
 			arguments[0] = lroundf(10 * JUMP_STRENGTH_BASED);
 			break;
 
+		case COMMAND_TIME:
+			arguments[0] = 0;
+			break;
+
 		default:
 			*argumentCount = 0;
 			break;
 		}
 	}
 
-	//if the input type is special, then rescan
+	//recheck if the input type is special
 	switch (*commandType)
 	{
 	case COMMAND_GAMEMODE:
@@ -2336,11 +2404,20 @@ void convertCommandLine(const char* command, int* commandType, int* argumentCoun
 				arguments[0] = PLAYER_MORTAL;
 			if (strcmp(words[1], "divine") == 0)
 				arguments[0] = PLAYER_IMMORTAL;
+		}
+		break;
 
-			for (int i = 1; i < COMMAND_LINE_MAX_ARGUMENT_COUNT && i < wordCount - 1; i++)
-			{
-				sscanf(words[i + 1], "%d", arguments + i);
-			}
+	case COMMAND_TIME:
+		if (wordCount > 1)
+		{
+			if (strcmp(words[1], "sunrise") == 0)
+				arguments[0] = 0;
+			if (strcmp(words[1], "noon") == 0)
+				arguments[0] = 600;
+			if (strcmp(words[1], "sunset") == 0)
+				arguments[0] = 1200;
+			if (strcmp(words[1], "midnight") == 0)
+				arguments[0] = 1800;
 		}
 		break;
 	}

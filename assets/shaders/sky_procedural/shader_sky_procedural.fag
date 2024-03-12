@@ -16,7 +16,11 @@ uniform float timeOfDay;//[0;1)
 
 const float sunInnerCutOff=0.999;
 const float sunOuterCutOff=0.7;
-const float onePerDeltaCutOff=1/(sunInnerCutOff-sunOuterCutOff);
+const float sunOnePerDeltaCutOff=1/(sunInnerCutOff-sunOuterCutOff);
+
+const float moonInnerCutOff=0.999;
+const float moonOuterCutOff=0.99;
+const float moonOnePerDeltaCutOff=1/(moonInnerCutOff-moonOuterCutOff);
 
 void main()
 {
@@ -27,8 +31,8 @@ void main()
 
 
 	vec3 gradient=texture(texture_gradient,uvGradient).rgb;
-	//gradient/=gradient.x+gradient.y+gradient.z;
-	gradient.y*=max(0,dot(sunDirectionNormalized, 2*texture(texture_gradient_horizon, uvGradientColour).xyz-1));
+	float horizonZ=2*texture(texture_gradient_horizon, uvGradientColour).z-1;
+	gradient.y*=mix(1,max(dot(dir, vec3(0,0,horizonZ)),0), abs(horizonZ));
 	gradient/=(gradient.x+gradient.y+gradient.z);
 
 	vec3 skyColour0=texture(texture_gradient_colour_1, uvGradientColour).xyz;
@@ -40,7 +44,13 @@ void main()
 	float sunDot=dot(sunDirectionNormalized, dir);
 	if(sunDot>sunOuterCutOff)
 	{
-		sky=mix(sky, sunColour, pow(min((sunDot-sunOuterCutOff)*onePerDeltaCutOff,1),32));
+		sky=mix(sky, sunColour, pow(min((sunDot-sunOuterCutOff)*sunOnePerDeltaCutOff,1),32));
+	}
+
+	float moonDot=-sunDot;
+	if(moonDot>moonOuterCutOff)
+	{
+		sky=mix(sky, vec3(1), pow(min((moonDot-moonOuterCutOff)*moonOnePerDeltaCutOff,1),32));
 	}
 
 	fragColour=vec4(sky,1);

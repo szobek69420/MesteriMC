@@ -33,4 +33,6 @@ void flare_query(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, flo
 
 void flare_update(flare* sus);
 
+void flare_setStrength(flare* sus, float strength);
+
 #endif
