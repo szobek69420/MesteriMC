@@ -503,21 +503,40 @@ void* loop_render(void* arg)
 		pthread_mutex_unlock(&mutex_cm);
 
 		//render------------------------------------------
-		//matrices
+		//matrices and variables
 		mat4 view = camera_getViewMatrix(&cum_render);
 		mat4 projection = cum_render.projection_matrix;
 		mat4 pv = mat4_multiply(projection, view);
 		mat4 projectionInverse = mat4_inverse(projection);
 		mat3 viewNormal = mat3_createFromMat(view);
 
-		mat4 shadowViewProjection = mat4_multiply(
-			mat4_ortho(-150, 150, -150, 150, 1, 200),
-			mat4_lookAt(
-				vec3_sum(cum_render.position, vec3_create2(sunDirection.x * 100, sunDirection.y * 100, sunDirection.z * 100)),
-				vec3_create2(-1 * sunDirection.x, -1 * sunDirection.y, -1 * sunDirection.z),
-				vec3_create2(0, 1, 0)
-			)
-		);
+		float sunShadowIntensity = powf(vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, 1, 0 }), 0.5f);
+		float moonShadowIntensity = powf(vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, -1, 0 }), 0.5f);
+		mat4 shadowViewProjection;
+		if (sunShadowIntensity > 0)
+		{
+			shadowViewProjection = mat4_multiply(
+				mat4_ortho(-150, 150, -150, 150, 1, 200),
+				mat4_lookAt(
+					vec3_sum(cum_render.position, vec3_create2(sunDirection.x * 100, sunDirection.y * 100, sunDirection.z * 100)),
+					vec3_create2(-1 * sunDirection.x, -1 * sunDirection.y, -1 * sunDirection.z),
+					vec3_create2(0, 1, 0)
+				)
+			);
+		}
+		else if (moonShadowIntensity > 0)
+		{
+			shadowViewProjection = mat4_multiply(
+				mat4_ortho(-150, 150, -150, 150, 1, 200),
+				mat4_lookAt(
+					vec3_sum(cum_render.position, vec3_create2(sunDirection.x * -100, sunDirection.y * -100, sunDirection.z * -100)),
+					sunDirection,
+					vec3_create2(0, 1, 0)
+				)
+			);
+		}
+		else
+			shadowViewProjection = mat4_create(1);
 		mat4 shadowLightMatrix = mat4_multiply(shadowViewProjection, mat4_inverse(view));//from the camera's view space to the suns projection space
 		
 		//fog distance
@@ -686,10 +705,11 @@ void* loop_render(void* arg)
 
 			sunTzu.attenuation.x = intensity;
 
-			if (settings_getInt(SETTINGS_SHADOWS) != 0)
+			if (settings_getInt(SETTINGS_SHADOWS) != 0&&sunShadowIntensity>0)
 			{
 				glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
 				glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
+				glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStrength"), sunShadowIntensity);
 			}
 			else
 				glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
@@ -711,7 +731,15 @@ void* loop_render(void* arg)
 
 			moonTzu.attenuation.x = intensity;
 
-			glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
+			if (settings_getInt(SETTINGS_SHADOWS) != 0 && moonShadowIntensity > 0)
+			{
+				glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
+				glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
+				glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStrength"), moonShadowIntensity);
+			}
+			else
+				glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
+
 
 
 			bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);

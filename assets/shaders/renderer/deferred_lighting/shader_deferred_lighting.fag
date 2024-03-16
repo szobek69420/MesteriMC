@@ -12,7 +12,8 @@ uniform sampler2D texture_shadow;
 uniform sampler2D texture_depth;
 uniform sampler2D texture_ssao;
 
-uniform int shadowOn;
+uniform int shadowOn;//are shadows on (by settings)
+uniform float shadowStrength;//the current strength of the shadows
 uniform mat4 shadow_lightMatrix; //from the camera's view space to the light's projection space
 const float shadowBias=0.003;
 const vec2 shadowSampleOffsets[9]=vec2[9](
@@ -100,7 +101,7 @@ void main()
 
 	//shadow check
 	float oneMinusShadowStrength=1;
-	if(shadowOn!=0)
+	if(shadowOn!=0&&shadowStrength>0.00001)
 	{
 		vec4 shadowPos=shadow_lightMatrix*vec4(viewspace_position, 1);
 		shadowPos.xyz/=shadowPos.w;
@@ -110,14 +111,14 @@ void main()
 
 		if(shadowPos.x<=1&&shadowPos.x>=0&&shadowPos.y<=1&&shadowPos.y>=0&&shadowDepth<0.9999&&distanceFromEye<shadowEnd)
 		{
-			oneMinusShadowStrength=1;
+			oneMinusShadowStrength=max(0,shadowStrength);//here it means shadow strength
 			if(texture(texture_shadow, shadowPos.xy).r>shadowPos.z-shadowBias)
-					oneMinusShadowStrength=0;//ez a shadow strength egyelore, hogy segitsen az elhalvanyulas kiszamolasaban
+					oneMinusShadowStrength=0;
 
 			if(distanceFromEye>shadowStart)
 				oneMinusShadowStrength*=(shadowEnd-distanceFromEye)*shadowHelper;
 
-			oneMinusShadowStrength=1-oneMinusShadowStrength;
+			oneMinusShadowStrength=1-oneMinusShadowStrength;//from here on it means oneMinusShadowStrength
 		}
 	}
 	
