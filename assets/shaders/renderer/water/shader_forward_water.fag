@@ -2,10 +2,10 @@
 #version 330 core
 
 in VS_OUT{
-    vec2 texCoords;
-    vec3 fragPos;
-    vec3 fragPosViewSpace;
-    mat3 tbn;
+	vec2 texCoords;
+	vec3 fragPos;
+	vec3 fragPosViewSpace;
+	mat3 tbn;
 }fs_in;
 
 out vec4 fragColour;
@@ -35,15 +35,17 @@ uniform float projectionNear;
 
 //lights
 struct light{
-    vec3 colour;
-    vec3 position;
-    vec3 attenuation;//x: intensity, y: linear, z: quadratic
+	vec3 colour;
+	vec3 position;
+	vec3 attenuation;//x: intensity, y: linear, z: quadratic
 };
 
 uniform light sun;
+uniform light moon;
 
 uniform mat4 shadow_lightMatrix;
 uniform int shadowOn;
+uniform float shadowStrength;
 const float shadowBias=0.003;
 uniform float shadowStart;
 uniform float shadowEnd;
@@ -60,49 +62,56 @@ float linearizeDepth(float);
 
 void main()
 {
-    vec2 screenUV=vec2(gl_FragCoord.x*onePerScreenWidth, gl_FragCoord.y*onePerScreenHeight);
-    float distanceFromEye=length(fs_in.fragPos-cameraPos);
-    vec3 viewDirection=normalize(cameraPos-fs_in.fragPos);
+	vec2 screenUV=vec2(gl_FragCoord.x*onePerScreenWidth, gl_FragCoord.y*onePerScreenHeight);
+	float distanceFromEye=length(fs_in.fragPos-cameraPos);
+	vec3 viewDirection=normalize(cameraPos-fs_in.fragPos);
 
-    //getting water depth
-    //float depth=linearizeDepth(texture(texture_depth_geometry, screenUV).r)-linearizeDepth(gl_FragCoord.z);
+	//getting water depth
+	//float depth=linearizeDepth(texture(texture_depth_geometry, screenUV).r)-linearizeDepth(gl_FragCoord.z);
 
 	vec4 tempPos = projectionInverse * (vec4(screenUV, texture(texture_depth_geometry, screenUV).r, 1)* 2 - 1);
 	vec3 waterFloorViewSpace = tempPos.xyz / tempPos.w;
 
-    float depth=length(waterFloorViewSpace-fs_in.fragPosViewSpace);
-    if(depth<shallowStart)
-        depth*=shallowHelper;
-    if(depth>1)
-        depth=1;
+	float depth=length(waterFloorViewSpace-fs_in.fragPosViewSpace);
+	if(depth<shallowStart)
+		depth*=shallowHelper;
+	if(depth>1)
+		depth=1;
 
-    //getting walter tint
-    vec3 waterColour=mix(waterColourShallow, waterColourDeep, depth);
+	//getting walter tint
+	vec3 waterColour=mix(waterColourShallow, waterColourDeep, depth);
 
-    //get distorted uv
-    vec2 distortedUV=fs_in.texCoords+(2*texture(texture_dudv, vec2(fs_in.texCoords.x+0.5*uvOffset, fs_in.texCoords.y+uvOffset)).rg-1)*0.03;
-    distortedUV=vec2(distortedUV.x+uvOffset, distortedUV.y);
-    
-    //get normal
-    vec3 normal=normalize(fs_in.tbn*(2*texture(texture_normal, distortedUV).rgb-1));
+	//get distorted uv
+	vec2 distortedUV=fs_in.texCoords+(2*texture(texture_dudv, vec2(fs_in.texCoords.x+0.5*uvOffset, fs_in.texCoords.y+uvOffset)).rg-1)*0.03;
+	distortedUV=vec2(distortedUV.x+uvOffset, distortedUV.y);
+	
+	//get normal
+	vec3 normal=normalize(fs_in.tbn*(2*texture(texture_normal, distortedUV).rgb-1));
 
-    //lighting calculations
-    vec3 lighting_sum=vec3(0);
-    vec3 ambient, diffuse, specular;
-    vec3 halfway;
+	//lighting calculations
+	vec3 lighting_sum=vec3(0);
+	vec3 ambient, diffuse, specular;
+	vec3 halfway;
 
-    //sun ambient
+	//sun ambient
 	ambient = 0.3*sun.attenuation.x*sun.colour*waterColour;
-	//diffuse
+	//sun diffuse
 	diffuse = max(dot(normal, sun.position), 0.0) * waterColour * sun.colour*sun.attenuation.x;
-
 	//sun specular
 	halfway = normalize(sun.position + viewDirection);  
 	specular = sun.attenuation.x*sun.colour *pow(max(dot(normal, halfway), 0.0), 128.0);
 
-    //sun shadow
+	//moon ambient
+	ambient += 0.3*moon.attenuation.x*moon.colour*waterColour;
+	//moon diffuse
+	diffuse += max(dot(normal, moon.position), 0.0) * waterColour * moon.colour*moon.attenuation.x;
+	//moon specular
+	halfway = normalize(moon.position + viewDirection);  
+	specular += moon.attenuation.x*moon.colour *pow(max(dot(normal, halfway), 0.0), 128.0);
+
+	//shadow
 	float oneMinusShadowStrength=1;
-	if(shadowOn!=0)
+	if(shadowOn!=0&&shadowStrength>0.00001)
 	{
 		vec4 shadowPos=shadow_lightMatrix*vec4(fs_in.fragPosViewSpace, 1);
 		shadowPos.xyz/=shadowPos.w;
@@ -112,41 +121,41 @@ void main()
 
 		if(shadowPos.x<=1&&shadowPos.x>=0&&shadowPos.y<=1&&shadowPos.y>=0&&shadowDepth<0.9999&&distanceFromEye<shadowEnd)
 		{
-			oneMinusShadowStrength=1;
-			if(texture(texture_depth_shadow, shadowPos.xy).r>shadowPos.z-shadowBias)
-					oneMinusShadowStrength=0;//ez a shadow strength egyelore, hogy segitsen az elhalvanyulas kiszamolasaban
+			oneMinusShadowStrength=shadowStrength;//here it is the shadow strength
+			if(texture(texture_depth_shadow, shadowPos.xy).r>shadowPos.z-shadowBias)//ha nincs arnyaekban
+					oneMinusShadowStrength=0;
 
 			if(distanceFromEye>shadowStart)
 				oneMinusShadowStrength*=(shadowEnd-distanceFromEye)*shadowHelper;
 
-			oneMinusShadowStrength=1-oneMinusShadowStrength;
+			oneMinusShadowStrength=1-oneMinusShadowStrength;//from here on it is oneMinusShadowStrength
 		}
 	}
-    diffuse*=0.8*oneMinusShadowStrength+0.2;
-    specular*=oneMinusShadowStrength;
+	diffuse*=0.8*oneMinusShadowStrength+0.2;
+	specular*=oneMinusShadowStrength;
 
-    //add sun beleuchtung to the sum
-    lighting_sum+=ambient+diffuse+specular;
+	//add sun beleuchtung to the sum
+	lighting_sum+=ambient+diffuse+specular;
 
-    //point lights
-    //...
+	//point lights
+	//...
 
-    //fresnel
-    float fresnel=max(dot(normal, viewDirection),0);
-    vec3 endColour=mix(lighting_sum, ambient,fresnel*(1-min(5*depth,1)));
+	//fresnel
+	float fresnel=max(dot(normal, viewDirection),0);
+	vec3 endColour=mix(lighting_sum, ambient,fresnel*(1-min(5*depth,1)));
 
-    //fog
-    float alpha=min(5*depth, 1);
-    if(distanceFromEye>fogStart)
-        alpha*=(fogEnd-distanceFromEye)*fogHelper;
-    if(alpha<0)
-        alpha=0;
+	//fog
+	float alpha=min(5*depth, 1);
+	if(distanceFromEye>fogStart)
+		alpha*=(fogEnd-distanceFromEye)*fogHelper;
+	if(alpha<0)
+		alpha=0;
 
-    fragColour=vec4(lighting_sum, alpha);
+	fragColour=vec4(lighting_sum, alpha);
 }
 
 float linearizeDepth(float depth) 
 {
-    float z = depth * 2.0 - 1.0; // back to NDC 
-    return (2.0 * projectionNear * projectionFar) / (projectionFar + projectionNear - z * (projectionFar - projectionNear));
+	float z = depth * 2.0 - 1.0; // back to NDC 
+	return (2.0 * projectionNear * projectionFar) / (projectionFar + projectionNear - z * (projectionFar - projectionNear));
 }

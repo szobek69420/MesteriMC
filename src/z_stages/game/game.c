@@ -510,10 +510,13 @@ void* loop_render(void* arg)
 		mat4 projectionInverse = mat4_inverse(projection);
 		mat3 viewNormal = mat3_createFromMat(view);
 
-		float sunShadowIntensity = powf(vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, 1, 0 }), 0.5f);
-		float moonShadowIntensity = powf(vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, -1, 0 }), 0.5f);
+		int isDayTime = 0;
+		if (vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, 1, 0 }) > 0)
+			isDayTime = 1;
+		float sunShadowIntensity = powf(fabs(vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, 1, 0 })), 0.5f);
+		float moonShadowIntensity = powf(fabs(vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, -1, 0 })), 0.5f);
 		mat4 shadowViewProjection;
-		if (sunShadowIntensity > 0)
+		if (isDayTime)
 		{
 			shadowViewProjection = mat4_multiply(
 				mat4_ortho(-150, 150, -150, 150, 1, 200),
@@ -524,7 +527,7 @@ void* loop_render(void* arg)
 				)
 			);
 		}
-		else if (moonShadowIntensity > 0)
+		else
 		{
 			shadowViewProjection = mat4_multiply(
 				mat4_ortho(-150, 150, -150, 150, 1, 200),
@@ -535,8 +538,6 @@ void* loop_render(void* arg)
 				)
 			);
 		}
-		else
-			shadowViewProjection = mat4_create(1);
 		mat4 shadowLightMatrix = mat4_multiply(shadowViewProjection, mat4_inverse(view));//from the camera's view space to the suns projection space
 		
 		//fog distance
@@ -701,7 +702,10 @@ void* loop_render(void* arg)
 
 			float intensity= 10* (0.9f * vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, 1, 0 }) + 0.1f);
 			if (intensity < 0)
+			{
+				sunTzu.attenuation.x = 0;
 				break;
+			}
 
 			sunTzu.attenuation.x = intensity;
 
@@ -721,13 +725,16 @@ void* loop_render(void* arg)
 			light_render(&lightRenderer, 0);
 			free(bufferData);
 		} while (0);
-		do {
+		do {//moon
 			moonTzu.position = vec3_scale(sunDirection,-1);//move moon according to day-night cycle
 			moonTzu.colour = (vec3){ 1,1,1 };
 
 			float intensity = (0.9f * vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, -1, 0 }) + 0.1f);
 			if (intensity < 0)
+			{
+				moonTzu.attenuation.x = 0;
 				break;
+			}
 
 			moonTzu.attenuation.x = intensity;
 
@@ -795,7 +802,8 @@ void* loop_render(void* arg)
 		if (settings_getInt(SETTINGS_SHADOWS)!=0)
 		{
 			glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
-			glUniform1i(glGetUniformLocation(waterShader.id, "shadowOn"), 69);
+			glUniform1i(glGetUniformLocation(waterShader.id, "shadowOn"), 1);
+			glUniform1f(glGetUniformLocation(waterShader.id, "shadowStrength"), isDayTime != 0 ? sunShadowIntensity : moonShadowIntensity);
 		}
 		else
 			glUniform1i(glGetUniformLocation(waterShader.id, "shadowOn"), 0);
@@ -811,9 +819,15 @@ void* loop_render(void* arg)
 			glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), fogEnd);
 		}
 
+		//sun and moon (their parameters have been set in the deferred pass)
 		glUniform3f(glGetUniformLocation(waterShader.id, "sun.position"), sunTzu.position.x, sunTzu.position.y, sunTzu.position.z);
 		glUniform3f(glGetUniformLocation(waterShader.id, "sun.colour"), sunTzu.colour.x, sunTzu.colour.y, sunTzu.colour.z);
 		glUniform3f(glGetUniformLocation(waterShader.id, "sun.attenuation"), sunTzu.attenuation.x, sunTzu.attenuation.y, sunTzu.attenuation.z);
+
+		glUniform3f(glGetUniformLocation(waterShader.id, "moon.position"), moonTzu.position.x, moonTzu.position.y, moonTzu.position.z);
+		glUniform3f(glGetUniformLocation(waterShader.id, "moon.colour"), moonTzu.colour.x, moonTzu.colour.y, moonTzu.colour.z);
+		glUniform3f(glGetUniformLocation(waterShader.id, "moon.attenuation"), moonTzu.attenuation.x, moonTzu.attenuation.y, moonTzu.attenuation.z);
+
 
 		glUniform3f(glGetUniformLocation(waterShader.id, "cameraPos"), cum_render.position.x, cum_render.position.y, cum_render.position.z);
 		glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "view"), 1, GL_FALSE, view.data);
