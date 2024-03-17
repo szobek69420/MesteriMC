@@ -293,7 +293,7 @@ void game(void* w, int* currentStage)
 
 	currentGameState = GAME_INGAME;
 
-	currentPlayerState = PLAYER_MORTAL;
+	currentPlayerState = PLAYER_IMMORTAL;
 
 	TIME_OF_DAY = 0;
 	sunDirection = (vec3){ 0.0f, 0.0f, 1.0f };
@@ -933,8 +933,12 @@ void* loop_render(void* arg)
 		glFrontFace(GL_CCW);
 
 		//stars
-		stars_setPlayerPosition(nightSky, cum_render.position);
-		stars_render(nightSky, pv);
+		if (isDayTime==0)
+		{
+			stars_setPlayerPosition(nightSky, cum_render.position);
+			stars_setIntensity(nightSky, powf(moonShadowIntensity,2));
+			stars_render(nightSky, pv);
+		}
 
 		// draw the content of endfbo to screenfbo -----------------------------------------------------------------------------
 		glDisable(GL_DEPTH_TEST);
@@ -1995,7 +1999,7 @@ void init_renderer()
 
 	//stars
 
-	nightSky = stars_create(100);
+	nightSky = stars_create(300);
 
 	//skybox
 	skyboxShader = shader_import(

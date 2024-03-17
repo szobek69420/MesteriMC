@@ -22,6 +22,8 @@ static unsigned int sky_gradient_colour_0 = 0;
 static unsigned int sky_gradient_colour_1 = 0;
 static unsigned int sky_gradient_horizon = 0;
 
+static unsigned int star = 0;
+
 static unsigned int menu_title_pause = 0;
 
 static unsigned int goku = 0;
@@ -126,6 +128,10 @@ int textureHandler_importTextures(int stage)
         glBindTexture(GL_TEXTURE_2D, 0);
         if (sky_gradient_horizon == 0)
             problem++;
+
+        star = textureHandler_loadImage("../assets/textures/sky/star.png", GL_RGBA, GL_RGBA, GL_LINEAR, 69);
+        if (star == 0)
+            problem++;
         break;
 
     case TEXTURE_MAIN_MENU:
@@ -171,6 +177,8 @@ void textureHandler_destroyTextures(int stage)
         glDeleteTextures(1, &sky_gradient_colour_1);
         glDeleteTextures(1, &sky_gradient_horizon);
 
+        glDeleteTextures(1, &star);
+
         glDeleteTextures(1, &menu_title_pause);
 
         glDeleteTextures(1, &plain_white);
@@ -191,6 +199,8 @@ void textureHandler_destroyTextures(int stage)
         sky_gradient_colour_0 = 0;
         sky_gradient_colour_1 = 0;
         sky_gradient_horizon = 0;
+
+        star = 0;
 
         menu_title_pause = 0;
 
@@ -254,6 +264,9 @@ unsigned int textureHandler_getTexture(int texture)
 
     case TEXTURE_SKY_GRADIENT_HORIZON:
         return sky_gradient_horizon;
+
+    case TEXTURE_STAR:
+        return star;
 
     case TEXTURE_MENU_BACKGROUND:
         return menu_background;
