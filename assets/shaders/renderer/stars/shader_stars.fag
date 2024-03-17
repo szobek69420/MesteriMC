@@ -1,0 +1,14 @@
+#version 330 core
+
+in vec2 uv;
+
+out vec4 fragmentColour;
+
+uniform float intensity;
+uniform sampler2D texture_star;
+
+void main()
+{
+	fragmentColour=texture(texture_star, uv);
+	fragmentColour.a*=intensity;
+}

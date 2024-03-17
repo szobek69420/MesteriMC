@@ -34,6 +34,7 @@
 
 #include "../../renderer/block_selection/block_selection.h"
 #include "../../renderer/hand/hand_renderer.h"
+#include "../../renderer/stars/stars.h"
 
 #include "../../ui/font_handler/font_handler.h"
 #include "../../ui/text/text_renderer.h"
@@ -62,9 +63,14 @@ float CLIP_FAR = 250.0f;
 const float MOVEMENT_SPEED_BASED = 4;
 const float GRAVITY_BASED = -25.0f;
 const float JUMP_STRENGTH_BASED = 10;
+const float FOV_BASED = 90;
 float MOVEMENT_SPEED = 4;
 float GRAVITY = -25.0;
 float JUMP_STRENGTH = 10;
+float FOV = 90;
+
+const float LENGTH_OF_DAY_IN_SECONDS = 100;
+float TIME_OF_DAY = 0.0f;//napkelte a 0, [0;1)-ben van az értéke
 
 
 #define PHYSICS_UPDATE 0.02f
@@ -105,7 +111,7 @@ int currentGameState;//is the game paused or in game or idk
 pthread_mutex_t mutex_gameState;
 
 enum playerState {
-	PLAYER_MORTAL, PLAYER_IMMORTAL
+	PLAYER_MORTAL=1, PLAYER_IMMORTAL=2
 };
 int currentPlayerState = PLAYER_MORTAL;
 
@@ -116,7 +122,8 @@ enum commandType {
 	COMMAND_SPEED, 
 	COMMAND_JUMP, 
 	COMMAND_GRAVITY,
-	COMMAND_TELEPORT
+	COMMAND_TELEPORT,
+	COMMAND_TIME
 };
 
 pthread_mutex_t mutex_window;//for window calls (like window_getHeight())
@@ -217,12 +224,14 @@ int inventoryDropTarget = -1;//where to drop the dragged item
 
 vector* lights;
 light sunTzu;
+light moonTzu;
 
 light_renderer lightRenderer;
+vec3 sunDirection;
 
-sun szunce;
+stars* nightSky;
 
-flare lensFlare;
+flare* lensFlare;
 
 handRenderer* hr;
 
@@ -284,14 +293,17 @@ void game(void* w, int* currentStage)
 
 	currentGameState = GAME_INGAME;
 
-	currentPlayerState = PLAYER_MORTAL;
+	currentPlayerState = PLAYER_IMMORTAL;
+
+	TIME_OF_DAY = 0;
+	sunDirection = (vec3){ 0.0f, 0.0f, 1.0f };
 
 	int tempHotbarContent[HOTBAR_SIZE]={ BLOCK_SUS ,BLOCK_DIRT ,BLOCK_GRASS ,BLOCK_OAK_LOG ,BLOCK_OAK_LEAVES };
 	memcpy(hotbarContent, tempHotbarContent, sizeof(hotbarContent));
 	int tempInventoryContent[INVENTORY_COLUMNS * INVENTORY_ROWS] = {
 		BLOCK_GRASS, BLOCK_DIRT, BLOCK_STONE, BLOCK_AIR,
 		BLOCK_OAK_LOG, BLOCK_OAK_LEAVES, BLOCK_AIR, BLOCK_AIR,
-		BLOCK_SUS, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
+		BLOCK_SUS, BLOCK_BORSOD, BLOCK_AIR, BLOCK_AIR,
 		BLOCK_AIR, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
 		BLOCK_AIR, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
 		BLOCK_AIR, BLOCK_AIR, BLOCK_AIR, BLOCK_AIR,
@@ -310,6 +322,7 @@ void game(void* w, int* currentStage)
 	CLIP_FAR = settings_getInt(SETTINGS_RENDER_DISTANCE) * CHUNK_WIDTH + 50;
 	cum = camera_create(vec3_create2(0, 50, 0), vec3_create2(0, 1, 0), 4, 0.2);
 	camera_setProjection(&cum, currentFov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
+	cum.fov = FOV_BASED;
 
 	ps = physicsSystem_create();
 
@@ -493,21 +506,41 @@ void* loop_render(void* arg)
 		pthread_mutex_unlock(&mutex_cm);
 
 		//render------------------------------------------
-		//matrices
+		//matrices and variables
 		mat4 view = camera_getViewMatrix(&cum_render);
 		mat4 projection = cum_render.projection_matrix;
 		mat4 pv = mat4_multiply(projection, view);
 		mat4 projectionInverse = mat4_inverse(projection);
 		mat3 viewNormal = mat3_createFromMat(view);
 
-		mat4 shadowViewProjection = mat4_multiply(
-			mat4_ortho(-150, 150, -150, 150, 1, 200),
-			mat4_lookAt(
-				vec3_sum(cum_render.position, vec3_create2(szunce.direction.x * 100, szunce.direction.y * 100, szunce.direction.z * 100)),
-				vec3_create2(-1 * szunce.direction.x, -1 * szunce.direction.y, -1 * szunce.direction.z),
-				vec3_create2(0, 1, 0)
-			)
-		);
+		int isDayTime = 0;
+		if (vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, 1, 0 }) > 0)
+			isDayTime = 1;
+		float sunShadowIntensity = powf(fabs(vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, 1, 0 })), 0.5f);
+		float moonShadowIntensity = powf(fabs(vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, -1, 0 })), 0.5f);
+		mat4 shadowViewProjection;
+		if (isDayTime)
+		{
+			shadowViewProjection = mat4_multiply(
+				mat4_ortho(-150, 150, -150, 150, 1, 200),
+				mat4_lookAt(
+					vec3_sum(cum_render.position, vec3_create2(sunDirection.x * 100, sunDirection.y * 100, sunDirection.z * 100)),
+					vec3_create2(-1 * sunDirection.x, -1 * sunDirection.y, -1 * sunDirection.z),
+					vec3_create2(0, 1, 0)
+				)
+			);
+		}
+		else
+		{
+			shadowViewProjection = mat4_multiply(
+				mat4_ortho(-150, 150, -150, 150, 1, 200),
+				mat4_lookAt(
+					vec3_sum(cum_render.position, vec3_create2(sunDirection.x * -100, sunDirection.y * -100, sunDirection.z * -100)),
+					sunDirection,
+					vec3_create2(0, 1, 0)
+				)
+			);
+		}
 		mat4 shadowLightMatrix = mat4_multiply(shadowViewProjection, mat4_inverse(view));//from the camera's view space to the suns projection space
 		
 		//fog distance
@@ -665,21 +698,66 @@ void* loop_render(void* arg)
 		light_render(&lightRenderer, 69);
 		free(bufferData);
 
-		//directional (sun)
-		if (settings_getInt(SETTINGS_SHADOWS) != 0)
-		{
-			glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
-			glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
-		}
-		else
-			glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
+		//directional (sun and moon)
+		do {//sun
+			sunTzu.position = sunDirection;//move sun according to day-night cycle
+			sunTzu.colour = (vec3){ 1, 0.97, 0.4 };
 
-	 
-		bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
-		memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
-		light_fillRenderer(&lightRenderer, bufferData, 1);
-		light_render(&lightRenderer, 0);
-		free(bufferData);
+			float intensity= 10* (0.9f * vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, 1, 0 }) + 0.1f);
+			if (intensity < 0)
+			{
+				sunTzu.attenuation.x = 0;
+				break;
+			}
+
+			sunTzu.attenuation.x = intensity;
+
+			if (settings_getInt(SETTINGS_SHADOWS) != 0&&sunShadowIntensity>0)
+			{
+				glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
+				glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
+				glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStrength"), sunShadowIntensity);
+			}
+			else
+				glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
+
+
+			bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
+			memcpy(bufferData, &(sunTzu.position.x), LIGHT_SIZE_IN_VBO);
+			light_fillRenderer(&lightRenderer, bufferData, 1);
+			light_render(&lightRenderer, 0);
+			free(bufferData);
+		} while (0);
+		do {//moon
+			moonTzu.position = vec3_scale(sunDirection,-1);//move moon according to day-night cycle
+			moonTzu.colour = (vec3){ 1,1,1 };
+
+			float intensity = (0.9f * vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, -1, 0 }) + 0.1f);
+			if (intensity < 0)
+			{
+				moonTzu.attenuation.x = 0;
+				break;
+			}
+
+			moonTzu.attenuation.x = intensity;
+
+			if (settings_getInt(SETTINGS_SHADOWS) != 0 && moonShadowIntensity > 0)
+			{
+				glUniformMatrix4fv(glGetUniformLocation(lightingPassShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
+				glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 69);
+				glUniform1f(glGetUniformLocation(lightingPassShader.id, "shadowStrength"), moonShadowIntensity);
+			}
+			else
+				glUniform1i(glGetUniformLocation(lightingPassShader.id, "shadowOn"), 0);
+
+
+
+			bufferData = (float*)malloc(LIGHT_SIZE_IN_VBO);
+			memcpy(bufferData, &(moonTzu.position.x), LIGHT_SIZE_IN_VBO);
+			light_fillRenderer(&lightRenderer, bufferData, 1);
+			light_render(&lightRenderer, 0);
+			free(bufferData);
+		} while (0);
 
 		glDepthMask(GL_TRUE);
 		glDepthFunc(GL_LESS);
@@ -727,7 +805,8 @@ void* loop_render(void* arg)
 		if (settings_getInt(SETTINGS_SHADOWS)!=0)
 		{
 			glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "shadow_lightMatrix"), 1, GL_FALSE, shadowLightMatrix.data);
-			glUniform1i(glGetUniformLocation(waterShader.id, "shadowOn"), 69);
+			glUniform1i(glGetUniformLocation(waterShader.id, "shadowOn"), 1);
+			glUniform1f(glGetUniformLocation(waterShader.id, "shadowStrength"), isDayTime != 0 ? sunShadowIntensity : moonShadowIntensity);
 		}
 		else
 			glUniform1i(glGetUniformLocation(waterShader.id, "shadowOn"), 0);
@@ -743,9 +822,15 @@ void* loop_render(void* arg)
 			glUniform1f(glGetUniformLocation(waterShader.id, "fogEnd"), fogEnd);
 		}
 
+		//sun and moon (their parameters have been set in the deferred pass)
 		glUniform3f(glGetUniformLocation(waterShader.id, "sun.position"), sunTzu.position.x, sunTzu.position.y, sunTzu.position.z);
 		glUniform3f(glGetUniformLocation(waterShader.id, "sun.colour"), sunTzu.colour.x, sunTzu.colour.y, sunTzu.colour.z);
 		glUniform3f(glGetUniformLocation(waterShader.id, "sun.attenuation"), sunTzu.attenuation.x, sunTzu.attenuation.y, sunTzu.attenuation.z);
+
+		glUniform3f(glGetUniformLocation(waterShader.id, "moon.position"), moonTzu.position.x, moonTzu.position.y, moonTzu.position.z);
+		glUniform3f(glGetUniformLocation(waterShader.id, "moon.colour"), moonTzu.colour.x, moonTzu.colour.y, moonTzu.colour.z);
+		glUniform3f(glGetUniformLocation(waterShader.id, "moon.attenuation"), moonTzu.attenuation.x, moonTzu.attenuation.y, moonTzu.attenuation.z);
+
 
 		glUniform3f(glGetUniformLocation(waterShader.id, "cameraPos"), cum_render.position.x, cum_render.position.y, cum_render.position.z);
 		glUniformMatrix4fv(glGetUniformLocation(waterShader.id, "view"), 1, GL_FALSE, view.data);
@@ -778,8 +863,8 @@ void* loop_render(void* arg)
 		glEnable(GL_CULL_FACE);
 
 		//get lens flare data
-		flare_queryQueryResult(&lensFlare);
-		flare_query(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
+		flare_queryQueryResult(lensFlare);
+		flare_query(lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
 
 		//prepare bloom--------------------------------------------------------------------------------
 		int viewportWidth = RENDERER_WIDTH/2, viewportHeight = RENDERER_HEIGHT/2;
@@ -826,15 +911,34 @@ void* loop_render(void* arg)
 		glDisable(GL_DEPTH_TEST);
 		glFrontFace(GL_CW);
 
+		
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT));
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT_COLOUR_0));
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT_COLOUR_1));
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, textureHandler_getTexture(TEXTURE_SKY_GRADIENT_HORIZON));
+
 
 		glUseProgram(skyboxShader.id);
+		vec3 sunDirectionNormalized = vec3_normalize(sunDirection);
+		glUniform1f(glGetUniformLocation(skyboxShader.id, "timeOfDay"), TIME_OF_DAY);
+		glUniform3f(glGetUniformLocation(skyboxShader.id, "sunDirectionNormalized"), sunDirectionNormalized.x, sunDirectionNormalized.y, sunDirectionNormalized.z);
 		glUniformMatrix4fv(glGetUniformLocation(skyboxShader.id, "pvm"), 1, GL_FALSE, mat4_multiply(pv, mat4_create2((float[]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, cum_render.position.x, cum_render.position.y, cum_render.position.z, 1 })).data);
 		glBindVertexArray(skyboxMesh.vao);
 		glDrawElements(GL_TRIANGLES, skyboxMesh.indexCount, GL_UNSIGNED_INT, 0);
 
 		glFrontFace(GL_CCW);
+
+		//stars
+		if (isDayTime==0)
+		{
+			stars_setPlayerPosition(nightSky, cum_render.position);
+			stars_setIntensity(nightSky, powf(moonShadowIntensity,2));
+			stars_render(nightSky, pv);
+		}
 
 		// draw the content of endfbo to screenfbo -----------------------------------------------------------------------------
 		glDisable(GL_DEPTH_TEST);
@@ -859,8 +963,14 @@ void* loop_render(void* arg)
 		glDisable(GL_BLEND);
 
 		//lens flare
-		if(isCameraSubmerged==0)
-			flare_render(&lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
+		do {
+			float intensity = (0.9f * vec3_dot(vec3_normalize(sunDirection), (vec3) { 0, 1, 0 }) + 0.1f);
+			if (intensity > 0&& isCameraSubmerged == 0)
+			{
+				flare_setStrength(lensFlare, intensity);
+				flare_render(lensFlare, &pv, cum_render.position, sunTzu.position, 1.0f / windowAspectXY);
+			}
+		} while (0);
 
 		//switch to default fbo ------------------------------------------------------------------------
 		glViewport(0, 0, windowWidth, windowHeight);
@@ -1236,22 +1346,6 @@ void* loop_physics(void* arg)
 				else if (input_is_key_released(GLFW_KEY_T))
 					changeGameState(69, GAME_COMMAND_LINE);
 
-				//player mode
-				/*if (input_is_key_released(GLFW_KEY_M))
-				{
-					switch (currentPlayerState)
-					{
-					case PLAYER_MORTAL:
-						collider_setSolidity(playerCollider, 0);
-						currentPlayerState = PLAYER_IMMORTAL;
-						break;
-
-					case PLAYER_IMMORTAL:
-						collider_setSolidity(playerCollider, 69);
-						currentPlayerState = PLAYER_MORTAL;
-						break;
-					}
-				}*/
 
 				//block interactions
 				if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_LEFT))
@@ -1398,6 +1492,14 @@ void* loop_physics(void* arg)
 				}
 
 				playerCollider->velocity = velocity;
+
+				//optifine zoom
+				float fov = cum.fov;
+				if (input_is_key_down(GLFW_KEY_C))
+					fov = lerp(fov, 15.0f, 0.1f);
+				else
+					fov = lerp(fov, FOV, 0.1f);
+				camera_setProjection(&cum, fov, window_getAspect(), CLIP_NEAR, CLIP_FAR);
 
 				//player part done
 
@@ -1579,6 +1681,26 @@ void* loop_physics(void* arg)
 						}
 						break;
 
+					case COMMAND_TIME:
+						if (argumentCount == 0)
+						{
+							printf("too few arguments\n");
+							strcpy(commandToShow, "too few arguments");
+						}
+						else if (argumentCount == 1)
+						{
+							arguments[0] %= 2400;
+							TIME_OF_DAY = (float)arguments[0] / 2400.0f;
+							printf("time set to %d\n", arguments[0]);
+							sprintf(commandToShow, "time set to %d", arguments[0]);
+						}
+						else
+						{
+							printf("invalid argument(s)\n");
+							strcpy(commandToShow, "invalid argument(s)");
+						}
+						break;
+
 					case COMMAND_UNKNOWN:
 						printf("invalid command\n");
 						strcpy(commandToShow, "invalid command");
@@ -1627,6 +1749,14 @@ void* loop_physics(void* arg)
 				pthread_mutex_unlock(&mutex_vaszonCommand);
 				break;
 		}
+
+		//day-night cycle
+		TIME_OF_DAY += PHYSICS_UPDATE / LENGTH_OF_DAY_IN_SECONDS;
+		if (TIME_OF_DAY > 1.0f)
+			TIME_OF_DAY -= 1.0f;
+		sunDirection.x = 0;
+		sunDirection.y = sinf(2*3.14159265f * TIME_OF_DAY);
+		sunDirection.z = cosf(2 * 3.14159265f * TIME_OF_DAY);
 
 
 		pthread_mutex_lock(&mutex_input);
@@ -1861,6 +1991,16 @@ void init_renderer()
 		vec3_create2(10, 0, 0)
 	);
 
+	moonTzu=light_create(
+		vec3_create2(1, 1, 1),
+		vec3_create2(-0.6, -0.5, 0.8),
+		vec3_create2(1, 0, 0)
+	);
+
+	//stars
+
+	nightSky = stars_create(300);
+
 	//skybox
 	skyboxShader = shader_import(
 		"../assets/shaders/sky_procedural/shader_sky_procedural.vag",
@@ -1869,18 +2009,15 @@ void init_renderer()
 	);
 	glUseProgram(skyboxShader.id);
 	glUniform1i(glGetUniformLocation(skyboxShader.id, "texture_gradient"), 0);
+	glUniform1i(glGetUniformLocation(skyboxShader.id, "texture_gradient_colour_0"), 1);
+	glUniform1i(glGetUniformLocation(skyboxShader.id, "texture_gradient_colour_1"), 2);
+	glUniform1i(glGetUniformLocation(skyboxShader.id, "texture_gradient_horizon"), 3);
 	glUniform3f(glGetUniformLocation(skyboxShader.id, "sunDirectionNormalized"), sunTzu.position.x, sunTzu.position.y, sunTzu.position.z);
 	glUniform3f(glGetUniformLocation(skyboxShader.id, "sunColour"), 1, 1, 1);
-	glUniform3f(glGetUniformLocation(skyboxShader.id, "skyColour0"), 0, 0.8f, 1.0f);
-	glUniform3f(glGetUniformLocation(skyboxShader.id, "skyColour1"), 1, 1, 1);
-	glUniform3f(glGetUniformLocation(skyboxShader.id, "skyColour2"), 0, 0.8f, 1.0f);
 	glUseProgram(0);
 
 	skyboxMesh = kuba_create();
 
-	//sun
-	szunce = sun_create();
-	sun_setDirection(&szunce, vec3_create2(0.6, 1, -0.8));
 
 	//lens flare
 	lensFlare = flare_create(0.4f);
@@ -1916,15 +2053,15 @@ void end_renderer()
 
 	light_destroyRenderer(lightRenderer);
 
+	//stars
+	stars_destroy(nightSky);
+
 	//skybox
 	shader_delete(&skyboxShader);
 	mesh_destroy(skyboxMesh);
 
-	//sun
-	sun_destroy(&szunce);
-
 	//lens flare
-	flare_destroy(&lensFlare);
+	flare_destroy(lensFlare);
 
 	//player mesh
 	playerMesh_destroy(&pm);
@@ -2274,6 +2411,8 @@ void convertCommandLine(const char* command, int* commandType, int* argumentCoun
 		*commandType = COMMAND_GRAVITY;
 	else if (strcmp(words[0], "/warp") == 0)
 		*commandType = COMMAND_TELEPORT;
+	else if (strcmp(words[0], "/time") == 0)
+		*commandType = COMMAND_TIME;
 	else
 		*commandType = COMMAND_UNKNOWN;
 
@@ -2305,13 +2444,17 @@ void convertCommandLine(const char* command, int* commandType, int* argumentCoun
 			arguments[0] = lroundf(10 * JUMP_STRENGTH_BASED);
 			break;
 
+		case COMMAND_TIME:
+			arguments[0] = 0;
+			break;
+
 		default:
 			*argumentCount = 0;
 			break;
 		}
 	}
 
-	//if the input type is special, then rescan
+	//recheck if the input type is special
 	switch (*commandType)
 	{
 	case COMMAND_GAMEMODE:
@@ -2321,11 +2464,20 @@ void convertCommandLine(const char* command, int* commandType, int* argumentCoun
 				arguments[0] = PLAYER_MORTAL;
 			if (strcmp(words[1], "divine") == 0)
 				arguments[0] = PLAYER_IMMORTAL;
+		}
+		break;
 
-			for (int i = 1; i < COMMAND_LINE_MAX_ARGUMENT_COUNT && i < wordCount - 1; i++)
-			{
-				sscanf(words[i + 1], "%d", arguments + i);
-			}
+	case COMMAND_TIME:
+		if (wordCount > 1)
+		{
+			if (strcmp(words[1], "sunrise") == 0)
+				arguments[0] = 0;
+			if (strcmp(words[1], "noon") == 0)
+				arguments[0] = 600;
+			if (strcmp(words[1], "sunset") == 0)
+				arguments[0] = 1200;
+			if (strcmp(words[1], "midnight") == 0)
+				arguments[0] = 1800;
 		}
 		break;
 	}

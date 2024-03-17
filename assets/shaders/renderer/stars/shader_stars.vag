@@ -1,0 +1,16 @@
+#version 330 core
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec2 aUV;
+layout(location=2) in mat4 instanceModelMatrix;
+
+out vec2 uv;
+
+uniform vec3 playerPos;
+uniform mat4 pv;
+
+void main()
+{
+	uv=aUV;
+	gl_Position=pv*(instanceModelMatrix*vec4(aPos,1.0)+vec4(playerPos,0));
+	gl_Position.z=gl_Position.w;
+}

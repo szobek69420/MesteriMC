@@ -4,10 +4,28 @@
 #include "../../glm2/vec3.h"
 #include "../../glm2/vec4.h"
 #include "../../glm2/mat4.h"
+#include "../../settings/settings.h"
 
 #include <glad/glad.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+struct flare {
+	unsigned int vao, vbo;
+
+	shader shaderFlare;
+	unsigned int textures[FLARE_TEXTURE_COUNT];
+	float spacing;
+
+	unsigned int queries[FLARE_QUERY_COUNT];
+	unsigned int waitedQuery;//index of the query we are currently waiting for
+	unsigned int nextQuery;//index of the query we will use the next frame
+	unsigned int queryResult;//the result of the last successful query
+	shader shaderQuery;
+
+	int FLARE_MAX_SAMPLES_PASSED;
+	float strength;
+};
 
 const char* textures[] = {
 	"../assets/textures/flare/tex1.png",
@@ -41,16 +59,16 @@ const float vertices[] = {
 	0.5f, 0.5f,			1,1
 };
 
-flare flare_create(float spacing)
+flare* flare_create(float spacing)
 {
-	flare sus;
+	flare* sus=malloc(sizeof(flare));
 	
 	//vertex data
-	glGenVertexArrays(1, &sus.vao);
-	glBindVertexArray(sus.vao);
+	glGenVertexArrays(1, &sus->vao);
+	glBindVertexArray(sus->vao);
 
-	glGenBuffers(1, &sus.vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, sus.vbo);
+	glGenBuffers(1, &sus->vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, sus->vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
@@ -59,25 +77,29 @@ flare flare_create(float spacing)
 	glEnableVertexAttribArray(1);
 
 	//flare part
-	sus.spacing = spacing;
-	sus.shaderFlare = shader_import("../assets/shaders/renderer/flare/shader_flare.vag", "../assets/shaders/renderer/flare/shader_flare.fag", NULL);
-	glUseProgram(sus.shaderFlare.id);
-	glUniform1i(glGetUniformLocation(sus.shaderFlare.id, "tex"), 0);
+	sus->spacing = spacing;
+	sus->shaderFlare = shader_import("../assets/shaders/renderer/flare/shader_flare.vag", "../assets/shaders/renderer/flare/shader_flare.fag", NULL);
+	glUseProgram(sus->shaderFlare.id);
+	glUniform1i(glGetUniformLocation(sus->shaderFlare.id, "tex"), 0);
 	glUseProgram(0);
 	for (int i = 0; i < FLARE_TEXTURE_COUNT; i++)
-		sus.textures[i] = textureHandler_loadImage(textures[i], GL_RGBA, GL_RGBA, GL_LINEAR, 69);
+		sus->textures[i] = textureHandler_loadImage(textures[i], GL_RGBA, GL_RGBA, GL_LINEAR, 69);
 
 	//query part
-	glGenQueries(FLARE_QUERY_COUNT, &sus.queries);
+	glGenQueries(FLARE_QUERY_COUNT, &sus->queries);
 	for (int i = 0; i < FLARE_QUERY_COUNT; i++)
 	{
-		glBeginQuery(GL_SAMPLES_PASSED, sus.queries[i]);
+		glBeginQuery(GL_SAMPLES_PASSED, sus->queries[i]);
 		glEndQuery(GL_SAMPLES_PASSED);
 	}
-	sus.waitedQuery = 0;
-	sus.nextQuery = 0;
-	sus.queryResult = 0;
-	sus.shaderQuery = shader_import("../assets/shaders/renderer/flare/shader_flare.vag", "../assets/shaders/renderer/flare/shader_flare_query.fag", NULL);
+	sus->waitedQuery = 0;
+	sus->nextQuery = 0;
+	sus->queryResult = 0;
+	sus->shaderQuery = shader_import("../assets/shaders/renderer/flare/shader_flare.vag", "../assets/shaders/renderer/flare/shader_flare_query.fag", NULL);
+
+	sus->strength = 1;
+
+	flare_update(sus);
 
 	return sus;
 }
@@ -91,7 +113,8 @@ void flare_destroy(flare* sus)
 	glDeleteTextures(FLARE_TEXTURE_COUNT, &sus->textures);
 
 	shader_delete(&sus->shaderQuery);
-	glDeleteQueries(FLARE_QUERY_COUNT, &sus->queries);
+
+	free(sus);
 }
 
 void flare_render(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, float aspectYX)
@@ -105,7 +128,8 @@ void flare_render(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, fl
 	sunScreen = vec4_scale(sunScreen, 1 / sunScreen.w);//perspective division
 	vec3 sunToCenter = vec3_create2(-sunScreen.x, -sunScreen.y, 0);
 	brightness = 0.5f - (vec3_magnitude(sunToCenter) * 0.844444f);
-	brightness *= (float)sus->queryResult / FLARE_MAX_SAMPLES_PASSED;
+	brightness *= sus->strength*(float)sus->queryResult / sus->FLARE_MAX_SAMPLES_PASSED;
+	//printf("passed: %d of %d\n", sus->queryResult, sus->FLARE_MAX_SAMPLES_PASSED);
 
 	if (brightness < 0)
 		goto yeet;
@@ -183,4 +207,14 @@ void flare_query(flare* sus, mat4* projectionView, vec3 cumPos, vec3 sunDir, flo
 	glDepthFunc(GL_LESS);
 	glBindVertexArray(0);
 	glUseProgram(0);
+}
+
+void flare_update(flare* sus)
+{
+	sus->FLARE_MAX_SAMPLES_PASSED = FLARE_MAX_SAMPLES_PASSED_FULL_HD*(settings_getInt(SETTINGS_RENDERER_WIDTH)/1920.0f * settings_getInt(SETTINGS_RENDERER_HEIGHT)/1080.0f);
+}
+
+void flare_setStrength(flare* sus, float strength)
+{
+	sus->strength = strength;
 }
