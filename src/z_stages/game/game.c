@@ -34,6 +34,7 @@
 
 #include "../../renderer/block_selection/block_selection.h"
 #include "../../renderer/hand/hand_renderer.h"
+#include "../../renderer/stars/stars.h"
 
 #include "../../ui/font_handler/font_handler.h"
 #include "../../ui/text/text_renderer.h"
@@ -227,6 +228,8 @@ light moonTzu;
 
 light_renderer lightRenderer;
 vec3 sunDirection;
+
+stars* nightSky;
 
 flare* lensFlare;
 
@@ -928,6 +931,10 @@ void* loop_render(void* arg)
 		glDrawElements(GL_TRIANGLES, skyboxMesh.indexCount, GL_UNSIGNED_INT, 0);
 
 		glFrontFace(GL_CCW);
+
+		//stars
+		stars_setPlayerPosition(nightSky, cum_render.position);
+		stars_render(nightSky, pv);
 
 		// draw the content of endfbo to screenfbo -----------------------------------------------------------------------------
 		glDisable(GL_DEPTH_TEST);
@@ -1986,6 +1993,10 @@ void init_renderer()
 		vec3_create2(1, 0, 0)
 	);
 
+	//stars
+
+	nightSky = stars_create(100);
+
 	//skybox
 	skyboxShader = shader_import(
 		"../assets/shaders/sky_procedural/shader_sky_procedural.vag",
@@ -2037,6 +2048,9 @@ void end_renderer()
 	vector_destroy(lights);
 
 	light_destroyRenderer(lightRenderer);
+
+	//stars
+	stars_destroy(nightSky);
 
 	//skybox
 	shader_delete(&skyboxShader);

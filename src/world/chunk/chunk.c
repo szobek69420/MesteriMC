@@ -351,14 +351,14 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	}
 
 	//normal mesh
-	seqtor_of(unsigned long) verticesNormal;
+	seqtor_of(unsigned int) verticesNormal;
 	seqtor_init(verticesNormal, 1);
 	seqtor_of(unsigned int) indicesNormal;
 	seqtor_init(indicesNormal, 1);
 
 	unsigned int currentVertex = 0;//melyik az oldal elso csucsa (kell az indexeleshez)
 	float x, y, z;
-	unsigned long ao;
+	unsigned int ao;
 	unsigned char isBlockVisible = 0;
 	for (int i = 1; i < CHUNK_HEIGHT+1; i++)//y
 	{
@@ -385,7 +385,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
-						unsigned long data = 0b0;
+						unsigned int data = 0b0;
 						chunk_ao_pos_z(chomk.blocks, j, i, k, l, ao);
 						data |= (ao & 0b11u); data <<= 6;
 
@@ -420,7 +420,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
-						unsigned long data = 0b0;
+						unsigned int data = 0b0;
 
 						chunk_ao_pos_x(chomk.blocks, j, i, k, l, ao);
 						data |= (ao & 0b11u); data <<= 6;
@@ -455,7 +455,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
-						unsigned long data = 0b0;
+						unsigned int data = 0b0;
 
 						chunk_ao_neg_z(chomk.blocks, j, i, k, l, ao);
 						data |= (ao & 0b11u); data <<= 6;
@@ -490,7 +490,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
-						unsigned long data = 0b0;
+						unsigned int data = 0b0;
 
 						chunk_ao_neg_x(chomk.blocks, j, i, k, l, ao);
 						data |= (ao & 0b11u); data <<= 6;
@@ -525,7 +525,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
-						unsigned long data = 0b0;
+						unsigned int data = 0b0;
 
 						chunk_ao_pos_y(chomk.blocks, j, i, k, l, ao);
 						data |= (ao & 0b11u); data <<= 6;
@@ -560,7 +560,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
-						unsigned long data = 0b0;
+						unsigned int data = 0b0;
 
 						chunk_ao_neg_y(chomk.blocks, j, i, k, l, ao);
 						data |= (ao & 0b11u); data <<= 6;
@@ -592,7 +592,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 	//normal mesh
 	if (verticesNormal.size > 0)
 	{
-		meshNormal->sizeVertices = verticesNormal.size * sizeof(unsigned long);
+		meshNormal->sizeVertices = verticesNormal.size * sizeof(unsigned int);
 		meshNormal->vertices = malloc(meshNormal->sizeVertices);
 		memcpy(meshNormal->vertices, verticesNormal.data, meshNormal->sizeVertices);
 
@@ -608,7 +608,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 
 	//walter mesh
-	seqtor_of(unsigned long) verticesWalter;
+	seqtor_of(unsigned int) verticesWalter;
 	seqtor_init(verticesWalter, 1);
 	seqtor_of(unsigned int) indicesWalter;
 	seqtor_init(indicesWalter, 1);
@@ -638,7 +638,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 					//vertices (4 per side)
 					for (int l = 0; l < 4; l++)
 					{
-						unsigned long data = 0b0;
+						unsigned int data = 0b0;
 						blocks_getVertexPosition(BLOCK_POSITIVE_Y, l, &x, &y, &z);
 						data |= (j -1+ lroundf(x)) & 0b111111u; data <<= 6;
 						data |= (i -1+ lroundf(y)) & 0b111111u; data <<= 6;
@@ -664,7 +664,7 @@ chunk chunk_generate(chunkManager* cm, int chunkX, int chunkY, int chunkZ, meshR
 
 	if (verticesWalter.size > 0)
 	{
-		meshWalter->sizeVertices = verticesWalter.size * sizeof(unsigned long);
+		meshWalter->sizeVertices = verticesWalter.size * sizeof(unsigned int);
 		meshWalter->vertices = (float*)malloc(meshWalter->sizeVertices);
 		memcpy(meshWalter->vertices, verticesWalter.data, meshWalter->sizeVertices);
 
@@ -753,7 +753,7 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 		glEnableVertexAttribArray(2);//normal
 		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, CHUNK_NORMAL_MESH_VERTEX_SIZE * sizeof(float), (void*)(8 * sizeof(float)));
 		glEnableVertexAttribArray(3);//tangent*/
-		glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(unsigned long), (void*)0);
+		glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(unsigned int), (void*)0);
 		glEnableVertexAttribArray(0);
 
 		glBindVertexArray(0);
@@ -781,9 +781,9 @@ void chunk_loadMeshInGPU(chunk* chomk, meshRaw meshNormal, meshRaw meshWalter)
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, chomk->waterMesh.ebo);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshWalter.sizeIndices, meshWalter.indices, GL_STATIC_DRAW);
 
-		glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(unsigned long)+2*sizeof(float), (void*)0);
+		glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(unsigned int)+2*sizeof(float), (void*)0);
 		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(unsigned long) + 2 * sizeof(float), (void*)(sizeof(unsigned long)));
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(unsigned int) + 2 * sizeof(float), (void*)(sizeof(unsigned int)));
 		glEnableVertexAttribArray(1);
 
 		glBindVertexArray(0);
