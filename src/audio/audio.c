@@ -3,10 +3,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <miniaudio.h>
+#include <pthread.h>
 
 #include "../utils/seqtor.h"
 
 //path to menu sounds
+#define AUDIO_MUSIC_MENU_1_PATH "../assets/audio/music/music_menu_1.mp3"
 
 //path to ingame sounds
 #define AUDIO_SFX_GAME_JOIN_PATH "../assets/audio/sfx/game_join.mp3"
@@ -27,7 +29,8 @@ struct sound {
 
 static sound_id_t currentId = 1;
 
-static ma_engine* engine;
+static ma_engine* engine=NULL;
+static pthread_mutex_t* mutex = NULL;
 static int currentEngineState = AUDIO_NONE;
 
 //sound initializers
@@ -35,6 +38,8 @@ static ma_sound sfx_game_join;
 static ma_sound sfx_jump;
 static ma_sound sfx_block_break;
 static ma_sound sfx_block_place;
+
+static ma_sound music_menu_1;
 
 //active sounds
 static sound activeSounds[AUDIO_MAX_COUNT_OF_SIMULTANEOUS_SOUNDS];
@@ -51,12 +56,20 @@ int audio_init(int engineState)
 	ma_result result;
 	
 	engine = malloc(sizeof(ma_engine));
+	mutex = malloc(sizeof(pthread_mutex_t));
+
+	pthread_mutex_init(mutex, NULL);
+	pthread_mutex_lock(mutex);
 
 	result = ma_engine_init(NULL, engine);
 	if (result != MA_SUCCESS) {
 		printf("Failed to initialize audio engine.");
 		free(engine);
 		engine = NULL;
+
+		pthread_mutex_unlock(mutex);
+		free(mutex);
+		mutex = NULL;
 		return -1;
 	}
 
@@ -68,7 +81,8 @@ int audio_init(int engineState)
 		activeSounds[i].data = NULL;
 		activeSounds[i].id = 0;//0 means unused
 	}
-
+	
+	pthread_mutex_unlock(mutex);
 	return 0;
 }
 
@@ -76,6 +90,8 @@ void audio_destroy()
 {
 	if (engine == NULL)
 		return;
+
+	pthread_mutex_lock(mutex);
 
 	for (unsigned int i = 0; i < AUDIO_MAX_COUNT_OF_SIMULTANEOUS_SOUNDS; i++)
 	{
@@ -92,12 +108,19 @@ void audio_destroy()
 	free(engine);
 	engine = NULL;
 	currentEngineState = 0;
+
+	pthread_mutex_unlock(mutex);
+	pthread_mutex_destroy(mutex);
+	free(mutex);
+	mutex = NULL;
 }
 
 void audio_cleanupUnused()
 {
 	if (engine == NULL)
 		return;
+
+	pthread_mutex_lock(mutex);
 
 	for (int i = 0; i < AUDIO_MAX_COUNT_OF_SIMULTANEOUS_SOUNDS; i++)
 	{
@@ -108,6 +131,8 @@ void audio_cleanupUnused()
 			activeSounds[i].id = 0;
 		}
 	}
+
+	pthread_mutex_unlock(mutex);
 }
 
 sound_id_t audio_playSound(int _sound)
@@ -116,6 +141,8 @@ sound_id_t audio_playSound(int _sound)
 	{
 		return 0;
 	}
+
+	pthread_mutex_lock(mutex);
 
 	sound s;
 	s.data = malloc(sizeof(ma_sound));
@@ -140,13 +167,21 @@ sound_id_t audio_playSound(int _sound)
 			result = ma_sound_init_from_file(engine, AUDIO_SFX_BLOCK_PLACE_PATH, 0, NULL, NULL, s.data);
 			break;
 
+		case AUDIO_MUSIC_MENU_1:
+			result = ma_sound_init_from_file(engine, AUDIO_MUSIC_MENU_1_PATH, 0, NULL, NULL, s.data);
+			break;
+
 		default:
 			free(s.data);
+			pthread_mutex_unlock(mutex);
 			return 0;
 	}
 
 	if (result != MA_SUCCESS)
+	{
+		pthread_mutex_unlock(mutex);
 		return 0;
+	}
 
 	//actually play the sound
 	int index = -1;
@@ -173,6 +208,7 @@ sound_id_t audio_playSound(int _sound)
 	if (index == -1)//no place for a new sound
 	{
 		free(s.data);
+		pthread_mutex_unlock(mutex);
 		return 0;
 	}
 
@@ -180,21 +216,30 @@ sound_id_t audio_playSound(int _sound)
 	if (result != MA_SUCCESS)
 	{
 		free(s.data);
+		pthread_mutex_unlock(mutex);
 		return 0;
 	}
 
 	//add sound to the activeSounds
 	s.id = currentId++;
 	activeSounds[index] = s;
+
+	pthread_mutex_unlock(mutex);
+
 	return s.id;
 }
 
 int audio_soundAtEnd(sound_id_t soundId)
 {
+	if (engine == NULL || soundId == 0)
+		return 69;
+
+	pthread_mutex_lock(mutex);
+
 	int index = -1;
 	for (int i = 0; i < AUDIO_MAX_COUNT_OF_SIMULTANEOUS_SOUNDS; i++)
 	{
-		if (activeSounds[index].id == soundId)
+		if (activeSounds[i].id == soundId)
 		{
 			index = i;
 			break;
@@ -202,16 +247,26 @@ int audio_soundAtEnd(sound_id_t soundId)
 	}
 
 	if (index == -1 || ma_sound_at_end(activeSounds[index].data) != 0)
+	{
+		pthread_mutex_unlock(mutex);
 		return 69;
+	}
+
+	pthread_mutex_unlock(mutex);
 	return 0;
 }
 
 void audio_stopSound(sound_id_t soundId)
 {
+	if (engine == NULL || soundId == 0)
+		return;
+
+	pthread_mutex_lock(mutex);
+
 	int index = -1;
 	for (int i = 0; i < AUDIO_MAX_COUNT_OF_SIMULTANEOUS_SOUNDS; i++)
 	{
-		if (activeSounds[index].id == soundId)
+		if (activeSounds[i].id == soundId)
 		{
 			index = i;
 			break;
@@ -225,12 +280,16 @@ void audio_stopSound(sound_id_t soundId)
 		activeSounds[index].data = NULL;
 		activeSounds[index].id = 0;
 	}
+
+	pthread_mutex_unlock(mutex);
 }
 
+//ide nem szabad mutexet rakni, mert mutexes fuggvenybol van meghivva
 void audio_loadSounds(int currentState)//currentState erteke AUDIO_INGAME vagy AUDIO_MENU
 {
 	if (engine == NULL)
 		return;
+
 
 	switch (currentState)
 	{
@@ -242,7 +301,7 @@ void audio_loadSounds(int currentState)//currentState erteke AUDIO_INGAME vagy A
 		break;
 
 	case AUDIO_MENU:
-
+		ma_sound_init_from_file(engine, AUDIO_MUSIC_MENU_1_PATH, 0, NULL, NULL, &music_menu_1);
 		break;
 	}
 }
@@ -251,6 +310,7 @@ void audio_unloadSounds(int currentState)
 {
 	if (engine == NULL)
 		return;
+
 
 	switch (currentState)
 	{
@@ -262,7 +322,7 @@ void audio_unloadSounds(int currentState)
 		break;
 
 	case AUDIO_MENU:
-
+		ma_sound_uninit(&music_menu_1);
 		break;
 	}
 }
