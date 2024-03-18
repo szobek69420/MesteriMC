@@ -8,6 +8,7 @@
 #define AUDIO_MENU 669
 
 //menu sfx and music
+#define AUDIO_MUSIC_MENU_1 42069
 
 //ingame sfx and music
 #define AUDIO_SFX_GAME_JOIN 69420

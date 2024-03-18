@@ -7,6 +7,7 @@
 #include "../utils/seqtor.h"
 
 //path to menu sounds
+#define AUDIO_MUSIC_MENU_1_PATH "../assets/audio/music/music_menu_1.mp3"
 
 //path to ingame sounds
 #define AUDIO_SFX_GAME_JOIN_PATH "../assets/audio/sfx/game_join.mp3"
@@ -35,6 +36,8 @@ static ma_sound sfx_game_join;
 static ma_sound sfx_jump;
 static ma_sound sfx_block_break;
 static ma_sound sfx_block_place;
+
+static ma_sound music_menu_1;
 
 //active sounds
 static sound activeSounds[AUDIO_MAX_COUNT_OF_SIMULTANEOUS_SOUNDS];
@@ -140,6 +143,10 @@ sound_id_t audio_playSound(int _sound)
 			result = ma_sound_init_from_file(engine, AUDIO_SFX_BLOCK_PLACE_PATH, 0, NULL, NULL, s.data);
 			break;
 
+		case AUDIO_MUSIC_MENU_1:
+			result = ma_sound_init_from_file(engine, AUDIO_MUSIC_MENU_1_PATH, 0, NULL, NULL, s.data);
+			break;
+
 		default:
 			free(s.data);
 			return 0;
@@ -191,10 +198,13 @@ sound_id_t audio_playSound(int _sound)
 
 int audio_soundAtEnd(sound_id_t soundId)
 {
+	if (engine == NULL || soundId == 0)
+		return 69;
+
 	int index = -1;
 	for (int i = 0; i < AUDIO_MAX_COUNT_OF_SIMULTANEOUS_SOUNDS; i++)
 	{
-		if (activeSounds[index].id == soundId)
+		if (activeSounds[i].id == soundId)
 		{
 			index = i;
 			break;
@@ -208,10 +218,13 @@ int audio_soundAtEnd(sound_id_t soundId)
 
 void audio_stopSound(sound_id_t soundId)
 {
+	if (engine == NULL || soundId == 0)
+		return;
+
 	int index = -1;
 	for (int i = 0; i < AUDIO_MAX_COUNT_OF_SIMULTANEOUS_SOUNDS; i++)
 	{
-		if (activeSounds[index].id == soundId)
+		if (activeSounds[i].id == soundId)
 		{
 			index = i;
 			break;
@@ -242,7 +255,7 @@ void audio_loadSounds(int currentState)//currentState erteke AUDIO_INGAME vagy A
 		break;
 
 	case AUDIO_MENU:
-
+		ma_sound_init_from_file(engine, AUDIO_MUSIC_MENU_1_PATH, 0, NULL, NULL, &music_menu_1);
 		break;
 	}
 }
@@ -262,7 +275,7 @@ void audio_unloadSounds(int currentState)
 		break;
 
 	case AUDIO_MENU:
-
+		ma_sound_uninit(&music_menu_1);
 		break;
 	}
 }

@@ -24,6 +24,8 @@
 #include "../../event/event_queue.h"
 #include "../../input/input.h"
 
+#include "../../audio/audio.h"
+
 #ifdef sleep(DURATION_IN_SEX)
 #undef sleep(DURATION_IN_SEX)
 #endif
@@ -49,6 +51,8 @@ enum {
     MENU_MAIN, MENU_SETTINGS
 };
 int menuState;
+
+sound_id_t bgMusic=0;
 
 font f;
 
@@ -102,6 +106,11 @@ void mainMenu(void* window, int* _currentStage)
         while ((e = event_queue_poll()).type != NONE)
             handle_event2(e);
 
+        if (audio_soundAtEnd(bgMusic) != 0)
+        {
+            bgMusic = audio_playSound(AUDIO_MUSIC_MENU_1);
+        }
+
         double x, y;
         glfwGetCursorPos(w, &x, &y);
 
@@ -148,6 +157,8 @@ void init()
     textureHandler_importTextures(TEXTURE_MAIN_MENU);
 
     fontHandler_init();
+
+    audio_init(AUDIO_MENU);
 
     int temp;
     char buffer[50];
@@ -252,6 +263,7 @@ void init()
 
 void end()
 {
+    audio_destroy();
     fontHandler_close();
     fontHandler_destroyFont(&f);
     canvas_destroy(vaszonBackground);
