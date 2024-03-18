@@ -1292,6 +1292,7 @@ void* loop_physics(void* arg)
 
 	float lastFrame = glfwGetTime();
 	vec3 previousCumPosition = cum.position;
+	float lastAudioCleanup = 0;
 	while (69)
 	{
 		float currentTime = glfwGetTime();
@@ -1302,6 +1303,12 @@ void* loop_physics(void* arg)
 		}
 		lastFrame = currentTime;
 
+		//audio
+		if (currentTime - lastAudioCleanup > 5)
+		{
+			audio_cleanupUnused();
+			lastAudioCleanup = currentTime;
+		}
 
 		//input
 		input_update();
@@ -1418,6 +1425,8 @@ void* loop_physics(void* arg)
 						{
 							chunkManager_changeBlock(&cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2], tempRaycastBlock[0], tempRaycastBlock[1], tempRaycastBlock[2], hotbarContent[hotbarSlotSelected]);
 							chunkManager_reloadChunk(&cm, &mutex_cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2]);
+						
+							audio_playSound(AUDIO_SFX_BLOCK_PLACE);
 						}
 					}
 				}

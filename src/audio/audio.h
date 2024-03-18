@@ -1,6 +1,7 @@
 #ifndef AUDIO_H
 #define AUDIO_H
 
+#define AUDIO_MAX_COUNT_OF_SIMULTANEOUS_SOUNDS 100
 
 #define AUDIO_NONE 642
 #define AUDIO_INGAME 666
@@ -18,23 +19,21 @@
 
 //-------------------------------
 
-enum audio_play_status{
-	AUDIO_PLAY_SUCCESSFUL,
-	AUDIO_PLAY_ERROR
-};
+struct sound;
+typedef struct sound sound;
 
-//sounds cannot be reused!!!
-typedef struct sound {
-	const void * data;
-	enum audio_play_status status;
-} sound;
+typedef unsigned int sound_id_t;
 
 //returns 0 if problemlos (the value of the engineState is either AUDIO_INGAME or AUDIO_MENU
 int audio_init(int engineState);
 void audio_destroy();
 
-sound audio_playSound(int sound);
-void audio_stopSound(sound* s);
-int audio_soundAtEnd(sound* s);
+//removes finished sounds from the list so that the response time of audio_playSound will always be immediate
+void audio_cleanupUnused();
+
+//returns the id of the sound (0 if it was unsuccessful)
+sound_id_t audio_playSound(int sound);
+void audio_stopSound(sound_id_t soundId);
+int audio_soundAtEnd(sound_id_t s);
 
 #endif
