@@ -10,3 +10,5 @@ Currently, it looks like this:
 ![image](https://github.com/szobek69420/MesteriMC/assets/137615071/5796cedb-7f03-4270-b617-133bd8d3ed06)
 
 ![image](https://github.com/szobek69420/MesteriMC/assets/137615071/387d3e9b-8ca5-4ed0-a7a7-582c64a1acb5)
+
+![image](https://github.com/szobek69420/MesteriMC/assets/137615071/c7eaf8dd-bc00-4683-9b18-4c25a73ee568)
