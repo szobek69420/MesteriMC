@@ -56,6 +56,8 @@
 
 #include "../../settings/settings.h"
 
+#include "../../audio/audio.h"
+
 
 float CLIP_NEAR = 0.1f;
 float CLIP_FAR = 250.0f;
@@ -315,6 +317,7 @@ void game(void* w, int* currentStage)
 	event_queue_init();
 	input_init();
 
+	audio_init(AUDIO_INGAME);
 
 	fontHandler_init();
 	init_canvas();
@@ -426,6 +429,8 @@ void game(void* w, int* currentStage)
 	end_canvas();
 	fontHandler_close();
 	end_renderer();
+
+	audio_destroy();
 
 	end_cube();
 
@@ -1258,6 +1263,8 @@ void* loop_generation(void* arg)
 
 void* loop_physics(void* arg)
 {
+	int firstFrame = 69;
+
 	collider* playerCollider;
 	collider* cameraCollider;//a little collider for the camera to detect walter
 	
@@ -1285,6 +1292,7 @@ void* loop_physics(void* arg)
 
 	float lastFrame = glfwGetTime();
 	vec3 previousCumPosition = cum.position;
+	float lastAudioCleanup = 0;
 	while (69)
 	{
 		float currentTime = glfwGetTime();
@@ -1295,6 +1303,12 @@ void* loop_physics(void* arg)
 		}
 		lastFrame = currentTime;
 
+		//audio
+		if (currentTime - lastAudioCleanup > 5)
+		{
+			audio_cleanupUnused();
+			lastAudioCleanup = currentTime;
+		}
 
 		//input
 		input_update();
@@ -1328,6 +1342,12 @@ void* loop_physics(void* arg)
 		{
 			case GAME_INGAME:
 				//player part
+				if (firstFrame != 0)
+				{
+					audio_playSound(AUDIO_SFX_GAME_JOIN);
+					firstFrame = 0;
+				}
+
 				pthread_mutex_lock(&mutex_cum);
 				previousCumPosition = cum.position;
 				cum.position = vec3_sum(playerCollider->position, (vec3) { 0, 0.69f, 0 });
@@ -1367,6 +1387,9 @@ void* loop_physics(void* arg)
 							chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ - 1);
 						else if (raycastBlockZ == CHUNK_WIDTH - 1)
 							chunkManager_reloadChunk(&cm, &mutex_cm, raycastChunkX, raycastChunkY, raycastChunkZ + 1); 
+
+
+						audio_playSound(AUDIO_SFX_BLOCK_BREAK);
 					}
 				}
 				if (input_is_mouse_button_pressed(GLFW_MOUSE_BUTTON_RIGHT))
@@ -1402,6 +1425,8 @@ void* loop_physics(void* arg)
 						{
 							chunkManager_changeBlock(&cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2], tempRaycastBlock[0], tempRaycastBlock[1], tempRaycastBlock[2], hotbarContent[hotbarSlotSelected]);
 							chunkManager_reloadChunk(&cm, &mutex_cm, tempRaycastChunk[0], tempRaycastChunk[1], tempRaycastChunk[2]);
+						
+							audio_playSound(AUDIO_SFX_BLOCK_PLACE);
 						}
 					}
 				}
@@ -1471,6 +1496,7 @@ void* loop_physics(void* arg)
 						if (COLLISION_GET_NEG_Y(playerCollider->flags))
 						{
 							velocity.y = JUMP_STRENGTH;
+							audio_playSound(AUDIO_SFX_JUMP);
 						}
 					}
 					break;
