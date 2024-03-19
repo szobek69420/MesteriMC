@@ -74,7 +74,6 @@ float FOV = 90;
 const float LENGTH_OF_DAY_IN_SECONDS = 100;
 float TIME_OF_DAY = 0.0f;//napkelte a 0, [0;1)-ben van az értéke
 
-
 #define PHYSICS_UPDATE 0.02f
 #define PHYSICS_STEPS_PER_UPDATE 100
 #define GENERATION_UPDATE 0.001f
@@ -1271,7 +1270,7 @@ void* loop_physics(void* arg)
 	do {
 		int playerColliderId=0, cameraColliderId=0;
 
-		collider temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.5f, 1.79f, 0.5f }, 0, 1, 0);
+		collider temp = collider_createBoxCollider((vec3) { 0, 50, 0 }, (vec3) { 0.5f, 1.79f, 0.5f }, 0, currentPlayerState==PLAYER_MORTAL, 0);
 		physicsSystem_addCollider(ps, temp);
 		playerColliderId = temp.id;
 
@@ -1293,6 +1292,7 @@ void* loop_physics(void* arg)
 	float lastFrame = glfwGetTime();
 	vec3 previousCumPosition = cum.position;
 	float lastAudioCleanup = 0;
+	float nextCaveNoise = 0;
 	while (69)
 	{
 		float currentTime = glfwGetTime();
@@ -1346,6 +1346,13 @@ void* loop_physics(void* arg)
 				{
 					audio_playSound(AUDIO_SFX_GAME_JOIN);
 					firstFrame = 0;
+					nextCaveNoise = currentTime + 120 + 120 * ((float)rand() / (float)RAND_MAX);
+				}
+
+				if (currentTime > nextCaveNoise)
+				{
+					AUDIO_PLAY_RANDOM_CAVE_NOISE();
+					nextCaveNoise = currentTime + 120 + 120 * ((float)rand() / (float)RAND_MAX);
 				}
 
 				pthread_mutex_lock(&mutex_cum);

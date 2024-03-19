@@ -16,6 +16,15 @@
 #define AUDIO_SFX_BLOCK_BREAK_PATH "../assets/audio/sfx/block_break.mp3"
 #define AUDIO_SFX_BLOCK_PLACE_PATH "../assets/audio/sfx/block_place.mp3"
 
+#define AUDIO_SFX_CAVE_NOISE_1_PATH "../assets/audio/sfx/cave_noises/cave_noise_1.mp3"
+#define AUDIO_SFX_CAVE_NOISE_2_PATH "../assets/audio/sfx/cave_noises/cave_noise_2.mp3"
+#define AUDIO_SFX_CAVE_NOISE_3_PATH "../assets/audio/sfx/cave_noises/cave_noise_3.mp3"
+#define AUDIO_SFX_CAVE_NOISE_4_PATH "../assets/audio/sfx/cave_noises/cave_noise_4.mp3"
+#define AUDIO_SFX_CAVE_NOISE_5_PATH "../assets/audio/sfx/cave_noises/cave_noise_5.mp3"
+#define AUDIO_SFX_CAVE_NOISE_6_PATH "../assets/audio/sfx/cave_noises/cave_noise_6.mp3"
+#define AUDIO_SFX_CAVE_NOISE_7_PATH "../assets/audio/sfx/cave_noises/cave_noise_7.mp3"
+#define AUDIO_SFX_CAVE_NOISE_8_PATH "../assets/audio/sfx/cave_noises/cave_noise_8.mp3"
+
 //path to miscellaneous sounds
 
 
@@ -38,6 +47,8 @@ static ma_sound sfx_game_join;
 static ma_sound sfx_jump;
 static ma_sound sfx_block_break;
 static ma_sound sfx_block_place;
+
+static ma_sound sfx_cave_noises[AUDIO_CAVE_NOISE_COUNT];
 
 static ma_sound music_menu_1;
 
@@ -165,6 +176,31 @@ sound_id_t audio_playSound(int _sound)
 
 		case AUDIO_SFX_BLOCK_PLACE:
 			result = ma_sound_init_from_file(engine, AUDIO_SFX_BLOCK_PLACE_PATH, 0, NULL, NULL, s.data);
+			break;
+
+		case AUDIO_SFX_CAVE_NOISE_1:
+			result= ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_1_PATH, 0, NULL, NULL, s.data);
+			break;
+		case AUDIO_SFX_CAVE_NOISE_2:
+			result = ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_2_PATH, 0, NULL, NULL, s.data);
+			break;
+		case AUDIO_SFX_CAVE_NOISE_3:
+			result = ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_3_PATH, 0, NULL, NULL, s.data);
+			break;
+		case AUDIO_SFX_CAVE_NOISE_4:
+			result = ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_4_PATH, 0, NULL, NULL, s.data);
+			break;
+		case AUDIO_SFX_CAVE_NOISE_5:
+			result = ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_5_PATH, 0, NULL, NULL, s.data);
+			break;
+		case AUDIO_SFX_CAVE_NOISE_6:
+			result = ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_6_PATH, 0, NULL, NULL, s.data);
+			break;
+		case AUDIO_SFX_CAVE_NOISE_7:
+			result = ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_7_PATH, 0, NULL, NULL, s.data);
+			break;
+		case AUDIO_SFX_CAVE_NOISE_8:
+			result = ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_8_PATH, 0, NULL, NULL, s.data);
 			break;
 
 		case AUDIO_MUSIC_MENU_1:
@@ -298,6 +334,15 @@ void audio_loadSounds(int currentState)//currentState erteke AUDIO_INGAME vagy A
 		ma_sound_init_from_file(engine, AUDIO_SFX_JUMP_PATH, 0, NULL, NULL, &sfx_jump);
 		ma_sound_init_from_file(engine, AUDIO_SFX_BLOCK_BREAK_PATH, 0, NULL, NULL, &sfx_block_break);
 		ma_sound_init_from_file(engine, AUDIO_SFX_BLOCK_PLACE_PATH, 0, NULL, NULL, &sfx_block_place);
+
+		ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_1_PATH, 0, NULL, NULL, sfx_cave_noises);
+		ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_2_PATH, 0, NULL, NULL, sfx_cave_noises + 1);
+		ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_3_PATH, 0, NULL, NULL, sfx_cave_noises + 2);
+		ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_4_PATH, 0, NULL, NULL, sfx_cave_noises + 3);
+		ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_5_PATH, 0, NULL, NULL, sfx_cave_noises + 4);
+		ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_6_PATH, 0, NULL, NULL, sfx_cave_noises + 5);
+		ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_7_PATH, 0, NULL, NULL, sfx_cave_noises + 6);
+		ma_sound_init_from_file(engine, AUDIO_SFX_CAVE_NOISE_8_PATH, 0, NULL, NULL, sfx_cave_noises + 7);
 		break;
 
 	case AUDIO_MENU:
@@ -319,6 +364,9 @@ void audio_unloadSounds(int currentState)
 		ma_sound_uninit(&sfx_jump);
 		ma_sound_uninit(&sfx_block_break);
 		ma_sound_uninit(&sfx_block_place);
+
+		for (int i = 0; i < AUDIO_CAVE_NOISE_COUNT; i++)
+			ma_sound_uninit(sfx_cave_noises + i);
 		break;
 
 	case AUDIO_MENU:
