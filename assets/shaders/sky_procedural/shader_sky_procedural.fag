@@ -31,6 +31,7 @@ void main()
 
 
 	vec3 gradient=texture(texture_gradient,uvGradient).rgb;
+	gradient+=vec3(0.05);
 	float horizonZ=2*texture(texture_gradient_horizon, uvGradientColour).z-1;
 	gradient.y*=mix(1,max(dot(dir, vec3(0,0,horizonZ)),0), abs(horizonZ));
 	gradient/=(gradient.x+gradient.y+gradient.z);

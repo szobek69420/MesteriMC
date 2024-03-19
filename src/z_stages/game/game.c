@@ -71,11 +71,11 @@ float GRAVITY = -25.0;
 float JUMP_STRENGTH = 10;
 float FOV = 90;
 
-const float LENGTH_OF_DAY_IN_SECONDS = 100;
+const float LENGTH_OF_DAY_IN_SECONDS = 1000;
 float TIME_OF_DAY = 0.0f;//napkelte a 0, [0;1)-ben van az értéke
 
 #define PHYSICS_UPDATE 0.02f
-#define PHYSICS_STEPS_PER_UPDATE 100
+#define PHYSICS_STEPS_PER_UPDATE 50
 #define GENERATION_UPDATE 0.001f
 #define CHUNK_UPDATES_PER_GENERATION_UPDATE 4
 #define CHUNK_MESH_UPDATES_PER_FRAME 20
@@ -526,7 +526,7 @@ void* loop_render(void* arg)
 		if (isDayTime)
 		{
 			shadowViewProjection = mat4_multiply(
-				mat4_ortho(-150, 150, -150, 150, 1, 200),
+				mat4_ortho(-100, 100, -100, 100, 1, 200),
 				mat4_lookAt(
 					vec3_sum(cum_render.position, vec3_create2(sunDirection.x * 100, sunDirection.y * 100, sunDirection.z * 100)),
 					vec3_create2(-1 * sunDirection.x, -1 * sunDirection.y, -1 * sunDirection.z),
@@ -537,7 +537,7 @@ void* loop_render(void* arg)
 		else
 		{
 			shadowViewProjection = mat4_multiply(
-				mat4_ortho(-150, 150, -150, 150, 1, 200),
+				mat4_ortho(-100, 100, -100, 100, 1, 200),
 				mat4_lookAt(
 					vec3_sum(cum_render.position, vec3_create2(sunDirection.x * -100, sunDirection.y * -100, sunDirection.z * -100)),
 					sunDirection,
@@ -1848,7 +1848,7 @@ void handle_event(event e)
 void init_renderer()
 {
 	int fogEnd = settings_getInt(SETTINGS_RENDER_DISTANCE) * CHUNK_WIDTH - 10;
-	int shadowEnd = fogEnd > 150 ? 150 : fogEnd;
+	int shadowEnd = fogEnd > 100 ? 100 : fogEnd;
 
 	//rendor = renderer_create(window_getWidth(), window_getHeight());
 	renderer_setWidth(settings_getInt(SETTINGS_RENDERER_WIDTH));
