@@ -67,7 +67,8 @@ void main()
 
 	vec2 uv=vec2(gl_FragCoord.x*onePerScreenWidth, gl_FragCoord.y*onePerScreenHeight);
 	float depth=texture(texture_depth, uv).r;//getting depth buffer info
-	vec4 pos = projection_inverse * (vec4(uv, depth, 1)* 2 - 1);
+	vec3 projectionspace_position=vec3(uv, depth)*2-1;
+	vec4 pos = projection_inverse * vec4(projectionspace_position,1);
 	vec3 viewspace_position = pos.xyz / pos.w;
     vec3 view_dir = normalize(-viewspace_position); //(view_pos-frag_pos), but view_pos is (0, 0, 0) in view space
 
@@ -108,8 +109,10 @@ void main()
 	float oneMinusShadowStrength=1;
 	if(shadowOn!=0&&shadowStrength>0.00001)
 	{
-		vec4 shadowPos=shadow_lightMatrix*vec4(viewspace_position, 1);
+		vec4 shadowPos=shadow_lightMatrix*vec4(viewspace_position.xyz,1);
 		shadowPos.xyz/=shadowPos.w;
+		shadowPos.x/=pow(abs(shadowPos.x),0.5);
+		shadowPos.y/=pow(abs(shadowPos.y),0.5);
 		shadowPos=0.5*shadowPos+0.5;
 		float shadowDepth=texture(texture_shadow, shadowPos.xy).r;
 

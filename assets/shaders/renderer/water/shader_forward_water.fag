@@ -143,6 +143,8 @@ void main()
 	{
 		vec4 shadowPos=shadow_lightMatrix*vec4(fs_in.fragPosViewSpace, 1);
 		shadowPos.xyz/=shadowPos.w;
+		shadowPos.x/=pow(abs(shadowPos.x),0.5);
+		shadowPos.y/=pow(abs(shadowPos.y),0.5);
 		shadowPos=0.5*shadowPos+0.5;
 		float shadowDepth=texture(texture_depth_shadow, shadowPos.xy).r;
 
