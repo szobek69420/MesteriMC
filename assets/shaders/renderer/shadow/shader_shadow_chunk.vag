@@ -16,4 +16,9 @@ void main()
 
 	vec3 position=vec3(posx, posy, posz);
 	gl_Position=lightMatrix*model*vec4(position,1);
+
+	//azert, hogy a texel suruseg nagyobb legyen a jatekoshoz kozel
+	gl_Position/=gl_Position.w;
+	gl_Position.x/=pow(abs(gl_Position.x),0.5);
+	gl_Position.y/=pow(abs(gl_Position.y),0.5);
 }
